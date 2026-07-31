@@ -37,6 +37,18 @@
 
 ### 2. 建立資料表與儲存空間
 
+**若專案曾執行過舊版 schema，先清乾淨。** 在 SQL Editor 執行：
+
+```sql
+select table_name from information_schema.tables
+where table_schema = 'public' order by table_name;
+```
+
+看到 `users`、或看不到 `profiles`，代表裝的是 2026-07-31 改版前的舊 schema。
+此時**必須**先執行 [`supabase/reset-legacy.sql`](../../supabase/reset-legacy.sql) 再繼續——
+直接重跑新的 schema.sql 沒有用，`create table if not exists` 會靜默跳過既有的舊表，
+留下缺欄位、外鍵指向錯誤的結構。該腳本會刪除資料，執行前請確認沒有要保留的內容。
+
 1. 進入 **SQL Editor**，貼上並執行 [`supabase/schema.sql`](../../supabase/schema.sql)。
    它會一併建立 `room-risk` storage bucket 與其存取政策。
 2. 接著執行 [`supabase/seed.sql`](../../supabase/seed.sql) 建立 10 筆示範房源與

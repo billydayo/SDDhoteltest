@@ -23,23 +23,52 @@ US9（房源檢測與詳情頁展示）。
 - **雙模式要求**：標註 `[2M]` 的驗證任務 MUST 在 Supabase 模式與示範模式下各執行一次（FR-080、SC-017）
 - **模擬標示要求**：US11（渠道控價）與 US5 的自動審核 MUST 於畫面標示為模擬／規則式（FR-110、FR-103a）
 
+### 目前進度（2026-07-31）
+
+- ✅ **Phase 1 Setup**（T001–T007）已完成
+- 🔶 **Phase 2 Supabase 專案與資料庫**（T008–T017）— schema 與 seed 已就緒，尚缺示範帳號
+- ✅ **Phase 3 Foundational 雙軌資料層**（T018–T032）已完成
+- ✅ **Phase 4 User Story 1**（T034–T040）已完成
+- ✅ **Phase 5 User Story 2**（T042–T049）已完成
+- ⬜ **T033、T041、T050** 需在瀏覽器實測（開發環境無 node／python 可執行 JS）
+- ⬜ Phase 6 之後（T051–T119）尚未開始
+
+**Phase 2 的現況（2026-07-31 以 anon key 實測）**：
+`reset-legacy.sql` → `schema.sql` → `seed.sql` 已執行完成——`rooms` 具備
+`features` 欄位與 10 筆種子資料、`profiles` 與 `system_settings` 已建立、
+舊的 `public.users` 表已移除。
+
+仍待處理：
+- **T015**：`profiles` 為空，示範帳號 `guest@sunny.com` 與 `admin@sunny.com`
+  尚未於 Authentication → Users 建立。在此之前登入頁的「填入」按鈕可以用，
+  但實際登入會失敗（帳號不存在）。建立後需執行 `schema.sql` 末端的 UPDATE
+  把 admin 升為管理員。
+- **T009**：Google provider 是否已啟用未經驗證。未啟用時點擊 Google 登入會
+  導向失敗，介面會顯示錯誤訊息。
+- **T008**：Confirm email 是否已關閉未經驗證。若未關閉，註冊後帳號需收信驗證
+  才能登入，與本專案「註冊後立即可用」的設計不符。
+
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Create project structure per implementation plan in index.html, styles/, and src/
-- [ ] T002 Initialize app shell and entry point in index.html and src/main.js
-- [ ] T003 [P] Create src/config.js with empty credential placeholders and src/config.example.js, and load config.js via a plain `<script>` tag before the app module in index.html
-- [ ] T004 [P] Add assets/rooms/ placeholder images and assets/hero.jpg (freely usable, each under 1 MB) referenced by supabase/seed.sql
-- [ ] T005 [P] Establish CSS custom properties for the beige palette and type scale in styles/base.css
-- [ ] T006 [P] Add .gitignore entries and confirm no service_role key exists anywhere in the repository (FR-085, SC-022)
-- [ ] T007 [P] Define the shared vocabulary lists for amenities and room features in src/data/vocabulary.js so filters, seed data, and admin forms stay in sync
+- [X] T001 [P] Create project structure per implementation plan in index.html, styles/, and src/
+- [X] T002 Initialize app shell and entry point in index.html and src/main.js
+- [X] T003 [P] Create src/config.js with empty credential placeholders and src/config.example.js, and load config.js via a plain `<script>` tag before the app module in index.html
+- [X] T004 [P] Add assets/rooms/ placeholder images and assets/hero.svg (self-made SVG, ~1 KB each) referenced by supabase/seed.sql and src/state/seed.js
+- [X] T005 [P] Establish CSS custom properties for the beige palette and type scale in styles/base.css
+- [X] T006 [P] Add .gitignore entries and confirm no service_role key exists anywhere in the repository (FR-085, SC-022)
+- [X] T007 [P] Define the shared vocabulary lists for amenities and room features in src/data/vocabulary.js so filters, seed data, and admin forms stay in sync
 
 ---
 
 ## Phase 2: Supabase 專案與資料庫 (Blocking Prerequisite)
 
 **⚠️ CRITICAL**: 未完成 RLS 政策的資料表視為未完成（憲章 Supabase 約束）
+
+**⚠️ 需人工操作**: 本階段全部需要在 Supabase Dashboard 與 SQL Editor 中執行，
+無法由開發工具代勞。SQL 腳本已備妥於 `supabase/schema.sql` 與 `supabase/seed.sql`。
+未完成此階段前，應用程式會以示範模式運作，功能完整。
 
 - [ ] T008 Create the Supabase project and disable "Confirm email" under Authentication → Providers → Email
 - [ ] T009 Enable the Google provider in Supabase Auth and register the callback URL in Google Cloud's authorized redirect URIs
@@ -49,7 +78,7 @@ US9（房源檢測與詳情頁展示）。
 - [ ] T013 [P] Verify the room-risk storage bucket exists, is public-read, and rejects writes from a non-admin account
 - [ ] T014 [P] Run supabase/seed.sql and confirm 10 rooms with amenities/features, the singleton site_content row, and 8 simulated channel prices appear
 - [ ] T015 Create demo accounts guest@sunny.com and admin@sunny.com in the dashboard, then promote admin via the SQL snippet at the end of supabase/schema.sql
-- [ ] T016 Manually verify orders_no_overlap: adjacent bookings succeed, overlapping and fully-contained bookings are rejected, and a pending-payment order blocks the same range (T012 of the previous revision, extended)
+- [ ] T016 Manually verify orders_no_overlap: adjacent bookings succeed, overlapping and fully-contained bookings are rejected, and a pending-payment order blocks the same range
 - [ ] T017 Manually verify expire_stale_orders() releases an expired pending-payment order, and that guard_order_transition rejects paying for it afterwards
 
 ---
@@ -58,22 +87,22 @@ US9（房源檢測與詳情頁展示）。
 
 **⚠️ CRITICAL**: 在完成此階段前，不得開始任何使用者故事的實裝
 
-- [ ] T018 Rewrite src/lib/supabase.js to read credentials only from window.__SUNNY_CONFIG__, remove the dead import.meta.env / process.env branches, and lazy-load the client via dynamic import only when configured
-- [ ] T019 Define the shared async data-access interface and mode-binding facade in src/data/repository.js
-- [ ] T020 Enforce the expireStaleOrders() call sites inside the repository layer (before availability queries, order creation, and order list reads) so individual pages cannot forget them
-- [ ] T021 [P] Implement the localStorage adapter with seed bootstrap and async signatures in src/data/adapters/local.js, src/state/seed.js, and src/state/persistence.js
-- [ ] T022 [P] Implement the Supabase adapter with snake_case⇄camelCase mapping in src/data/adapters/supabase.js
-- [ ] T023 Implement the error-translation table from contracts/README.md in src/data/adapters/supabase.js so callers see business errors, never raw database messages
-- [ ] T024 Implement centralized state store and mutation helpers in src/state/store.js
-- [ ] T025 [P] Implement date, money, validation, and storage utilities in src/utils/dates.js, src/utils/money.js, src/utils/validation.js, and src/utils/storage.js
-- [ ] T026 [P] Implement per-entity data modules delegating to the repository in src/data/rooms.js, orders.js, reviews.js, refunds.js, profiles.js, favorites.js, risk-checks.js, channel-prices.js, admin-logs.js, settings.js, and site-content.js
-- [ ] T027 Build auth/session flow over Supabase Auth with a simulated fallback for demo mode in src/services/auth.js, and guest/member/admin guards in src/router.js
-- [ ] T028 Implement the audit-log writer in src/services/audit.js and wire it into every admin mutation path so a change can never be saved without a log entry (FR-114)
-- [ ] T029 Create shared header, layout shell, loading and error states, and app container in src/components/header.js and src/app.js
-- [ ] T030 [P] Add the persistent demo-mode indicator in src/components/demo-badge.js and the reusable simulated-data indicator in src/components/simulated-badge.js (FR-079, FR-110)
-- [ ] T031 Implement booking and search core logic with half-open overlap rules, room-state checks, and pending-payment occupancy in src/services/search.js and src/services/booking.js
-- [ ] T032 [P] Configure role-aware admin access and navigation for all eleven back-office modules in src/pages/admin.js and src/components/admin-panel.js
-- [ ] T033 [2M] Verify both modes boot correctly: with credentials the app reads from Supabase; with empty credentials it enters demo mode and issues zero network requests (SC-018)
+- [X] T018 Rewrite src/lib/supabase.js to read credentials only from window.__SUNNY_CONFIG__, remove the dead import.meta.env / process.env branches, and lazy-load the client via dynamic import only when configured
+- [X] T019 Define the shared async data-access interface and mode-binding facade in src/data/repository.js
+- [X] T020 Enforce the expireStaleOrders() call sites inside the repository layer (before availability queries, order creation, and order list reads) so individual pages cannot forget them
+- [X] T021 [P] Implement the localStorage adapter with seed bootstrap and async signatures in src/data/adapters/local.js, src/state/seed.js, and src/state/persistence.js
+- [X] T022 [P] Implement the Supabase adapter with snake_case⇄camelCase mapping in src/data/adapters/supabase.js
+- [X] T023 Implement the error-translation table from contracts/README.md in src/data/adapters/supabase.js so callers see business errors, never raw database messages
+- [X] T024 Implement centralized state store and mutation helpers in src/state/store.js
+- [X] T025 [P] Implement date, money, validation, and storage utilities in src/utils/dates.js, src/utils/money.js, src/utils/validation.js, src/utils/storage.js, and src/utils/errors.js
+- [X] T026 [P] Implement per-entity data modules delegating to the repository in src/data/rooms.js, orders.js, reviews.js, refunds.js, profiles.js, favorites.js, risk-checks.js, channel-prices.js, admin-logs.js, settings.js, and site-content.js
+- [X] T027 Build auth/session flow over Supabase Auth with a simulated fallback for demo mode in src/services/auth.js, and guest/member/admin guards in src/router.js
+- [X] T028 Implement the audit-log writer in src/services/audit.js and wire it into every admin mutation path so a change can never be saved without a log entry (FR-114)
+- [X] T029 Create shared header, layout shell, loading and error states, and app container in src/components/header.js and src/app.js
+- [X] T030 [P] Add the persistent demo-mode indicator in src/components/demo-badge.js and the reusable simulated-data indicator in src/components/simulated-badge.js (FR-079, FR-110)
+- [X] T031 Implement booking and search core logic with half-open overlap rules, room-state checks, and pending-payment occupancy in src/services/search.js and src/services/booking.js
+- [X] T032 [P] Configure role-aware admin access and navigation for all eleven back-office modules in src/components/admin-panel.js and the admin shell in src/main.js
+- [ ] T033 [2M] Verify both modes boot correctly: with credentials the app reads from Supabase; with empty credentials it enters demo mode and issues zero network requests (SC-018) — **待瀏覽器實測**。已完成靜態驗證（39 個模組的 import 全數解析、index.html 引用的檔案全數存在），但本機無 node 與可用的 python，無法啟動伺服器實際執行。請開啟 index.html 並檢查 Network 面板確認。
 
 **Checkpoint**: 基礎設施完成後，所有使用者故事都可以在平行中開始實作
 
@@ -83,14 +112,14 @@ US9（房源檢測與詳情頁展示）。
 
 **Independent Test**: 在未登入情境下設定日期、人數、價格上限、設施與特色條件和排序，確認列表更新、房型切換與詳情頁顯示均正確
 
-- [ ] T034 [P] [US1] Build room list rendering and room card layout in src/pages/home.js and src/components/room-card.js
-- [ ] T035 [P] [US1] Build the filter bar with multi-select amenities and features in src/components/filter-bar.js
-- [ ] T036 [US1] Implement guest search, sort, and AND-logic amenity/feature filtering in src/services/search.js
-- [ ] T037 [US1] Display active filters with a one-click clear control in src/components/filter-bar.js (FR-010)
-- [ ] T038 [US1] Implement room detail page, rating display (null shows 尚無評分, never 0), and total price calculation in src/pages/room-detail.js and src/utils/dates.js
-- [ ] T039 [US1] Add room status UX, loading state, empty state, and no-result messaging in src/pages/home.js and src/components/room-card.js
-- [ ] T040 [US1] Wire booking CTA redirect for guests and preserve filter state across navigation in src/pages/room-detail.js and src/router.js
-- [ ] T041 [P] [US1] [2M] Validate homepage and detail-page acceptance scenarios against the browser flow in quickstart.md
+- [X] T034 [P] [US1] Build room list rendering and room card layout in src/pages/home.js and src/components/room-card.js
+- [X] T035 [P] [US1] Build the filter bar with multi-select amenities and features in src/components/filter-bar.js
+- [X] T036 [US1] Implement guest search, sort, and AND-logic amenity/feature filtering in src/services/search.js
+- [X] T037 [US1] Display active filters with a one-click clear control in src/components/filter-bar.js (FR-010)
+- [X] T038 [US1] Implement room detail page, rating display (null shows 尚無評分, never 0), and total price calculation in src/pages/room-detail.js and src/utils/dates.js
+- [X] T039 [US1] Add room status UX, loading state, empty state, and no-result messaging in src/pages/home.js and src/components/room-card.js
+- [X] T040 [US1] Wire booking CTA redirect for guests and preserve filter state across navigation in src/pages/room-detail.js and src/router.js
+- [ ] T041 [P] [US1] [2M] Validate homepage and detail-page acceptance scenarios against the browser flow in quickstart.md — **待瀏覽器實測**（開發環境無法執行 JS）
 
 ---
 
@@ -98,15 +127,15 @@ US9（房源檢測與詳情頁展示）。
 
 **Independent Test**: 註冊、登出、重新登入、以 Google 登入、更新顯示名稱後刷新確認資料維持；再於另一瀏覽器以同一帳號登入確認資料一致
 
-- [ ] T042 [P] [US2] Create registration and login forms with the demo-project password warning and public test accounts in src/pages/login.js
-- [ ] T043 [US2] Implement signUp/signIn/signOut over Supabase Auth with display_name passed through user metadata in src/services/auth.js
-- [ ] T044 [US2] Implement signInWithGoogle and the OAuth return flow, restoring the originally requested route in src/services/auth.js and src/router.js
-- [ ] T045 [US2] Disable the Google button in demo mode with an explanation, never faking a consent screen (FR-089)
-- [ ] T046 [US2] Handle the user-cancelled OAuth case with a 已取消登入 message and no account creation (FR-090)
-- [ ] T047 [US2] Implement session restore via getSession and onAuthStateChange, plus session-expiry handling in src/services/auth.js and src/state/store.js
-- [ ] T048 [US2] Add password-length and duplicate-email validation with messages that never reveal whether an email exists in src/pages/login.js and src/services/auth.js
-- [ ] T049 [US2] Add account settings page, profile update handling, logout, role-aware routing, and header name sync in src/pages/account.js, src/router.js, and src/components/header.js
-- [ ] T050 [P] [US2] [2M] Validate registration, login, Google login, account merging by email, logout, persistence, and cross-browser identity (SC-021, SC-025)
+- [X] T042 [P] [US2] Create registration and login forms with the demo-project password warning and public test accounts in src/pages/login.js
+- [X] T043 [US2] Implement signUp/signIn/signOut over Supabase Auth with display_name passed through user metadata in src/services/auth.js
+- [X] T044 [US2] Implement signInWithGoogle and the OAuth return flow, restoring the originally requested route in src/services/auth.js and src/main.js
+- [X] T045 [US2] Disable the Google button in demo mode with an explanation, never faking a consent screen (FR-089)
+- [X] T046 [US2] Handle the user-cancelled OAuth case with a 已取消登入 message and no account creation (FR-090)
+- [X] T047 [US2] Implement session restore via getSession and onAuthStateChange, plus session-expiry handling in src/services/auth.js and src/state/store.js
+- [X] T048 [US2] Add password-length and duplicate-email validation with messages that never reveal whether an email exists in src/pages/login.js and src/services/auth.js
+- [X] T049 [US2] Add account settings page, profile update handling, logout, role-aware routing, and header name sync in src/pages/account.js, src/router.js, and src/components/header.js
+- [ ] T050 [P] [US2] [2M] Validate registration, login, Google login, account merging by email, logout, persistence, and cross-browser identity (SC-021, SC-025) — **待瀏覽器實測**
 
 ---
 
@@ -154,8 +183,8 @@ US9（房源檢測與詳情頁展示）。
 ## Phase 9: User Story 6 - 後台核心管理與營運指標 (Priority: P6)
 
 - [ ] T073 [P] [US6] Build admin dashboard and room management screens in src/pages/admin.js and src/components/admin-panel.js
-- [ ] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value (FR-049 群組)
-- [ ] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders (SC 對應 US6 場景 3)
+- [ ] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value
+- [ ] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders
 - [ ] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin.js
 - [ ] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
 - [ ] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
@@ -183,7 +212,7 @@ US9（房源檢測與詳情頁展示）。
 ## Phase 12: User Story 9 - 拍照風險預測與房源品質檢測 (Priority: P9)
 
 **⚠️ 約束**: 前台使用者上傳的照片 MUST NOT 離開瀏覽器。兩條路徑的程式碼 MUST 分離——
-`pages/risk-check.js` MUST NOT import `services/risk-upload.js`（FR-086、憲章原則 VI）
+`pages/risk-check.js` MUST NOT import `services/risk-upload.js` 或 `data/risk-checks.js`（FR-086、憲章原則 VI）
 
 - [ ] T087 [P] [US9] Build the front-of-house risk check page with upload control, preview, and processing state in src/pages/risk-check.js
 - [ ] T088 [US9] Implement in-browser Canvas analysis of brightness, clutter, and contrast in src/services/risk-score.js (shared by both paths — computation only, no storage)

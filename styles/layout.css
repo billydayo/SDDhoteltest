@@ -1,0 +1,99 @@
+/* layout.css — 頁面骨架：頁首、主內容、頁尾、模式橫幅 */
+
+#mode-banner:empty { display: none; }
+
+.mode-banner {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--f-small);
+  text-align: center;
+  border-bottom: 1px solid var(--c-border);
+}
+.mode-banner--demo {
+  background: var(--c-warn-soft);
+  color: var(--c-warn);
+}
+.mode-banner--error {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+.mode-banner strong { font-weight: 700; }
+
+.site-header {
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.site-header__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.site-header__brand {
+  font-family: var(--font-heading);
+  font-size: var(--f-h2);
+  font-weight: 700;
+  color: var(--c-brand-strong);
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.site-nav ul {
+  list-style: none;
+  display: flex;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.site-nav a {
+  display: inline-block;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--c-text);
+  font-size: var(--f-small);
+}
+.site-nav a:hover { background: var(--c-surface-alt); }
+.site-nav a[aria-current="page"] {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+
+.site-header__account {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--f-small);
+}
+
+.site-main {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--sp-5) var(--sp-4) var(--sp-7);
+  min-height: 60vh;
+}
+.site-main:focus { outline: none; }
+
+.site-footer {
+  background: var(--c-surface-alt);
+  border-top: 1px solid var(--c-border);
+  padding: var(--sp-5) var(--sp-4);
+  text-align: center;
+  font-size: var(--f-small);
+  color: var(--c-text-muted);
+}
+.site-footer nav { margin-bottom: var(--sp-2); }
+.site-footer__note { max-width: 60ch; margin: 0 auto; }
+
+.page-header {
+  margin-bottom: var(--sp-5);
+}
+.page-header p { color: var(--c-text-muted); margin-bottom: 0; }

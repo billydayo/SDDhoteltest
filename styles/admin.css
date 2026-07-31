@@ -1,0 +1,90 @@
+/* admin.css — 後台版面與十一個模組的導覽 */
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--sp-5);
+  align-items: start;
+}
+
+.admin-nav {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  position: sticky;
+  top: var(--sp-4);
+}
+.admin-nav h2 {
+  font-size: var(--f-small);
+  text-transform: none;
+  color: var(--c-text-muted);
+  margin-bottom: var(--sp-2);
+}
+.admin-nav ul { list-style: none; margin: 0; padding: 0; }
+.admin-nav a {
+  display: block;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--f-small);
+  color: var(--c-text);
+  text-decoration: none;
+}
+.admin-nav a:hover { background: var(--c-surface-alt); }
+.admin-nav a[aria-current="page"] {
+  background: var(--c-brand-soft);
+  color: var(--c-brand-strong);
+  font-weight: 600;
+}
+
+.admin-panel { min-width: 0; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+.stat-tile {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+}
+.stat-tile__label {
+  font-size: var(--f-small);
+  color: var(--c-text-muted);
+  margin-bottom: var(--sp-1);
+}
+.stat-tile__value {
+  font-family: var(--font-heading);
+  font-size: var(--f-h1);
+  font-weight: 700;
+  color: var(--c-brand-strong);
+  line-height: 1.2;
+}
+/* 無資料時顯示破折號，不顯示 0，也不做除以零的計算 */
+.stat-tile__value--empty { color: var(--c-text-muted); }
+
+.data-table-wrap { overflow-x: auto; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--f-small);
+  background: var(--c-surface);
+}
+.data-table th,
+.data-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  white-space: nowrap;
+}
+.data-table th {
+  background: var(--c-surface-alt);
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table td.is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tr.is-alert { background: var(--c-danger-soft); }

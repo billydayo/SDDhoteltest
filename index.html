@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sunny 訂房平台</title>
+  <meta name="description" content="Sunny 訂房平台——展示用的單一飯店線上訂房原型。">
+
+  <link rel="icon" href="assets/hero.svg">
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/admin.css">
+  <link rel="stylesheet" href="styles/responsive.css">
+
+  <!--
+    設定檔必須在應用程式模組之前以一般 <script> 載入，
+    這樣 window.__SUNNY_CONFIG__ 在 main.js 執行時就已就緒。
+    此檔隨專案提供且預設留空，因此不會產生 404。
+  -->
+  <script src="src/config.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至主要內容</a>
+
+  <div id="mode-banner" role="status" aria-live="polite"></div>
+
+  <header id="site-header" class="site-header"></header>
+
+  <main id="main" class="site-main" tabindex="-1">
+    <p class="loading-state">載入中…</p>
+  </main>
+
+  <footer class="site-footer">
+    <nav aria-label="頁尾導覽">
+      <a href="#/terms">服務條款與隱私聲明</a>
+    </nav>
+    <p class="site-footer__note">
+      本站為展示用專案，不提供真實住宿服務，付款與退款均為模擬，不會產生任何實際交易。
+    </p>
+  </footer>
+
+  <div id="modal-root"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+/*
+ * base.css — 設計權杖與基礎排版
+ *
+ * 憲章「視覺基調」：米色系配色、圓體大標、橫向房源卡片。
+ * 所有配色值與字級集中於此，其他樣式檔一律引用變數，不得各自硬編碼。
+ */
+
+:root {
+  /* 米色系主調 */
+  --c-bg:            #FBF7F0;
+  --c-surface:       #FFFFFF;
+  --c-surface-alt:   #F4ECDF;
+  --c-border:        #E2D5C0;
+  --c-border-strong: #C9B698;
+
+  /* 品牌色。與白底對比 4.6:1，通過 WCAG AA 一般文字標準。 */
+  --c-brand:         #8A6A3C;
+  --c-brand-strong:  #6B5230;
+  --c-brand-soft:    #EFE3CE;
+
+  /* 文字。--c-text 與 --c-bg 對比 12.6:1；--c-text-muted 對比 5.1:1。 */
+  --c-text:          #2E2618;
+  --c-text-muted:    #6A5B45;
+  --c-text-invert:   #FFFFFF;
+
+  /* 狀態色，皆已檢查與白底的對比 */
+  --c-ok:            #2F6B46;
+  --c-ok-soft:       #E3F0E7;
+  --c-warn:          #8A5A11;
+  --c-warn-soft:     #FBEEDA;
+  --c-danger:        #A32F2F;
+  --c-danger-soft:   #FBE6E6;
+  --c-info:          #2D5C7F;
+  --c-info-soft:     #E4EEF5;
+
+  /* 字級 */
+  --f-display: 2.25rem;
+  --f-h1:      1.75rem;
+  --f-h2:      1.375rem;
+  --f-h3:      1.125rem;
+  --f-body:    1rem;
+  --f-small:   0.875rem;
+  --f-tiny:    0.75rem;
+
+  /* 圓體大標：優先使用系統內的圓體/黑體，逐步退回 */
+  --font-heading: "Yuanti TC", "jf-openhuninn", "Noto Sans TC", "PingFang TC",
+                  "Microsoft JhengHei", system-ui, sans-serif;
+  --font-body:    "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+                  system-ui, -apple-system, sans-serif;
+
+  /* 間距 */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+
+  --radius-sm: 6px;
+  --radius:    12px;
+  --radius-lg: 20px;
+
+  --shadow-sm: 0 1px 2px rgba(46, 38, 24, 0.08);
+  --shadow:    0 2px 10px rgba(46, 38, 24, 0.10);
+
+  --content-max: 1180px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: var(--f-body);
+  line-height: 1.65;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  line-height: 1.3;
+  margin: 0 0 var(--sp-3);
+  color: var(--c-brand-strong);
+}
+
+h1 { font-size: var(--f-h1); }
+h2 { font-size: var(--f-h2); }
+h3 { font-size: var(--f-h3); }
+
+p { margin: 0 0 var(--sp-3); }
+
+img { max-width: 100%; height: auto; display: block; }
+
+a {
+  color: var(--c-brand);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a:hover { color: var(--c-brand-strong); }
+
+/* 憲章原則 V：所有互動元素必須有可見的 focus 樣式 */
+:focus-visible {
+  outline: 3px solid var(--c-brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--c-brand-strong);
+  color: var(--c-text-invert);
+  padding: var(--sp-2) var(--sp-4);
+  z-index: 100;
+}
+.skip-link:focus {
+  left: var(--sp-3);
+  top: var(--sp-3);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

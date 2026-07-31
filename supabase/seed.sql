@@ -3,8 +3,10 @@
 -- 於 schema.sql 執行完畢後執行。本檔案可重複執行（idempotent）：
 -- 房源以固定 UUID 建立，重跑時只更新內容，不會產生重複資料。
 --
--- 注意：images 欄位指向專案內的相對路徑，對應的圖片檔需存在於 assets/rooms/。
--- 圖片必須為可自由使用的示意圖，且單檔不得超過 1 MB（憲章「資源」條）。
+-- 注意：images 欄位指向專案內的相對路徑，對應的圖片檔位於 assets/rooms/。
+-- 目前提供的是自製的 SVG 佔位示意圖（每檔約 1 KB），不涉及任何第三方著作權。
+-- 若要換成真實照片，需為可自由使用的圖片且單檔不得超過 1 MB（憲章「資源」條），
+-- 同時更新此處與 src/state/seed.js 兩邊的路徑。
 --
 -- 訂單、評論與退款的示範資料需要真實的 auth.users，無法以純 SQL 建立，
 -- 請於建立示範帳號後透過應用程式介面產生，或見本檔末的選用區塊。
@@ -17,61 +19,61 @@
 
 insert into public.rooms (id, name, type, max_guests, nightly_price, images, amenities, features, description, status) values
   ('11111111-1111-4111-8111-000000000001', '暖陽單人房 A', 'single', 1, 1800,
-   '["assets/rooms/single-a.jpg"]'::jsonb,
+   '["assets/rooms/single-a.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","書桌"]'::jsonb,
    '["商務友善","安靜樓層"]'::jsonb,
    '面向內庭的安靜單人房，適合商務短住。採光良好，附書桌與閱讀燈。', 'available'),
 
   ('11111111-1111-4111-8111-000000000002', '暖陽單人房 B', 'single', 1, 1800,
-   '["assets/rooms/single-b.jpg"]'::jsonb,
+   '["assets/rooms/single-b.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","書桌"]'::jsonb,
    '["商務友善"]'::jsonb,
    '同層的另一間單人房，格局相同，窗景面向街道。', 'available'),
 
   ('11111111-1111-4111-8111-000000000003', '日光雙人房 A', 'double', 2, 2600,
-   '["assets/rooms/double-a.jpg"]'::jsonb,
+   '["assets/rooms/double-a.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","備品組","陽台"]'::jsonb,
    '["採光佳","情侶推薦"]'::jsonb,
    '一張加大雙人床的標準房型，早晨採光充足，附小陽台，適合情侶或夫妻。', 'available'),
 
   ('11111111-1111-4111-8111-000000000004', '日光雙人房 B', 'double', 2, 2600,
-   '["assets/rooms/double-b.jpg"]'::jsonb,
+   '["assets/rooms/double-b.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","備品組"]'::jsonb,
    '["安靜樓層","情侶推薦"]'::jsonb,
    '與 A 房同規格，位於安靜的走廊末端。', 'available'),
 
   ('11111111-1111-4111-8111-000000000005', '日光雙人房 C', 'double', 2, 2800,
-   '["assets/rooms/double-c.jpg"]'::jsonb,
+   '["assets/rooms/double-c.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","備品組","浴缸","陽台"]'::jsonb,
    '["採光佳","情侶推薦","泡澡放鬆"]'::jsonb,
    '含獨立浴缸與陽台的雙人房，空間略大於標準雙人房。', 'available'),
 
   ('11111111-1111-4111-8111-000000000006', '雙床房 A', 'twin', 2, 2900,
-   '["assets/rooms/twin-a.jpg"]'::jsonb,
+   '["assets/rooms/twin-a.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","衣櫃"]'::jsonb,
    '["商務友善","朋友同行"]'::jsonb,
    '兩張單人床的房型，適合朋友同行或商務同事。', 'available'),
 
   ('11111111-1111-4111-8111-000000000007', '雙床房 B', 'twin', 3, 3200,
-   '["assets/rooms/twin-b.jpg"]'::jsonb,
+   '["assets/rooms/twin-b.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","衣櫃","加床服務"]'::jsonb,
    '["朋友同行","可加床"]'::jsonb,
    '可加床的雙床房，最多可住三人。', 'available'),
 
   ('11111111-1111-4111-8111-000000000008', '家庭四人房', 'family', 4, 4200,
-   '["assets/rooms/family-a.jpg"]'::jsonb,
+   '["assets/rooms/family-a.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","小冰箱","客廳區","嬰兒床可租借","浴缸"]'::jsonb,
    '["親子友善","無障礙","可加床"]'::jsonb,
    '兩大床的家庭房，附小客廳區與無障礙動線，適合親子出遊。', 'available'),
 
   ('11111111-1111-4111-8111-000000000009', '景觀套房', 'suite', 2, 5600,
-   '["assets/rooms/suite-a.jpg"]'::jsonb,
+   '["assets/rooms/suite-a.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","浴缸","小冰箱","客廳區","咖啡機","陽台"]'::jsonb,
    '["採光佳","泡澡放鬆","情侶推薦"]'::jsonb,
    '頂層景觀套房，含起居空間與大面窗景，附膠囊咖啡機。', 'available'),
 
   ('11111111-1111-4111-8111-000000000010', '景觀套房（整理中）', 'suite', 2, 5600,
-   '["assets/rooms/suite-b.jpg"]'::jsonb,
+   '["assets/rooms/suite-b.svg"]'::jsonb,
    '["免費 Wi-Fi","冷氣","獨立衛浴","浴缸","小冰箱","客廳區","咖啡機","陽台"]'::jsonb,
    '["採光佳","泡澡放鬆"]'::jsonb,
    '與景觀套房同規格。此房目前設為整理中，用於展示房態排除規則。', 'maintenance')
@@ -93,7 +95,7 @@ on conflict (id) do update set
 update public.site_content set
   hero_title    = 'Sunny 訂房平台',
   hero_subtitle = '舒適住宿，安心入住',
-  hero_image    = 'assets/hero.jpg',
+  hero_image    = 'assets/hero.svg',
   updated_at    = now()
 where id = '00000000-0000-0000-0000-000000000001';
 

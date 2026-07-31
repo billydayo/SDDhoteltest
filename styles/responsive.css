@@ -1,0 +1,62 @@
+/*
+ * responsive.css — 響應式規則
+ *
+ * 憲章原則 V：版面必須在 320px 寬度下正常顯示且不產生橫向捲動。
+ * 橫向房源列表在窄螢幕改為直向堆疊，寬內容（表格）自行捲動而非撐開頁面。
+ */
+
+@media (max-width: 900px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-nav {
+    position: static;
+  }
+  .admin-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+}
+
+@media (max-width: 860px) {
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-aside { position: static; }
+}
+
+@media (max-width: 640px) {
+  /* 橫向房源卡片在窄螢幕改為直向堆疊，而非讓整頁橫向捲動（憲章原則 V） */
+  .room-card { grid-template-columns: 1fr; }
+  .room-card__media { min-height: 160px; }
+  .room-card__body { padding: var(--sp-4); }
+
+  .filter-bar__row { grid-template-columns: 1fr 1fr; }
+  .risk-metrics { grid-template-columns: 1fr; }
+  :root {
+    --f-display: 1.75rem;
+    --f-h1: 1.5rem;
+    --f-h2: 1.25rem;
+  }
+
+  .site-header__inner {
+    padding: var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .site-header__brand { width: 100%; margin-right: 0; }
+
+  .site-main { padding: var(--sp-4) var(--sp-3) var(--sp-6); }
+
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+  .toast-stack {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: var(--sp-3);
+  }
+  .toast { max-width: none; }
+}
+
+/* 320px 保底：任何寬內容都必須在自己的容器裡捲動 */
+@media (max-width: 360px) {
+  .site-main { padding-left: var(--sp-2); padding-right: var(--sp-2); }
+}

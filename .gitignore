@@ -1,4 +1,7 @@
 # Environment
+# 注意：src/config.js 刻意「不」列入忽略。它隨專案提供且預設為空字串（示範模式），
+# 若被忽略，缺檔時 index.html 的 <script> 會產生 404，違反「主控台零錯誤」。
+# anon key 是設計上可公開的識別碼，其防護來自 RLS 而非保密。
 .env
 .env.*
 !.env.example
@@ -7,6 +10,12 @@
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
+*.swp
+*.tmp
 
-# Node / package manager
+# Logs
+*.log
+
+# Node / package manager（本專案不使用，僅防誤入）
 node_modules/

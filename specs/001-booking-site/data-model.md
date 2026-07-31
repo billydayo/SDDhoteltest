@@ -204,8 +204,16 @@ expires_at < now()` 的訂單改為 `cancelled`。此函式 MUST 於下列時機
 **Validation rules**:
 - 同一訂單同時僅能有一筆 `pending` 申請
   （部分唯一索引：`unique (order_id) where status = 'pending'`）
+- 同一會員可對**不同訂單**分別申請，不限一筆
+- **單一會員總數上限 5 筆**，由 `enforce_refund_limit` trigger 強制執行。
+  只計 `pending` 與 `approved`；**`rejected` 不佔額度**——否則被駁回 5 次的
+  會員將無法再申請，與 FR-039「駁回後可再次申請」直接矛盾。
+  以 trigger 而非 CHECK 實作，因為此約束需要跨列聚合。
 - 入住日已到或訂單已退款時不可申請
 - 退款金額依政策計算：入住日前 7 天以上 100%、3–6 天 50%、1–2 天 20%、當日起 0%
+
+**介面約束（FR-036c）**：未達上限時 MUST NOT 顯示已用或剩餘次數。
+`refundQuota()` 回傳的 `used` 與 `remaining` 僅供內部判斷。
 
 **RLS**:
 | 動作 | 允許對象 |

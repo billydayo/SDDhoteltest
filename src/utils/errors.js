@@ -27,6 +27,7 @@ export const MESSAGES = Object.freeze({
   ORDER_EXPIRED:         '此訂單已因逾期未付款而取消，請重新訂房。',
   REFUND_ALREADY_PENDING:'此訂單已有審核中的退款申請。',
   REFUND_NOT_ALLOWED:    '此訂單目前不可申請退款。',
+  REFUND_LIMIT_REACHED:  '你的退款申請已達上限 5 筆，無法再提出新的申請。',
   REVIEW_ALREADY_EXISTS: '此訂單已撰寫過評論。',
   REVIEW_NOT_ALLOWED:    '需完成入住後才能撰寫評論。',
   ALREADY_FAVORITED:     '此房源已在你的收藏清單中。',

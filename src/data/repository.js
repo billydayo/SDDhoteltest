@@ -74,6 +74,23 @@ async function sweepExpired() {
   }
 }
 
+/**
+ * 主動清理逾期訂單，回傳實際被取消的筆數。
+ *
+ * 與上面的 sweepExpired() 不同：這支不節流，且會把結果回報給呼叫端，
+ * 讓應用程式知道「剛剛真的有訂單過期」而決定是否更新畫面。
+ * 由 main.js 的定期掃描使用（FR-099）。
+ */
+export async function sweepExpiredOrders() {
+  lastExpiry = Date.now();
+  try {
+    const count = await adapter.expireStaleOrders();
+    return Number(count) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 房源
 // ---------------------------------------------------------------------------

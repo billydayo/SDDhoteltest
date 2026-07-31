@@ -11,7 +11,7 @@
  * 不得表現為一般性當機，也不得悄悄退回示範模式。
  */
 
-import { initRepository, getSystemSettings } from './data/repository.js';
+import { initRepository, getSystemSettings, sweepExpiredOrders } from './data/repository.js';
 import { verifyConnection, isSupabaseConfigured, isPartiallyConfigured } from './lib/supabase.js';
 import { initAuth, consumeOAuthResult, takePostAuthRedirect } from './services/auth.js';
 import { initShell, renderError, refreshHeader, toast } from './app.js';
@@ -62,6 +62,7 @@ async function boot() {
     if (postAuth) window.location.hash = postAuth;
 
     await router.startRouter();
+    startExpirySweep();
 
     if (oauth.cancelled) {
       toast(oauth.message, 'error');
@@ -84,9 +85,41 @@ function initShellSafely() {
   }
 }
 
+/**
+ * 逾期訂單的定期清理（FR-099）。
+ *
+ * 「查詢時判定」保證了正確性——沒有人看得到過期訂單仍佔著房。但如果使用者
+ * 就停在訂單頁不動，畫面不會自己更新，房源也要等下一次有人查詢才釋出。
+ * 這支定時器補上那段：每分鐘掃一次，真的有訂單過期時才更新畫面。
+ *
+ * 這不是背景排程作業（憲章原則 II 禁止的是伺服器端 cron）——
+ * 它只是應用程式在開著的時候自己發的查詢，關掉分頁就停止。
+ *
+ * 只在分頁可見時執行：背景分頁沒有人在看，掃描沒有意義，徒增請求。
+ */
+const SWEEP_INTERVAL_MS = 60_000;
+
+/** 過期後值得自動重繪的頁面。表單頁刻意排除，避免把使用者填到一半的內容清掉。 */
+const REFRESHABLE = ['#/orders', '#/'];
+
+function startExpirySweep() {
+  window.setInterval(async () => {
+    if (document.visibilityState !== 'visible') return;
+
+    const expired = await sweepExpiredOrders();
+    if (!expired) return;
+
+    toast(`${expired} 筆訂單因逾期未付款已自動取消，房源已釋出。`);
+
+    const path = router.currentHash().split('?')[0];
+    const safe = REFRESHABLE.includes(path) || /^#\/orders\/[^/]+$/.test(path);
+    if (safe) router.resolve();
+  }, SWEEP_INTERVAL_MS);
+}
+
 const ADMIN_ROUTES = [
   '#/admin', '#/admin/rooms', '#/admin/orders', '#/admin/users',
-  '#/admin/reviews', '#/admin/refunds', '#/admin/export', '#/admin/content',
+  '#/admin/reviews', '#/admin/refunds', '#/admin/content',
   '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings'
 ];
 

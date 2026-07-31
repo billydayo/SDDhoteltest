@@ -352,6 +352,46 @@ create table if not exists public.refunds (
 create unique index if not exists refunds_one_pending_per_order
   on public.refunds (order_id) where status = 'pending';
 
+-- 單一會員的退款申請上限。
+--
+-- 只計「審核中」與「已核准」，**被駁回的不佔額度**。這是必要的界定：
+-- FR-039 明訂駁回後會員可再次申請，若駁回也計入上限，被駁回 5 次的人
+-- 就再也不能申請任何退款，兩條規則會互相矛盾。
+--
+-- 以 trigger 而非 CHECK 實作，因為約束需要跨列聚合，CHECK 做不到。
+create or replace function public.enforce_refund_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  used int;
+  max_allowed constant int := 5;
+begin
+  if new.status not in ('pending', 'approved') then
+    return new;
+  end if;
+
+  select count(*) into used
+  from public.refunds
+  where user_id = new.user_id
+    and status in ('pending', 'approved')
+    and (tg_op = 'INSERT' or id <> new.id);
+
+  if used >= max_allowed then
+    raise exception '退款申請已達上限 % 筆', max_allowed using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists refunds_enforce_limit on public.refunds;
+create trigger refunds_enforce_limit
+  before insert or update on public.refunds
+  for each row execute function public.enforce_refund_limit();
+
 -- ---------------------------------------------------------------------------
 -- site_content — 全站單筆
 -- ---------------------------------------------------------------------------

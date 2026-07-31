@@ -215,3 +215,46 @@ export function buttonRow(...buttons) {
   buttons.filter(Boolean).forEach((b) => row.append(b));
   return row;
 }
+
+/**
+ * 匯出按鈕（US8 / FR-058、FR-059、FR-060）。
+ *
+ * 刻意做成可放在任一後台模組的零件，而不是獨立的「報表匯出」分頁——
+ * spec US8 場景 1 描述的是「管理員位於**訂單管理**且有篩選結果，點選匯出，
+ * 下載包含**目前篩選結果**的檔案」。匯出必須貼著資料所在的頁面，
+ * 才能拿得到當下的篩選條件；獨立分頁只能匯出全部，反而做不到規格要的事。
+ *
+ * @param {object}   config
+ * @param {string}   config.label     按鈕文字
+ * @param {string}   config.filename  不含副檔名
+ * @param {string}   config.sheetName 工作表名稱
+ * @param {Array<{key: string, label: string}>} config.columns
+ * @param {() => object[]} config.getRows 取得當下要匯出的資料列
+ * @param {(message: string, tone?: string) => void} config.notify
+ */
+export function createExportButton({ label = '匯出報表', filename, sheetName, columns, getRows, notify }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn';
+  btn.textContent = label;
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '匯出中…';
+    try {
+      // 動態載入：SheetJS 接近 1 MB，沒按匯出的人不該付這個成本
+      const { exportRows } = await import('../services/export.js');
+      const result = await exportRows({
+        filename, sheetName, columns, rows: getRows()
+      });
+      notify(result.message, result.format === 'none' ? 'error' : 'ok');
+    } catch {
+      notify('匯出未能完成，請稍後再試。', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  });
+
+  return btn;
+}

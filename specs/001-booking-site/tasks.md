@@ -154,7 +154,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 
 - [X] T018 Rewrite src/lib/supabase.js to read credentials only from window.__SUNNY_CONFIG__, remove the dead import.meta.env / process.env branches, and lazy-load the client via dynamic import only when configured
 - [X] T019 Define the shared async data-access interface and mode-binding facade in src/data/repository.js
-- [X] T020 Enforce the expireStaleOrders() call sites inside the repository layer (before availability queries, order creation, and order list reads) so individual pages cannot forget them
+- [X] T020 Enforce the expireStaleOrders() call sites inside the repository layer (before availability queries, order creation, and order list reads) so individual pages cannot forget them, plus a once-a-minute sweep in main.js that only repaints when something actually expired and never on form pages (FR-099a)
 - [X] T021 [P] Implement the localStorage adapter with seed bootstrap and async signatures in src/data/adapters/local.js, src/state/seed.js, and src/state/persistence.js
 - [X] T022 [P] Implement the Supabase adapter with snake_case⇄camelCase mapping in src/data/adapters/supabase.js
 - [X] T023 Implement the error-translation table from contracts/README.md in src/data/adapters/supabase.js so callers see business errors, never raw database messages
@@ -224,7 +224,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 
 - [X] T060 [P] [US4] Implement order list and detail page showing all six statuses in src/pages/orders.js
 - [X] T061 [US4] Create refund request form and reason validation in src/pages/orders.js and src/services/refunds.js
-- [X] T062 [US4] Enforce one-pending-refund rules, date validity checks, and tiered refund amount logic in src/services/refunds.js
+- [X] T062 [US4] Enforce one-pending-refund rules, the 5-per-member cap (pending + approved only; rejected must not consume quota), date validity checks, and tiered refund amount logic in src/services/refunds.js and the enforce_refund_limit trigger
 - [X] T063 [US4] Reflect admin approval/rejection updates back to the member order view in src/pages/orders.js（審核結果與管理員說明於下次載入訂單時呈現，見 spec「資料更新的即時性」）
 - [ ] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019) — **待瀏覽器實測**
 
@@ -268,7 +268,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 
 ## Phase 11: User Story 8 - 後台輔助：報表匯出與內容編輯 (Priority: P8)
 
-- [X] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js
+- [X] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js, surfaced as a reusable export button embedded in each admin data page (訂單管理／房源管理) rather than a standalone 報表匯出 module — the export scope must be the page's current filter result (FR-058)
 - [X] T085 [US8] Add homepage title/subtitle/image editing with live content updates in src/data/site-content.js and src/pages/home.js
 - [ ] T086 [P] [US8] [2M] Validate export fallback and content editing UX in browser-based checks (SC-010)
 

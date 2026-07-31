@@ -17,7 +17,7 @@ import { ORDER_STATUS, orderStatusLabel, PAYMENT_METHODS } from '../data/vocabul
 import { toUserMessage, isAppError } from '../utils/errors.js';
 import {
   quoteRefund, refundUnavailableReason, validateReason, submitRefundRequest,
-  refundsForOrder, REFUND_POLICY, REFUND_STATUS, refundStatusLabel
+  refundsForOrder, refundQuota, REFUND_POLICY, REFUND_STATUS, refundStatusLabel
 } from '../services/refunds.js';
 import * as router from '../router.js';
 
@@ -136,17 +136,18 @@ export async function renderOrderDetail(context) {
       return;
     }
 
-    const [room, refunds] = await Promise.all([
+    const [room, refunds, quota] = await Promise.all([
       getRoom(order.roomId).catch(() => null),
-      refundsForOrder(order.id).catch(() => [])
+      refundsForOrder(order.id).catch(() => []),
+      refundQuota().catch(() => null)
     ]);
-    render(buildDetail(order, room, refunds, context));
+    render(buildDetail(order, room, refunds, quota, context));
   } catch (err) {
     renderError(err, { retry: () => renderOrderDetail(context) });
   }
 }
 
-function buildDetail(order, room, refunds, context) {
+function buildDetail(order, room, refunds, quota, context) {
   const frag = document.createDocumentFragment();
 
   const back = document.createElement('a');
@@ -185,7 +186,7 @@ function buildDetail(order, room, refunds, context) {
 
   // 退款區塊：申請紀錄在前，可申請時再顯示表單（US4）
   if (refunds.length) frag.append(buildRefundHistory(refunds));
-  frag.append(buildRefundSection(order, refunds, context));
+  frag.append(buildRefundSection(order, quota, context));
 
   return frag;
 }
@@ -259,7 +260,7 @@ function buildRefundHistory(refunds) {
   return section;
 }
 
-function buildRefundSection(order, refunds, context) {
+function buildRefundSection(order, quota, context) {
   const section = document.createElement('section');
   section.className = 'card';
   section.style.marginTop = 'var(--sp-4)';
@@ -275,6 +276,18 @@ function buildRefundSection(order, refunds, context) {
     p.className = 'tag tag--neutral';
     p.style.display = 'inline-block';
     p.textContent = blocked;
+    section.append(p);
+    section.append(buildPolicyNote());
+    return section;
+  }
+
+  // 額度用盡時才提及上限——平常不顯示剩餘次數，那不是使用者需要知道的資訊，
+  // 顯示出來反而像在倒數，會影響他們判斷該不該申請。
+  if (quota?.reached) {
+    const p = document.createElement('p');
+    p.className = 'tag tag--danger';
+    p.style.display = 'inline-block';
+    p.textContent = `退款申請已達上限 ${quota.limit} 筆，無法再提出新的申請。`;
     section.append(p);
     section.append(buildPolicyNote());
     return section;

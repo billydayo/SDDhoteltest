@@ -27,6 +27,41 @@ export const REFUND_POLICY = Object.freeze([
 ]);
 
 /**
+ * 單一會員的退款申請上限。
+ *
+ * 只計「審核中」與「已核准」兩種狀態，**被駁回的不佔額度**。
+ *
+ * 這個界定是必要的：FR-039 明訂駁回後會員可以再次申請。若駁回也計入上限，
+ * 被駁回 5 次的人就再也不能申請任何退款——那會讓兩條規則互相矛盾，
+ * 而且懲罰的是「申請被拒絕」這件本來就對會員不利的事。
+ */
+export const MAX_REFUNDS_PER_MEMBER = 5;
+
+/** 計入上限的狀態 */
+const COUNTED_STATUSES = ['pending', 'approved'];
+
+/**
+ * 目前的退款額度使用情形。
+ *
+ * ⚠️ `used` 與 `remaining` 只供內部判斷，**不得顯示於介面**。
+ *    使用者不需要知道自己還剩幾次——把次數攤開來像在倒數，
+ *    反而會影響他們判斷「這次該不該申請」。畫面只在 `reached` 為真時
+ *    才提及有上限這回事。
+ *
+ * @returns {Promise<{ used: number, limit: number, remaining: number, reached: boolean }>}
+ */
+export async function refundQuota() {
+  const all = await listRefunds().catch(() => []);
+  const used = all.filter((r) => COUNTED_STATUSES.includes(r.status)).length;
+  return {
+    used,
+    limit: MAX_REFUNDS_PER_MEMBER,
+    remaining: Math.max(0, MAX_REFUNDS_PER_MEMBER - used),
+    reached: used >= MAX_REFUNDS_PER_MEMBER
+  };
+}
+
+/**
  * 退款試算。回傳 null 代表不可退款。
  * @returns {{ percent: number, amount: number }|null}
  */
@@ -84,6 +119,11 @@ export async function submitRefundRequest(order, reason) {
 
   const reasonError = validateReason(reason);
   if (reasonError) throw appError('REFUND_NOT_ALLOWED', reasonError);
+
+  // 額度檢查是即時回饋；最終保證來自資料庫的 enforce_refund_limit trigger。
+  // 訊息只說「已達上限」，不揭露已用幾筆——使用者不需要知道剩餘次數。
+  const quota = await refundQuota();
+  if (quota.reached) throw appError('REFUND_LIMIT_REACHED');
 
   const quote = quoteRefund(order);
   if (!quote) throw appError('REFUND_NOT_ALLOWED', '此訂單目前不可申請退款。');

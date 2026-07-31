@@ -425,8 +425,14 @@ export async function requestRefund(input) {
   if (!order || order.userId !== user.id) throw appError('NOT_FOUND');
   if (order.status !== 'confirmed') throw appError('REFUND_NOT_ALLOWED');
 
-  const pending = store.read('refunds').some((r) => r.orderId === input.orderId && r.status === 'pending');
+  const myRefunds = store.read('refunds').filter((r) => r.userId === user.id);
+
+  const pending = myRefunds.some((r) => r.orderId === input.orderId && r.status === 'pending');
   if (pending) throw appError('REFUND_ALREADY_PENDING');
+
+  // 單一會員上限 5 筆，只計審核中與已核准——駁回的不佔額度（見 services/refunds.js）
+  const counted = myRefunds.filter((r) => ['pending', 'approved'].includes(r.status)).length;
+  if (counted >= 5) throw appError('REFUND_LIMIT_REACHED');
 
   const refund = {
     id: uuid(),

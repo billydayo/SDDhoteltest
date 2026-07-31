@@ -65,28 +65,41 @@ function buildPage(content, result) {
   return frag;
 }
 
+/**
+ * 主視覺。
+ *
+ * 圖片以 object-fit: cover 鋪滿一個高度受限的區塊，而不是以原始尺寸流動排版——
+ * 後者會讓 1600×600 的圖在寬螢幕上撐出近 500px 高，把搜尋列整個推到摺線以下。
+ * 訂房網站最重要的元件是搜尋列，主視覺不該吃掉整個第一屏。
+ *
+ * 文字壓在圖片上，因此需要漸層遮罩保住對比（見 styles/layout.css 的 .hero::after）。
+ */
 function buildHero(content) {
   const hero = document.createElement('section');
-  hero.className = 'card';
-  hero.style.marginBottom = 'var(--sp-5)';
+  hero.className = 'hero';
 
   if (content?.heroImage) {
     const img = document.createElement('img');
+    img.className = 'hero__image';
     img.src = content.heroImage;
     img.alt = `${content.heroTitle ?? 'Sunny 訂房平台'} 主視覺`;
-    img.style.borderRadius = 'var(--radius)';
-    img.style.marginBottom = 'var(--sp-4)';
     hero.append(img);
+  } else {
+    hero.classList.add('hero--plain');
   }
+
+  const inner = document.createElement('div');
+  inner.className = 'hero__inner';
 
   const h1 = document.createElement('h1');
   h1.textContent = content?.heroTitle ?? 'Sunny 訂房平台';
-  const p = document.createElement('p');
-  p.textContent = content?.heroSubtitle ?? '舒適住宿，安心入住';
-  p.style.color = 'var(--c-text-muted)';
-  p.style.marginBottom = '0';
 
-  hero.append(h1, p);
+  const p = document.createElement('p');
+  p.className = 'hero__lede';
+  p.textContent = content?.heroSubtitle ?? '舒適住宿，安心入住';
+
+  inner.append(h1, p);
+  hero.append(inner);
   return hero;
 }
 

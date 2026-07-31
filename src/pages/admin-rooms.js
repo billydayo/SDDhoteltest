@@ -16,7 +16,7 @@ import { withAudit, ACTIONS, diffSummary } from '../services/audit.js';
 import {
   createDataTable, createEmptyRow, textField, selectField, textareaField,
   checkboxGroup, actionButton, confirmAction, inlineError, showInlineError,
-  statusTag, buttonRow
+  statusTag, buttonRow, createExportButton
 } from '../components/admin-ui.js';
 import { AMENITIES, ROOM_FEATURES, ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel }
   from '../data/vocabulary.js';
@@ -165,11 +165,46 @@ function buildForm(panel, context) {
 // 房源清單
 // ---------------------------------------------------------------------------
 
+const ROOM_EXPORT_COLUMNS = [
+  { key: 'name', label: '房名' },
+  { key: 'typeLabel', label: '房型' },
+  { key: 'maxGuests', label: '人數上限' },
+  { key: 'nightlyPrice', label: '每晚價格' },
+  { key: 'statusLabel', label: '房態' },
+  { key: 'ratingText', label: '平均評分' },
+  { key: 'amenities', label: '設施' },
+  { key: 'features', label: '房型特色' }
+];
+
 function buildTable(rooms, panel, context) {
   const section = document.createElement('section');
+
+  const head = document.createElement('div');
+  head.style.display = 'flex';
+  head.style.justifyContent = 'space-between';
+  head.style.alignItems = 'center';
+  head.style.gap = 'var(--sp-3)';
+  head.style.flexWrap = 'wrap';
+
   const h2 = document.createElement('h2');
+  h2.style.margin = '0';
   h2.textContent = '房源清單';
-  section.append(h2);
+
+  head.append(h2, createExportButton({
+    label: '匯出房源',
+    filename: 'sunny-rooms',
+    sheetName: '房源',
+    columns: ROOM_EXPORT_COLUMNS,
+    notify: toast,
+    getRows: () => rooms.map((r) => ({
+      ...r,
+      typeLabel: typeLabel(r.type),
+      statusLabel: roomStatusLabel(r.status),
+      // 尚無評分時輸出文字而非 0，與畫面一致（FR-047）
+      ratingText: r.averageRating === null ? '尚無評分' : String(r.averageRating)
+    }))
+  }));
+  section.append(head);
 
   if (!rooms.length) {
     section.append(createEmptyRow('尚無房源，請由上方表單新增。'));

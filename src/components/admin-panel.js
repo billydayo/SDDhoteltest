@@ -7,7 +7,13 @@
 
 import * as store from '../state/store.js';
 
-/** 後台十一模組。route 對應 router.js 的路徑。 */
+/**
+ * 後台模組。route 對應 router.js 的路徑。
+ *
+ * 「報表匯出」刻意不是獨立分頁——匯出按鈕改為嵌在各資料頁面內。
+ * spec US8 場景 1 要的是「位於訂單管理且有篩選結果時匯出目前結果」，
+ * 獨立分頁拿不到別頁的篩選條件，只能匯出全部，反而做不到規格要求的事。
+ */
 export const ADMIN_MODULES = Object.freeze([
   { route: '#/admin',           label: '儀表板',        story: 'US6' },
   { route: '#/admin/rooms',     label: '房源管理',      story: 'US6' },
@@ -15,7 +21,6 @@ export const ADMIN_MODULES = Object.freeze([
   { route: '#/admin/users',     label: '用戶管理',      story: 'US6' },
   { route: '#/admin/reviews',   label: '評論審核',      story: 'US7' },
   { route: '#/admin/refunds',   label: '退款審核',      story: 'US7' },
-  { route: '#/admin/export',    label: '報表匯出',      story: 'US8' },
   { route: '#/admin/content',   label: '內容編輯',      story: 'US8' },
   { route: '#/admin/risk',      label: '房源品質檢測',  story: 'US9' },
   { route: '#/admin/channel',   label: '渠道比價與控價', story: 'US11', simulated: true },

@@ -69,11 +69,26 @@ Google 帳號會進入同一個 `auth.users`，`profiles` 僅有一筆（FR-088�
 
 | 函式 | 呼叫時機 | 說明 |
 |---|---|---|
-| `expire_stale_orders()` | 查詢房況前、建立訂單前、讀取訂單列表前 | 將逾期的待付款訂單改為 `cancelled` 並釋出房況，回傳受影響筆數 |
+| `expire_stale_orders()` | 查詢房況前、建立訂單前、讀取訂單列表前，以及應用程式開啟期間每分鐘一次 | 將逾期的待付款訂單改為 `cancelled` 並釋出房況，回傳受影響筆數 |
 | `pending_payment_minutes()` | `orders.expires_at` 的預設值 | 讀取目前的保留分鐘數 |
 
 `expire_stale_orders()` 由 repository 層負責呼叫，MUST NOT 交由個別頁面自行決定。
 漏呼叫的後果是過期訂單持續擋房，且使用者會看到「已無空房」但實際上房是空的。
+
+定期掃描（FR-099a）由 `main.js` 的 `startExpirySweep()` 執行，
+僅在分頁可見時運作，且只有實際取消了訂單才更新畫面。
+這**不是**伺服器端排程——它是應用程式自己發的查詢，關掉分頁即停止，
+因此不違反憲章原則 II 的「禁止排程作業」。
+
+### 資料庫端的 trigger
+
+| Trigger | 作用 |
+|---|---|
+| `handle_new_user` | 註冊時自動建立 `profiles` 資料列 |
+| `prevent_role_escalation` | 非管理員不得變更 `role`（`auth.uid()` 為 null 的特權情境放行，供 bootstrap） |
+| `guard_order_transition` | 會員的訂單狀態轉換守門；禁止竄改金額、日期與到期時間 |
+| `refresh_room_rating` | 評論異動時重算 `rooms.average_rating` |
+| `enforce_refund_limit` | 單一會員退款上限 5 筆（只計 pending 與 approved） |
 
 ### 4. Supabase Storage
 
@@ -92,6 +107,7 @@ Google 帳號會進入同一個 `auth.users`，`profiles` 僅有一筆（FR-088�
 |---|---|---|
 | `23P01` exclusion violation（`orders_no_overlap`） | `ROOM_UNAVAILABLE` | 此房源於所選日期已無空房 |
 | `23505` unique violation（`refunds` pending 索引） | `REFUND_ALREADY_PENDING` | 此訂單已有審核中的退款申請 |
+| `P0001` 且訊息含「退款申請已達上限」（`enforce_refund_limit`） | `REFUND_LIMIT_REACHED` | 你的退款申請已達上限 5 筆，無法再提出新的申請 |
 | `23505` unique violation（`reviews.order_id`） | `REVIEW_ALREADY_EXISTS` | 此訂單已撰寫過評論 |
 | `42501` 且訊息含「無法付款」（`guard_order_transition`） | `ORDER_EXPIRED` | 此訂單已因逾期未付款而取消，請重新訂房 |
 | `42501` 且訊息含「僅管理員可變更角色」 | `ROLE_FORBIDDEN` | 你沒有權限變更角色 |

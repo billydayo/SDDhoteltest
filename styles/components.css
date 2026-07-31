@@ -330,8 +330,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: var(--sp-6) var(--sp-5);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: clamp(1.5rem, 3vw, 2.5rem);
 }
 .room-list li { margin: 0; }
 
@@ -349,9 +349,13 @@
   transform: translateY(-3px);
 }
 
+/*
+ * 4:3 橫向。先前用 3:4 直向，在三欄網格下每張圖約 400px 高，
+ * 卡片整體逼近 700px——一屏放不下兩排，瀏覽房源變得很吃力。
+ */
 .room-card__media {
   position: relative;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 4 / 3;
   background: var(--c-surface-alt);
   overflow: hidden;
   border-radius: var(--arch);

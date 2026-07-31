@@ -33,6 +33,9 @@ function translate(error) {
   if (/無法付款|逾期取消/.test(message)) {
     return appError('ORDER_EXPIRED', undefined, { cause: error });
   }
+  if (/退款申請已達上限/.test(message)) {
+    return appError('REFUND_LIMIT_REACHED', undefined, { cause: error });
+  }
   if (/僅管理員可變更角色/.test(message)) {
     return appError('ROLE_FORBIDDEN', undefined, { cause: error });
   }

@@ -21,7 +21,6 @@ import { renderAdminOrders } from './admin-orders.js';
 import { renderAdminUsers } from './admin-users.js';
 import { renderAdminReviews } from './admin-reviews.js';
 import { renderAdminRefunds } from './admin-refunds.js';
-import { renderAdminExport } from './admin-export.js';
 import { renderAdminContent } from './admin-content.js';
 import { renderAdminRisk } from './admin-risk.js';
 import { renderAdminChannel } from './admin-channel.js';
@@ -35,7 +34,6 @@ const MODULES = {
   '#/admin/users':    renderAdminUsers,
   '#/admin/reviews':  renderAdminReviews,
   '#/admin/refunds':  renderAdminRefunds,
-  '#/admin/export':   renderAdminExport,
   '#/admin/content':  renderAdminContent,
   '#/admin/risk':     renderAdminRisk,
   '#/admin/channel':  renderAdminChannel,

@@ -12,7 +12,8 @@ import { listOrders, updateOrderStatus, getOrderStats, isPaymentTimeout } from '
 import { listRooms } from '../data/rooms.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
 import {
-  createDataTable, createEmptyRow, textField, selectField, actionButton, buttonRow, statusTag
+  createDataTable, createEmptyRow, textField, selectField, actionButton, buttonRow,
+  statusTag, createExportButton
 } from '../components/admin-ui.js';
 import { ORDER_STATUS, orderStatusLabel } from '../data/vocabulary.js';
 import { formatTWD, formatPercent } from '../utils/money.js';
@@ -20,6 +21,22 @@ import { formatDateRange, formatDateTime } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
 
 let filters = { orderNo: '', status: '', from: '', to: '' };
+
+const ORDER_EXPORT_COLUMNS = [
+  { key: 'orderNo', label: '訂單編號' },
+  { key: 'roomName', label: '房源' },
+  { key: 'contactName', label: '訂房人' },
+  { key: 'phone', label: '聯絡電話' },
+  { key: 'email', label: '電子郵件' },
+  { key: 'checkIn', label: '入住日' },
+  { key: 'checkOut', label: '退房日' },
+  { key: 'nights', label: '夜數' },
+  { key: 'guestCount', label: '入住人數' },
+  { key: 'totalAmount', label: '金額' },
+  { key: 'paymentMethod', label: '付款方式' },
+  { key: 'statusLabel', label: '狀態' },
+  { key: 'createdAt', label: '建立時間' }
+];
 
 export async function renderAdminOrders(panel, context) {
   const [orders, rooms, stats] = await Promise.all([
@@ -153,9 +170,32 @@ function buildFilterForm(panel, context) {
 
 function buildTable(orders, roomById, panel, context) {
   const section = document.createElement('section');
+
+  const head = document.createElement('div');
+  head.style.display = 'flex';
+  head.style.justifyContent = 'space-between';
+  head.style.alignItems = 'center';
+  head.style.gap = 'var(--sp-3)';
+  head.style.flexWrap = 'wrap';
+
   const h2 = document.createElement('h2');
+  h2.style.margin = '0';
   h2.textContent = `符合條件的訂單（${orders.length}）`;
-  section.append(h2);
+
+  // FR-058 / US8 場景 1：匯出「目前篩選結果」，而非全部訂單
+  head.append(h2, createExportButton({
+    label: '匯出目前結果',
+    filename: 'sunny-orders',
+    sheetName: '訂單',
+    columns: ORDER_EXPORT_COLUMNS,
+    notify: toast,
+    getRows: () => orders.map((o) => ({
+      ...o,
+      roomName: roomById.get(o.roomId)?.name ?? '（已下架）',
+      statusLabel: isPaymentTimeout(o) ? '已取消（逾期未付款）' : orderStatusLabel(o.status)
+    }))
+  }));
+  section.append(head);
 
   if (!orders.length) {
     section.append(createEmptyRow('沒有符合條件的訂單。請調整篩選條件後再試。'));

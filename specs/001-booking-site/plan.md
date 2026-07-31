@@ -8,6 +8,8 @@
 
 This feature delivers a single-page hotel booking demo in pure browser JavaScript, with guest browsing/search, member registration and login, three-step booking with simulated payments, order/refund flows, review moderation, admin management screens, and a browser-only photo risk scoring feature. The app stores all data in `localStorage`, uses no build tooling, and keeps the user experience fully testable by opening the app directly in a browser.
 
+**Demo Mode Requirement**: If no Supabase credentials are configured in the environment, the app must automatically boot into demo mode. In this mode, all data remains in browser `localStorage`, the feature set remains complete, and no server connection is attempted whatsoever. This ensures a self-contained, zero-backend prototype that works immediately without any external services.
+
 ## Technical Context
 
 **Language/Version**: HTML5, CSS3, ES modules / modern browser JavaScript (no framework)
@@ -24,7 +26,7 @@ This feature delivers a single-page hotel booking demo in pure browser JavaScrip
 
 **Performance Goals**: Room list/search updates feel instant (< 200 ms for local in-browser operations), initial page load under 2 seconds on modern hardware, no build step
 
-**Constraints**: No framework, no build pipeline, no backend, no real payment or identity services, local-only data persistence, static file serving only
+**Constraints**: No framework, no build pipeline, no backend, no real payment or identity services, local-only data persistence, static file serving only, automatic demo mode when Supabase credentials are absent, no server connection in demo mode
 
 **Scale/Scope**: One hotel, roughly 8–12 rooms, 3–4 room types, demo bookings, reviews, refunds, and admin workflows
 

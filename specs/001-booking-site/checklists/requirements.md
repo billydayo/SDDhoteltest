@@ -14,7 +14,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,15 +32,12 @@
 
 ## Notes
 
-### 第 2 輪驗證（企劃書導入後）
+### 第 3 輪驗證（決策已落定）
 
-16 項中 15 項通過。唯一未通過為「No [NEEDS CLARIFICATION] markers remain」，尚餘 2 個
-標記：
+16 項中 16 項通過。兩個原先保留的 [NEEDS CLARIFICATION] 標記已被明確決策取代：
 
-- **FR-041** — 退款金額規則：核准後是否全額退款？是否依距入住日天數採不同比例？
-- **FR-068** — 拍照風險評分規則：三項指標的合格門檻、加權方式與風險等級分級。
-
-兩者皆為無合理業界預設的產品決策，故保留標記而非逕行假設。
+- **FR-041** — 退款金額規則已定義為依距入住日期長短分級：7 天以上全額退款；3–6 天 50%；1–2 天 20%；入住當日或已入住不退款。
+- **FR-068** — 拍照風險評分規則已定義為亮度、雜亂度、對比三項指標加權計算，總風險分數 0–100，並分為低／中／高三個等級。
 
 ### 企劃書已解答的前一輪問題
 

@@ -7,7 +7,7 @@
  * 只有管理員能改 role，前端這層只是介面。變更一律進稽核日誌。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listProfiles, updateProfile, setUserRole } from '../data/profiles.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
 import {
@@ -82,7 +82,7 @@ function buildNameCell(profile, panel, context) {
       toast('已更新。', 'ok');
       reload(panel, context);
     } catch (err) {
-      toast(toUserMessage(err), 'error');
+      toastError(err);
     }
   });
 
@@ -122,7 +122,7 @@ function buildRoleAction(profile, panel, context) {
         toast('權限已變更。', 'ok');
         reload(panel, context);
       } catch (err) {
-        toast(toUserMessage(err), 'error');
+        toastError(err);
       }
     },
     toAdmin ? '' : 'danger'

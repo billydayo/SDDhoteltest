@@ -8,7 +8,7 @@
  * 狀態連動由 adapter 的 moderateRefund 一併處理，因此這裡只負責決策與紀錄。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listRefunds, moderateRefund } from '../data/refunds.js';
 import { listOrders } from '../data/orders.js';
 import { listRooms } from '../data/rooms.js';
@@ -178,6 +178,6 @@ async function moderate(refund, decision, panel, context) {
     );
     reload(panel, context);
   } catch (err) {
-    toast(toUserMessage(err), 'error');
+    toastError(err);
   }
 }

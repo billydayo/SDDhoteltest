@@ -5,7 +5,7 @@
  *    讓管理員清楚知道系統並沒有真的在監控 Agoda 或 Booking（FR-110）。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listRooms } from '../data/rooms.js';
 import { loadComparison, undercutAlerts, markResolved, buildComplaintEmail }
   from '../services/channel.js';
@@ -147,7 +147,7 @@ function buildActions(row, panel, context) {
         toast('已標記為處理完成。', 'ok');
         reload(panel, context);
       } catch (err) {
-        toast(toUserMessage(err), 'error');
+        toastError(err);
       }
     }));
   }

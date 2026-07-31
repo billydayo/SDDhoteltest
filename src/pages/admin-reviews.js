@@ -7,7 +7,7 @@
  * 覆寫自動判定與刪除已公開評論都會寫入稽核日誌（FR-103c、FR-114）。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listReviews, moderateReview, deleteReview } from '../data/reviews.js';
 import { listRooms } from '../data/rooms.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
@@ -166,7 +166,7 @@ function buildActions(review, panel, context) {
       toast('評論已刪除。', 'ok');
       reload(panel, context);
     } catch (err) {
-      toast(toUserMessage(err), 'error');
+      toastError(err);
     }
   }, 'danger');
 
@@ -210,7 +210,7 @@ async function moderate(review, decision, panel, context) {
     toast(decision === 'approved' ? '評論已公開。' : '評論已駁回。', 'ok');
     reload(panel, context);
   } catch (err) {
-    toast(toUserMessage(err), 'error');
+    toastError(err);
   }
 }
 

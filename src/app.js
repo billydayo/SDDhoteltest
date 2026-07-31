@@ -7,8 +7,8 @@
 
 import { renderHeader } from './components/header.js';
 import { renderModeBanner } from './components/demo-badge.js';
-import { toUserMessage } from './utils/errors.js';
-import { currentHash } from './router.js';
+import { toUserMessage, isAppError } from './utils/errors.js';
+import { currentHash, navigate, setPendingRedirect } from './router.js';
 import * as store from './state/store.js';
 
 const el = {
@@ -58,13 +58,27 @@ export function renderError(err, { retry } = {}) {
   box.className = 'error-state';
   box.setAttribute('role', 'alert');
 
+  const expired = isAppError(err, 'SESSION_EXPIRED');
+
   const h = document.createElement('h2');
-  h.textContent = '操作未能完成';
+  h.textContent = expired ? '登入已逾時' : '操作未能完成';
   const p = document.createElement('p');
   p.textContent = toUserMessage(err);
   box.append(h, p);
 
-  if (retry) {
+  // FR-009d：工作階段失效時必須「明確告知**並引導**重新登入」。
+  // 只顯示訊息不夠——使用者還得自己找到登入頁，而且登入後會回到首頁而非原本的位置。
+  if (expired) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--primary';
+    btn.textContent = '重新登入';
+    btn.addEventListener('click', () => {
+      setPendingRedirect(currentHash());   // 登入後回到剛才的頁面
+      navigate('#/login');
+    });
+    box.append(btn);
+  } else if (retry) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn';
@@ -131,4 +145,17 @@ export function toast(message, tone = 'info') {
   window.setTimeout(() => item.remove(), 5000);
 }
 
-export const toastError = (err) => toast(toUserMessage(err), 'error');
+/**
+ * 錯誤提示的統一入口。
+ *
+ * 除了顯示訊息，工作階段失效時還會把使用者帶回登入頁並記住原本的位置（FR-009d）。
+ * 動作按鈕的錯誤處理一律走這裡，不要各自呼叫 toast()，否則這段引導會被繞過。
+ */
+export function toastError(err) {
+  toast(toUserMessage(err), 'error');
+
+  if (isAppError(err, 'SESSION_EXPIRED')) {
+    setPendingRedirect(currentHash());
+    navigate('#/login');
+  }
+}

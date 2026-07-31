@@ -15,9 +15,13 @@
  * 自動判定不是最終結果——一律仍需管理員複核，且可被覆寫（FR-103、FR-103b）。
  */
 
-import { normalizeText } from '../utils/validation.js';
+import { normalizeText, REVIEW_MIN_LENGTH } from '../utils/validation.js';
 
-export const MIN_LENGTH = 10;
+/**
+ * 評論長度下限。單一真相來源在 utils/validation.js——這裡只是轉出，
+ * 讓審核規則與表單驗證不可能各自漂移成不同的數字。
+ */
+export const MIN_LENGTH = REVIEW_MIN_LENGTH;
 
 /** 規則代碼 → 給管理員看的說明 */
 export const RULES = Object.freeze({

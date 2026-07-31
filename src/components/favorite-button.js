@@ -7,7 +7,7 @@
 
 import { addFavorite, removeFavorite } from '../data/favorites.js';
 import { toUserMessage } from '../utils/errors.js';
-import { toast } from '../app.js';
+import { toast, toastError } from '../app.js';
 import * as store from '../state/store.js';
 import * as router from '../router.js';
 
@@ -52,7 +52,7 @@ export function createFavoriteButton(room, options = {}) {
     } catch (err) {
       store.markFavorite(room.id, !next);
       paint();
-      toast(toUserMessage(err), 'error');
+      toastError(err);
     } finally {
       btn.disabled = false;
     }

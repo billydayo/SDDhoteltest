@@ -7,7 +7,7 @@
  * 統計區塊的分母為 0 時顯示破折號，不做除以零的計算（T075）。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listOrders, updateOrderStatus, getOrderStats, isPaymentTimeout } from '../data/orders.js';
 import { listRooms } from '../data/rooms.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
@@ -211,7 +211,7 @@ function buildStatusEditor(order, panel, context) {
       toast('訂單狀態已更新。', 'ok');
       reload(panel, context);
     } catch (err) {
-      toast(toUserMessage(err), 'error');
+      toastError(err);
       select.value = order.status;
     }
   });

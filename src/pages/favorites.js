@@ -5,7 +5,7 @@
  * FR-095：已下架或被刪除的房源不得造成錯誤或空白卡片。
  */
 
-import { render, renderLoading, renderError, createPageHeader, createEmptyState, toast } from '../app.js';
+import { render, renderLoading, renderError, createPageHeader, createEmptyState, toast, toastError } from '../app.js';
 import { listFavorites, removeFavorite } from '../data/favorites.js';
 import { getRoom } from '../data/rooms.js';
 import { createRoomCard } from '../components/room-card.js';
@@ -73,7 +73,7 @@ function buildAvailableItem(room) {
       toast('已從收藏移除。');
       renderFavorites();
     } catch (err) {
-      toast(toUserMessage(err), 'error');
+      toastError(err);
     }
   });
 
@@ -99,7 +99,7 @@ function buildRemovedItem(favorite) {
       toast('已從收藏移除。');
       renderFavorites();
     } catch (err) {
-      toast(toUserMessage(err), 'error');
+      toastError(err);
     }
   });
 

@@ -4,7 +4,7 @@
  * 匯出訂單或房源。離線或元件載不到時自動退回 CSV 並明確告知（FR-059）。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import { listOrders } from '../data/orders.js';
 import { listRooms } from '../data/rooms.js';
 import { exportRows } from '../services/export.js';
@@ -100,7 +100,7 @@ async function runExport(button, label, config) {
     const result = await exportRows(config);
     toast(result.message, result.format === 'none' ? 'error' : 'ok');
   } catch (err) {
-    toast(toUserMessage(err), 'error');
+    toastError(err);
   } finally {
     button.disabled = false;
     button.textContent = label;

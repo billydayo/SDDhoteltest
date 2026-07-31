@@ -8,7 +8,7 @@
  * FR-089：示範模式的 Google 按鈕呈現為停用並說明原因，不假造授權畫面。
  */
 
-import { render, createPageHeader, toast } from '../app.js';
+import { render, createPageHeader, toast, toastError } from '../app.js';
 import {
   register, login, loginWithGoogle, isGoogleLoginAvailable,
   DEMO_ACCOUNTS, PASSWORD_WARNING, DEMO_LOGIN_NOTICE, takePostAuthRedirect
@@ -291,7 +291,7 @@ function buildGoogleSection() {
         await loginWithGoogle(pending?.hash ?? '#/');
         // 成功時瀏覽器已離開本頁，不會執行到這裡
       } catch (err) {
-        toast(toUserMessage(err), 'error');
+        toastError(err);
         setBusy(btn, false, '以 Google 帳號登入');
       }
     });

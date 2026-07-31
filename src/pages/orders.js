@@ -5,7 +5,7 @@
  * 退款申請表單與審核狀態追蹤屬 US4（T060–T064），屆時擴充本檔即可。
  */
 
-import { render, renderLoading, renderError, createEmptyState, createPageHeader, toast } from '../app.js';
+import { render, renderLoading, renderError, createEmptyState, createPageHeader, toast, toastError } from '../app.js';
 import { listOrders, getOrder, payOrder, remainingMs, isPaymentTimeout } from '../data/orders.js';
 import { getRoom } from '../data/rooms.js';
 import { createPaymentCountdown } from '../components/payment-countdown.js';
@@ -447,7 +447,7 @@ function buildPaymentPanel(order, context) {
       // FR-100 / T057：逾期的訂單不得復活，並提供重新訂房的入口
       if (isAppError(err, 'ORDER_EXPIRED')) {
         renderOrderDetail(context);
-        toast(toUserMessage(err), 'error');
+        toastError(err);
         return;
       }
       error.textContent = toUserMessage(err);

@@ -8,7 +8,7 @@
  * 每個變更都經 withAudit 包裝——改了卻沒留下紀錄是不被允許的（FR-114）。
  */
 
-import { createPageHeader, toast } from '../app.js';
+import { createPageHeader, toast, toastError } from '../app.js';
 import {
   listRooms, createRoom, updateRoom, deleteRoom, setRoomStatus, getFutureOrdersForRoom
 } from '../data/rooms.js';
@@ -220,7 +220,7 @@ function buildRowActions(room, panel, context) {
         toast('房態已更新。', 'ok');
         reload(panel, context);
       } catch (err) {
-        toast(toUserMessage(err), 'error');
+        toastError(err);
       }
     }
   ));
@@ -267,6 +267,6 @@ async function handleDelete(room, panel, context) {
     if (editing?.id === room.id) editing = null;
     reload(panel, context);
   } catch (err) {
-    toast(toUserMessage(err), 'error');
+    toastError(err);
   }
 }

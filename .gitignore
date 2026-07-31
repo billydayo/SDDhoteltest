@@ -1,0 +1,12 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Node / package manager
+node_modules/

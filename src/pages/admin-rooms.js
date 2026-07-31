@@ -64,7 +64,9 @@ function buildForm(panel, context) {
   });
   const price = textField({
     id: 'rm-price', name: 'nightlyPrice', label: '每晚價格（新臺幣）', type: 'number',
-    value: editing?.nightlyPrice ?? 2000, attrs: { min: '1', step: '100' }
+    value: editing?.nightlyPrice ?? 2000,
+    // step 為 1：價格可以是任意正整數，不該被限制成 100 的倍數
+    attrs: { min: '1', step: '1', inputmode: 'numeric', class: 'no-spin' }
   });
   const status = selectField({
     id: 'rm-status', name: 'status', label: '房態', value: editing?.status ?? 'available',

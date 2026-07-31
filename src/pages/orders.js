@@ -10,7 +10,9 @@ import { listOrders, getOrder, payOrder, remainingMs, isPaymentTimeout } from '.
 import { getRoom } from '../data/rooms.js';
 import { createPaymentCountdown } from '../components/payment-countdown.js';
 import { formatTWD } from '../utils/money.js';
-import { formatDate, formatDateRange, formatDateTime } from '../utils/dates.js';
+import {
+  formatDate, formatDateRange, formatDateTime, todayInTaipei, isSameOrBefore
+} from '../utils/dates.js';
 import { ORDER_STATUS, orderStatusLabel, PAYMENT_METHODS } from '../data/vocabulary.js';
 import { toUserMessage, isAppError } from '../utils/errors.js';
 import {
@@ -174,6 +176,10 @@ function buildDetail(order, room, refunds, context) {
   } else if (isPaymentTimeout(order)) {
     card.append(buildTimeoutPanel(order));
   }
+
+  // US5 場景 1：入住結束後，從訂單進入撰寫評論
+  const reviewEntry = buildReviewEntry(order);
+  if (reviewEntry) card.append(reviewEntry);
 
   frag.append(card);
 
@@ -453,6 +459,38 @@ function buildPaymentPanel(order, context) {
 
   panel.append(notice, pay, error);
   return panel;
+}
+
+/**
+ * 撰寫評論的入口（US5 場景 1）。
+ *
+ * 表單本身在房源詳情頁，因為評論要和該房源的其他評論一起呈現；
+ * 但使用者的心智路徑是「我住過這一筆 → 我想評論」，所以入口必須在訂單這裡。
+ *
+ * 是否真的還能評論（有沒有寫過、資格是否符合）由詳情頁判定，
+ * 這裡只負責在合理時機把人帶過去，避免為了顯示一顆按鈕多打一次評論查詢。
+ */
+function buildReviewEntry(order) {
+  const canReview = ['confirmed', 'completed'].includes(order.status)
+    && isSameOrBefore(order.checkOut, todayInTaipei());
+  if (!canReview) return null;
+
+  const wrap = document.createElement('div');
+  wrap.style.marginTop = 'var(--sp-4)';
+  wrap.style.paddingTop = 'var(--sp-4)';
+  wrap.style.borderTop = '1px solid var(--c-border-soft)';
+
+  const p = document.createElement('p');
+  p.className = 'field__hint';
+  p.textContent = '入住已結束，歡迎分享你的住宿體驗。評論送出後需經審核才會公開。';
+
+  const link = document.createElement('a');
+  link.className = 'btn btn--primary';
+  link.href = `#/rooms/${order.roomId}`;
+  link.textContent = '撰寫評論';
+
+  wrap.append(p, link);
+  return wrap;
 }
 
 /** 逾期取消：說明原因並提供重新訂房入口（T057） */

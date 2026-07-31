@@ -7,6 +7,17 @@
   <meta name="description" content="Sunny 訂房平台——展示用的單一飯店線上訂房原型。">
 
   <link rel="icon" href="assets/hero.svg">
+
+  <!--
+    Playfair Display：專案唯一的外部字型依賴，只用於拉丁字標題與數字。
+    中文會逐字退回系統明體。font-display: swap 讓載入失敗或離線時
+    文字不會消失，只是換成系統襯線體（憲章「字型」條）。
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&display=swap">
+
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/layout.css">
   <link rel="stylesheet" href="styles/components.css">

@@ -25,7 +25,7 @@ US9（房源檢測與詳情頁展示）。
 
 ### 目前進度（2026-07-31）
 
-**103 / 119 完成。程式碼與資料庫層均已完成並通過驗證。**
+**106 / 119 完成。程式碼與資料庫層均已完成；瀏覽器實測進行中（第 0–2 關已通過）。**
 
 | 階段 | 狀態 |
 |---|---|
@@ -47,13 +47,38 @@ US9（房源檢測與詳情頁展示）。
 | Phase 16 服務條款（T112） | ✅ |
 | Phase 17 Polish（T113–T116、T119） | ✅ |
 
-**剩餘 16 項**：
+**剩餘 13 項**：
 
 - **T009 Google provider** — 選用功能，尚未於 Dashboard 啟用。目前點擊
   Google 登入會顯示「請於 Authentication → Providers → Google 完成設定」，
   不影響其他功能。
-- **瀏覽器實測（15 項）**：T033、T041、T050、T059、T064、T072、T079、T083、
-  T086、T094、T099、T105、T111、T117、T118
+- **瀏覽器實測（12 項）**：T059、T064、T072、T079、T083、T086、T094、T099、
+  T105、T111、T117、T118
+
+### 瀏覽器實測進度
+
+驗收清單見 [checklists/browser-acceptance.md](./checklists/browser-acceptance.md)
+（225 項，分 14 關）。
+
+| 關卡 | 對應任務 | 狀態 |
+|---|---|---|
+| 第 0 關 啟動與模式切換 | T033 | ✅ 通過 |
+| 第 1 關 訪客瀏覽與搜尋 | T041 | ✅ 通過 |
+| 第 2 關 會員與登入 | T050 | ✅ 通過 |
+| 第 3 關 訂房與付款 | T059 | ⬜ |
+| 第 4 關 訂單與退款 | T064 | ⬜ |
+| 第 5 關 評論與自動審核 | T072 | ⬜ |
+| 第 6 關 後台核心 | T079 | ⬜ |
+| 第 7 關 審核閉環 | T083 | ⬜ |
+| 第 8 關 匯出與內容 | T086 | ⬜ |
+| 第 9 關 風險檢測 | T094 | ⬜ |
+| 第 10 關 收藏 | T099 | ⬜ |
+| 第 11 關 渠道比價 | T105 | ⬜ |
+| 第 12 關 日誌與參數 | T111 | ⬜ |
+| 第 13 關 跨切面與雙模式 | T117、T118 | ⬜ |
+
+前三關共 64 項全數通過，且未回報任何問題——包含視覺改版後的直向拱形卡片、
+Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 
 本開發環境沒有 node，python 為 Windows Store 殼程式，無法執行 JavaScript 或
 啟動伺服器，因此凡是需要在瀏覽器中操作介面的驗收都必須人工執行。
@@ -142,7 +167,7 @@ US9（房源檢測與詳情頁展示）。
 - [X] T030 [P] Add the persistent demo-mode indicator in src/components/demo-badge.js and the reusable simulated-data indicator in src/components/simulated-badge.js (FR-079, FR-110)
 - [X] T031 Implement booking and search core logic with half-open overlap rules, room-state checks, and pending-payment occupancy in src/services/search.js and src/services/booking.js
 - [X] T032 [P] Configure role-aware admin access and navigation for all eleven back-office modules in src/components/admin-panel.js and the admin shell in src/main.js
-- [ ] T033 [2M] Verify both modes boot correctly: with credentials the app reads from Supabase; with empty credentials it enters demo mode and issues zero network requests (SC-018) — **待瀏覽器實測**。已完成靜態驗證（39 個模組的 import 全數解析、index.html 引用的檔案全數存在），但本機無 node 與可用的 python，無法啟動伺服器實際執行。請開啟 index.html 並檢查 Network 面板確認。
+- [X] T033 [2M] Verify both modes boot correctly: with credentials the app reads from Supabase; with empty credentials it enters demo mode and issues zero network requests (SC-018) — **待瀏覽器實測**。已完成靜態驗證（39 個模組的 import 全數解析、index.html 引用的檔案全數存在），但本機無 node 與可用的 python，無法啟動伺服器實際執行。請開啟 index.html 並檢查 Network 面板確認。
 
 **Checkpoint**: 基礎設施完成後，所有使用者故事都可以在平行中開始實作
 
@@ -159,7 +184,7 @@ US9（房源檢測與詳情頁展示）。
 - [X] T038 [US1] Implement room detail page, rating display (null shows 尚無評分, never 0), and total price calculation in src/pages/room-detail.js and src/utils/dates.js
 - [X] T039 [US1] Add room status UX, loading state, empty state, and no-result messaging in src/pages/home.js and src/components/room-card.js
 - [X] T040 [US1] Wire booking CTA redirect for guests and preserve filter state across navigation in src/pages/room-detail.js and src/router.js
-- [ ] T041 [P] [US1] [2M] Validate homepage and detail-page acceptance scenarios against the browser flow in quickstart.md — **待瀏覽器實測**（開發環境無法執行 JS）
+- [X] T041 [P] [US1] [2M] Validate homepage and detail-page acceptance scenarios against the browser flow in quickstart.md — **待瀏覽器實測**（開發環境無法執行 JS）
 
 ---
 
@@ -175,7 +200,7 @@ US9（房源檢測與詳情頁展示）。
 - [X] T047 [US2] Implement session restore via getSession and onAuthStateChange, plus session-expiry handling in src/services/auth.js and src/state/store.js
 - [X] T048 [US2] Add password-length and duplicate-email validation with messages that never reveal whether an email exists in src/pages/login.js and src/services/auth.js
 - [X] T049 [US2] Add account settings page, profile update handling, logout, role-aware routing, and header name sync in src/pages/account.js, src/router.js, and src/components/header.js
-- [ ] T050 [P] [US2] [2M] Validate registration, login, Google login, account merging by email, logout, persistence, and cross-browser identity (SC-021, SC-025) — **待瀏覽器實測**
+- [X] T050 [P] [US2] [2M] Validate registration, login, Google login, account merging by email, logout, persistence, and cross-browser identity (SC-021, SC-025) — **待瀏覽器實測**
 
 ---
 

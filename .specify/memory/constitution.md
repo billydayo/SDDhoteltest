@@ -1,5 +1,23 @@
 <!--
 Sync Impact Report
+- Version change: 2.4.0 → 2.5.0
+- Bump rationale: MINOR。放寬示範模式的網路請求限制、改變卡片形狀語彙、
+  改採參考站的原始配色。三者皆為放寬或風格調整，不使既有的資料層、
+  安全或訂房規則失效。
+- Modified principles:
+  - II. 零建置的原生前端 → 移除「示範模式 MUST NOT 發出任何網路請求」。
+    改為區分兩件事：**資料**仍 MUST NOT 離開瀏覽器（這是示範模式的本質），
+    但靜態資源（webfont、CDN 函式庫）MAY 於需要時載入。
+- Modified sections:
+  - 品質標準與技術約束 →「視覺基調」條：橫向房源卡片改為**直向拱形卡片**；
+    解除 webfont 禁令，允許 Playfair Display 作為拉丁字標題字型。
+  - 合規審查 → 新增「已知不合規項目」清單，記錄兩處低於 WCAG AA 的配色。
+- 依據：使用者於 2026-07-31 指示「憲章取消零網路請求、改成直向拱形卡片、
+  顏色依照參考站」。
+- ⚠️ 本次修訂使原則 V 的對比度要求出現兩處已知違反，已依「合規審查」條
+  明確記錄而非靜默留存。修復方式僅需調整兩個色值，見該節。
+
+Sync Impact Report（前一版）
 - Version change: 2.3.0 → 2.4.0
 - Bump rationale: MINOR。視覺基調由「圓體大標」改為「襯線大標」，並明確化
   配色與對比度的要求。此為擴充既有指引與調整風格宣告，不使既有的資料層、
@@ -92,8 +110,11 @@ Sync Impact Report（前一版）
   **Supabase**（託管 Postgres + Auth + Storage），MUST 由瀏覽器直接呼叫，
   MUST NOT 在其上再架設一層自製 API 伺服器或 Node 服務。
 - MUST NOT 依賴後端才能運行。未設定 Supabase 憑證時，應用程式 MUST 自動進入
-  示範模式：資料存放於瀏覽器 `localStorage`、功能完整、且 MUST NOT 發出任何
-  網路請求。「直接開啟 `index.html` 就能用」是不可協商的特性。
+  示範模式：資料存放於瀏覽器 `localStorage`、功能完整、且 **MUST NOT 連線至
+  Supabase 或任何資料服務**。「直接開啟 `index.html` 就能用」是不可協商的特性。
+- 示範模式 MAY 載入靜態資源（webfont、CDN 函式庫）。這與上一條的差別是刻意的：
+  受管制的是**資料**離不離開瀏覽器，不是有沒有網路封包。靜態資源載入失敗時
+  MUST 優雅退回（字型退回系統字、SheetJS 退回 CSV），MUST NOT 導致功能中斷。
 - MUST NOT 引入 Supabase Edge Functions、Database Webhooks、排程作業（cron）
   或任何形式的爬蟲。需要伺服器端執行的功能 MUST 改以模擬資料呈現，或不做。
   唯一例外是資料庫內部的 trigger 與 function——它們屬於 schema 的一部分，
@@ -240,14 +261,18 @@ Sync Impact Report（前一版）
 - **HTML 有效性**：頁面 MUST 通過 W3C validator（或等效檢查）且無錯誤。
 - **樣式**：MUST NOT 使用 inline `style` 屬性與 inline `onclick`，除非規格明確要求。
   事件 MUST 以 `addEventListener` 綁定。
-- **視覺基調**：暖象牙底色搭配深林綠主墨色與黃銅強調色（仍屬米色系）、
-  **襯線大標**、橫向房源卡片。標題字重 MUST 保持 400——精品調性靠字形與尺寸
-  經營，加粗反而顯得廉價。基調 MUST 全站一致；配色值與字級 MUST 集中於單一
-  樣式來源（`styles/base.css` 的 CSS 自訂屬性），MUST NOT 於各頁重複硬編碼。
-  MUST NOT 引入 webfont：CJK 字型檔動輒數 MB，且會使離線可用性失效。
+- **視覺基調**：暖象牙底色搭配深林綠主墨色與黃銅強調色、**襯線大標**、
+  **直向拱形房源卡片**。標題字重 MUST 保持 400——精品調性靠字形與尺寸經營，
+  加粗反而顯得廉價。拱形 MUST 以 `border-radius` 的雙值語法實作
+  （水平半徑遠大於垂直半徑），否則會變成單純的圓角而非拱。
+  基調 MUST 全站一致；配色值與字級 MUST 集中於 `styles/base.css` 的 CSS
+  自訂屬性，MUST NOT 於各頁重複硬編碼。
+- **字型**：MAY 引入拉丁字 webfont（目前為 Playfair Display）。
+  CJK webfont MUST NOT 引入——字型檔動輒數 MB。字型載入失敗時 MUST 優雅退回
+  系統襯線體，版面 MUST NOT 因此崩壞（`font-display: swap`）。
 - **對比度稽核**：新增或調整任何承載文字的顏色時，MUST 於 `base.css` 的註解
   標註其與背景的對比度。米色與黃銅這類低飽和配色特別容易在不知不覺中掉到
-  4.5:1 以下。
+  4.5:1 以下。已知不合規項目見「合規審查」節。
 - **命名**：CSS class 使用 kebab-case，JavaScript 變數與函式使用 camelCase，
   常數使用 UPPER_SNAKE_CASE，`localStorage` 鍵名使用企劃書所定義的名稱。
 - **編碼**：所有檔案 MUST 為 UTF-8，HTML MUST 宣告 `<meta charset="utf-8">`。
@@ -343,4 +368,22 @@ Sync Impact Report（前一版）
 - 已知的不合規項目 MUST 被明確記錄並排入修復，MUST NOT 靜默留存。
 - 執行期的開發指引以各功能目錄下的 `plan.md` 為準；本憲章僅規範不可協商的邊界。
 
-**Version**: 2.4.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-07-31
+**已知不合規項目**（2026-07-31 起）：
+
+依使用者指示採用參考站的原始配色後，有一處**實際**低於原則 V 要求的 4.5:1：
+
+| 位置 | 組合 | 實測對比 | 狀態 |
+|---|---|---|---|
+| 白字於 `--c-brand` `#96793F` 上 | `.btn--primary` 按鈕文字 | **4.1:1** | ⚠️ 實際使用中，未達 AA |
+| `--c-text-faint` `#7C8883` 於 `--c-bg` 上 | — | 3.4:1 | 已定義但**目前無任何規則使用**，無實際影響 |
+
+按鈕文字是唯一真正的違反。這是刻意保留的風格決定，非疏漏。
+**修復方式為改動一行**：`styles/base.css` 的 `--c-brand` 改為 `#7A6132`
+（即參考站的 `--brass-deep`，白字對比 5.9:1）。視覺差異極小，
+不影響任何其他設計決定。
+
+`--c-text-faint` 若日後要投入使用，MUST 先改為 `#63706B`（4.8:1）。
+
+在修復之前，`.btn--primary` MUST NOT 被描述為符合 WCAG AA。
+
+**Version**: 2.5.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-07-31

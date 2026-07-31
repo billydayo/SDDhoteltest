@@ -155,6 +155,23 @@
 }
 .field textarea { resize: vertical; min-height: 96px; line-height: 1.7; }
 
+/*
+ * 移除數字欄位的上下箭頭。
+ *
+ * 用於價格、金額這類「使用者會直接鍵入完整數字」的欄位——按 24 次箭頭
+ * 從 100 加到 2500 沒有意義，而且箭頭的點擊區極小、各家瀏覽器樣式又不一致。
+ * 人數這種 1–4 的小範圍欄位則保留箭頭，那裡點兩下確實比打字快。
+ */
+.field input.no-spin::-webkit-outer-spin-button,
+.field input.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field input.no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .field input[aria-invalid="true"],
 .field textarea[aria-invalid="true"] { border-color: var(--c-danger); }
 
@@ -303,37 +320,41 @@
 /* --------------------------------------------------------- 房源卡片 */
 
 /*
- * 憲章「視覺基調」與企劃書皆指定橫向房源卡片。
- * 窄螢幕由 responsive.css 改為直向堆疊，而非讓整頁橫向捲動。
+ * 直向拱形卡片（憲章「視覺基調」，2026-07-31 由橫向改為直向）。
+ *
+ * 拱形用 border-radius 的雙值語法：水平半徑 50% 遠大於垂直半徑 22%，
+ * 才會是「拱」而不是圓角。卡片與圖片各套一次，圖片才不會溢出拱的弧線。
  */
 .room-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--sp-5);
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: var(--sp-6) var(--sp-5);
 }
+.room-list li { margin: 0; }
 
 .room-card {
-  display: grid;
-  grid-template-columns: 300px 1fr;
+  display: flex;
+  flex-direction: column;
   background: var(--c-surface);
-  border: 1px solid var(--c-border-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--arch);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .room-card:hover {
   box-shadow: var(--shadow);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
 }
 
 .room-card__media {
   position: relative;
+  aspect-ratio: 3 / 4;
   background: var(--c-surface-alt);
   overflow: hidden;
-  min-height: 210px;
+  border-radius: var(--arch);
 }
 .room-card__media img {
   position: absolute;
@@ -350,10 +371,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  flex: 1;
   min-width: 0;
 }
 
-.room-card__title { margin: 0; font-size: var(--f-h3); }
+.room-card__title { margin: 0; font-size: var(--f-md); line-height: 1.4; }
 .room-card__title a { color: inherit; text-decoration: none; }
 .room-card__title a:hover { color: var(--c-brand-strong); }
 
@@ -371,7 +393,7 @@
 /* 價格用襯線體，與標題同一語彙，強調它是這張卡片的主角 */
 .room-card__price {
   font-family: var(--font-display);
-  font-size: var(--f-h2);
+  font-size: var(--f-h3);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--c-text);
@@ -399,13 +421,15 @@
 
 .room-card__footer {
   margin-top: auto;
-  padding-top: var(--sp-3);
+  padding-top: var(--sp-4);
   border-top: 1px solid var(--c-border-soft);
   display: flex;
   gap: var(--sp-2);
   align-items: center;
   flex-wrap: wrap;
 }
+/* 直向卡片較窄，主要動作占滿整列比擠在一起好讀 */
+.room-card__footer .btn--primary { flex: 1; min-width: 7rem; }
 
 .room-card--unavailable .room-card__media img { filter: grayscale(0.75); opacity: 0.7; }
 
@@ -418,11 +442,12 @@
   align-items: start;
 }
 
+/* 詳情頁主圖同樣採拱形，維持全站語彙一致 */
 .detail-gallery {
-  border-radius: var(--radius-lg);
+  border-radius: var(--arch);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  margin-bottom: var(--sp-5);
+  margin-bottom: var(--sp-6);
 }
 .detail-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 

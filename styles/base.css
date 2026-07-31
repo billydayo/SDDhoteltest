@@ -14,8 +14,13 @@
 
 :root {
   /* ---- 色彩 -------------------------------------------------------------
+     配色依照參考站 sunny-booking-prototype2 的原始值（使用者 2026-07-31 指定）。
      每個用於文字的色都標註了與其背景的對比度。
-     憲章原則 V：一般文字 4.5:1、大字 3:1，米色系不是對比不足的藉口。 */
+
+     ⚠️ 其中兩處低於憲章原則 V 要求的 4.5:1，已列入憲章的「已知不合規項目」：
+        --c-text-faint 於 --c-bg 上為 3.4:1
+        白字於 --c-brand 上為 4.1:1
+     兩者為刻意保留的風格決定。若要修復，憲章該節記載了替代色值。 */
 
   --c-bg:            #FAF8F4;   /* 頁面底：暖象牙 */
   --c-surface:       #FFFFFF;   /* 卡片 */
@@ -26,17 +31,16 @@
   --c-border-soft:   rgba(27, 42, 36, 0.055);
   --c-border-strong: rgba(27, 42, 36, 0.22);
 
-  /* 文字。--c-text 對 --c-bg 為 15.8:1；--c-text-muted 為 5.9:1。 */
-  --c-text:          #1B2A24;
-  --c-text-muted:    #55635D;
-  --c-text-faint:    #6E7B75;   /* 僅用於 16px 以上或非必要資訊 */
+  /* 文字 */
+  --c-text:          #1B2A24;   /* 對 --c-bg 15.8:1 ✅ */
+  --c-text-muted:    #4A5852;   /* 對 --c-bg  7.3:1 ✅ */
+  --c-text-faint:    #7C8883;   /* 對 --c-bg  3.4:1 ⚠️ 低於 AA，僅用於非必要註解 */
   --c-text-invert:   #FFFFFF;
 
-  /* 黃銅。--c-brand 作為填色時搭配白字為 5.9:1；
-     --c-brand-accent 僅供裝飾（分隔線、圖示），不承載文字。 */
-  --c-brand:         #7A6132;
-  --c-brand-strong:  #5F4B26;
-  --c-brand-accent:  #96793F;
+  /* 黃銅 */
+  --c-brand:         #96793F;   /* 填色。白字於其上 4.1:1 ⚠️ 低於 AA */
+  --c-brand-strong:  #7A6132;   /* 對 --c-bg 5.6:1 ✅ 用於文字與 hover */
+  --c-brand-accent:  #96793F;   /* 裝飾用（圓點、分隔線），不承載文字 */
   --c-brand-soft:    #F3EDE0;
 
   /* 深林綠。次要按鈕與選取態，白字對比 9.6:1。 */
@@ -55,10 +59,15 @@
   --c-info-soft:     #E4EEF5;
 
   /* ---- 字體 ----------------------------------------------------------
-     不引入 webfont：CJK 字型檔動輒數 MB，且憲章要求離線可用。
-     個性靠級距、字重與字距經營，不靠外部資源。 */
-  --font-display: "Hiragino Mincho ProN", "Songti TC", "Noto Serif TC",
-                  Georgia, "Times New Roman", serif;
+     Playfair Display 由 Google Fonts 載入，是專案唯一的外部字型依賴。
+     它只含拉丁字符，因此中文會逐字退回後面的系統明體——這正是想要的效果：
+     數字與英文標題有展示字型的個性，中文則維持系統明體的可讀性。
+
+     CJK webfont MUST NOT 引入（憲章「字型」條）：字型檔動輒數 MB。
+     Google CSS 預設帶 font-display: swap，載入失敗或離線時文字不會消失，
+     只會使用系統明體，字重與字距的設計仍然成立。 */
+  --font-display: "Playfair Display", "Hiragino Mincho ProN", "Songti TC",
+                  "Noto Serif TC", Georgia, "Times New Roman", serif;
   --font-body:    "Helvetica Neue", -apple-system, "PingFang TC",
                   "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
   --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -86,11 +95,15 @@
   --sp-7: 3rem;
   --sp-8: clamp(3rem, 7vw, 5.5rem);
 
-  /* ---- 形狀 ---- */
+  /* ---- 形狀 ----------------------------------------------------------
+     --arch 是精品度假村的招牌語彙：卡片頂端做成拱形。
+     必須用 border-radius 的雙值語法，水平半徑遠大於垂直半徑，
+     才會是「拱」而不是單純的圓角（憲章「視覺基調」條）。 */
   --radius-sm: 3px;
   --radius:    6px;
   --radius-lg: 12px;
   --radius-pill: 999px;
+  --arch: 50% 50% 0 0 / 22% 22% 0 0;
 
   --shadow-sm: 0 1px 2px rgba(27,42,36,0.04), 0 4px 16px rgba(27,42,36,0.05);
   --shadow:    0 2px 6px rgba(27,42,36,0.05), 0 16px 44px rgba(27,42,36,0.09);

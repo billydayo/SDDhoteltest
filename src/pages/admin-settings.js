@@ -49,7 +49,9 @@ function buildPendingPaymentForm(settings, panel) {
   const field = textField({
     id: 'set-hold', name: 'minutes', label: spec.label, type: 'number',
     value: String(current),
-    attrs: { min: String(spec.min), max: String(spec.max), step: '5' },
+    // step 為 1：範圍內的任意整數都該被接受。設成 5 會讓 7 分鐘這種值
+    // 被瀏覽器的原生驗證擋下，與 data/settings.js 的規則不一致。
+    attrs: { min: String(spec.min), max: String(spec.max), step: '1', inputmode: 'numeric', class: 'no-spin' },
     hint: `可接受範圍：${spec.min} 至 ${spec.max} 分鐘。變更只影響之後建立的新訂單，`
         + '既有訂單的到期時間不會被改動。'
   });

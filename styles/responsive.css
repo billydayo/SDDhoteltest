@@ -6,10 +6,6 @@
  * 捲動，頁面本體永遠不橫向捲動。
  */
 
-@media (max-width: 1024px) {
-  .room-card { grid-template-columns: 240px 1fr; }
-}
-
 @media (max-width: 900px) {
   .admin-layout { grid-template-columns: 1fr; }
   .admin-nav {
@@ -37,9 +33,9 @@
     --f-h3: 1.15rem;
   }
 
-  /* 橫向卡片改為直向堆疊，而非讓整頁橫向捲動 */
-  .room-card { grid-template-columns: 1fr; }
-  .room-card__media { min-height: 200px; aspect-ratio: 16 / 10; }
+  /* 窄螢幕改為單欄；拱形維持，但圖片比例放寬避免卡片過高 */
+  .room-list { grid-template-columns: 1fr; gap: var(--sp-5); }
+  .room-card__media { aspect-ratio: 4 / 3; }
   .room-card__body { padding: var(--sp-4); }
 
   .site-header__inner {
@@ -74,7 +70,7 @@
   .site-main { padding-left: var(--sp-3); padding-right: var(--sp-3); }
   .filter-bar__row { grid-template-columns: 1fr; }
   .card, .filter-bar { padding: var(--sp-4); }
-  .room-card__media { min-height: 170px; }
+  .room-card__media { aspect-ratio: 3 / 2; }
 }
 
 /* 列印：去掉互動元素與陰影 */

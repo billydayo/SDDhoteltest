@@ -23,6 +23,9 @@ export function createFilterBar(onChange) {
   const form = document.createElement('form');
   form.className = 'filter-bar';
   form.setAttribute('aria-label', '房源搜尋與篩選');
+  // 關閉原生驗證，改由 services/search.js 產生繁體中文訊息（FR-069、FR-075）。
+  // 否則輸入 0 只會跳出瀏覽器內建的英文提示。
+  form.noValidate = true;
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     onChange(readForm(form));
@@ -45,7 +48,11 @@ function buildMainRow(filters) {
     field('入住日', 'checkIn', 'date', filters.checkIn, { min: earliestCheckIn() }),
     field('退房日', 'checkOut', 'date', filters.checkOut, { min: earliestCheckIn() }),
     field('入住人數', 'guests', 'number', filters.guests, { min: '1', step: '1' }),
-    field('每晚價格上限', 'priceCap', 'number', filters.priceCap, { min: '1', step: '100' }),
+    // step 必須是 1：若設成 100，瀏覽器只接受 1、101、201…，
+    // 使用者輸入 2500 會被原生驗證擋下而送不出表單。
+    field('每晚價格上限', 'priceCap', 'number', filters.priceCap, {
+      min: '1', step: '1', inputmode: 'numeric', placeholder: '例如 3000', class: 'no-spin'
+    }),
     selectField('排序', 'sort', SORT_OPTIONS, filters.sort)
   );
   return row;

@@ -9,7 +9,11 @@
  *    密碼一律由 Supabase Auth 雜湊保管，應用資料表不存在密碼欄位。
  */
 
-export const SEED_VERSION = 3;
+/**
+ * 提高版本號會讓既有使用者的 localStorage 在下次載入時重建為新的種子資料。
+ * 新增房源或示範訂單後務必遞增，否則舊資料不會更新。
+ */
+export const SEED_VERSION = 4;
 
 const ROOM_IDS = {
   singleA: '11111111-1111-4111-8111-000000000001',
@@ -21,7 +25,17 @@ const ROOM_IDS = {
   twinB:   '11111111-1111-4111-8111-000000000007',
   family:  '11111111-1111-4111-8111-000000000008',
   suiteA:  '11111111-1111-4111-8111-000000000009',
-  suiteB:  '11111111-1111-4111-8111-000000000010'
+  suiteB:  '11111111-1111-4111-8111-000000000010',
+  waDouble:   '11111111-1111-4111-8111-000000000011',
+  waTwin:     '11111111-1111-4111-8111-000000000012',
+  starView:   '11111111-1111-4111-8111-000000000013',
+  gardenView: '11111111-1111-4111-8111-000000000014',
+  bizSingle:  '11111111-1111-4111-8111-000000000015',
+  bizDouble:  '11111111-1111-4111-8111-000000000016',
+  kidsFamily: '11111111-1111-4111-8111-000000000017',
+  accessible: '11111111-1111-4111-8111-000000000018',
+  execSuite:  '11111111-1111-4111-8111-000000000019',
+  honeymoon:  '11111111-1111-4111-8111-000000000020'
 };
 
 export const SITE_CONTENT_ID = '00000000-0000-0000-0000-000000000001';
@@ -145,6 +159,96 @@ function buildRooms() {
       features: ['採光佳', '泡澡放鬆'],
       description: '與景觀套房同規格。此房目前設為整理中，用於展示房態排除規則。',
       status: 'maintenance', averageRating: null
+    },
+    {
+      id: ROOM_IDS.waDouble, name: '和風雙人房', type: 'double',
+      maxGuests: 2, nightlyPrice: 3100,
+      images: ['assets/rooms/wa-double.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '備品組', '浴缸'],
+      features: ['泡澡放鬆', '情侶推薦', '安靜樓層'],
+      description: '榻榻米與檜木浴缸的和式房型，適合想放慢步調的旅客。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.waTwin, name: '和風雙床房', type: 'twin',
+      maxGuests: 2, nightlyPrice: 3300,
+      images: ['assets/rooms/wa-twin.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃', '備品組'],
+      features: ['朋友同行', '安靜樓層'],
+      description: '和式雙床房，兩張獨立床墊，附小型茶席空間。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.starView, name: '星空景觀房', type: 'double',
+      maxGuests: 2, nightlyPrice: 4100,
+      images: ['assets/rooms/star-view.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '陽台', '咖啡機'],
+      features: ['採光佳', '情侶推薦'],
+      description: '面東的高樓層房型，天氣好時可從陽台看見星空。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.gardenView, name: '庭園景觀房', type: 'double',
+      maxGuests: 2, nightlyPrice: 3600,
+      images: ['assets/rooms/garden-view.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '陽台', '備品組'],
+      features: ['採光佳', '安靜樓層', '情侶推薦'],
+      description: '低樓層房型，陽台直接面向內庭花園，清晨有鳥聲。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.bizSingle, name: '商務單人房', type: 'single',
+      maxGuests: 1, nightlyPrice: 2100,
+      images: ['assets/rooms/biz-single.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌', '衣櫃'],
+      features: ['商務友善', '安靜樓層'],
+      description: '附大型書桌與人體工學椅，長時間工作也不易疲勞。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.bizDouble, name: '商務雙人房', type: 'double',
+      maxGuests: 2, nightlyPrice: 2900,
+      images: ['assets/rooms/biz-double.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌', '小冰箱', '衣櫃'],
+      features: ['商務友善'],
+      description: '雙人商務房，兩側各有獨立插座與閱讀燈。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.kidsFamily, name: '親子主題房', type: 'family',
+      maxGuests: 4, nightlyPrice: 4800,
+      images: ['assets/rooms/kids-family.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '嬰兒床可租借', '加床服務'],
+      features: ['親子友善', '可加床', '採光佳'],
+      description: '含遊戲區與防撞設計的家庭房，備有兒童備品與床欄。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.accessible, name: '無障礙友善房', type: 'double',
+      maxGuests: 2, nightlyPrice: 3000,
+      images: ['assets/rooms/accessible.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃'],
+      features: ['無障礙', '安靜樓層'],
+      description: '加寬門框與無門檻淋浴間，走道淨寬足供輪椅迴轉。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.execSuite, name: '頂樓行政套房', type: 'suite',
+      maxGuests: 3, nightlyPrice: 6800,
+      images: ['assets/rooms/exec-suite.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台', '加床服務'],
+      features: ['採光佳', '商務友善', '可加床', '泡澡放鬆'],
+      description: '頂樓行政套房，含獨立起居室與辦公區，可加床。',
+      status: 'available', averageRating: null
+    },
+    {
+      id: ROOM_IDS.honeymoon, name: '蜜月套房', type: 'suite',
+      maxGuests: 2, nightlyPrice: 7500,
+      images: ['assets/rooms/honeymoon.svg'],
+      amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台', '備品組'],
+      features: ['情侶推薦', '泡澡放鬆', '採光佳'],
+      description: '雙人按摩浴缸與景觀陽台，房內備有慶祝布置服務。',
+      status: 'maintenance', averageRating: null
     }
   ];
 }
@@ -168,14 +272,132 @@ function buildChannelPrices() {
   ];
 }
 
+const GUEST_ID = '22222222-2222-4222-8222-000000000001';
+
+/** 相對於今天的 YYYY-MM-DD，讓示範資料不會隨時間過期 */
+function dayOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(d);
+}
+
+/**
+ * 示範用訂單：六種狀態各一筆，全部屬於 guest@sunny.com。
+ *
+ * 佔房的三種狀態（待付款、已確認、退款審核中）刻意分配到不同房源，
+ * 因此不會觸發重疊判定——與 Supabase 模式的排除約束行為一致。
+ *
+ * 待付款訂單的 expiresAt 設為 3 天後而非系統參數的 60 分鐘，
+ * 否則示範資料一小時內就會被 expireStaleOrders() 取消，
+ * 「六種狀態齊備」的性質活不過一個下午。
+ */
+function buildOrders() {
+  const base = {
+    userId: GUEST_ID,
+    contactName: '示範會員',
+    phone: '0900-000-000',
+    email: 'guest@sunny.com'
+  };
+  const iso = (days) => new Date(Date.now() + days * 86400_000).toISOString();
+
+  return [
+    {
+      ...base, id: 'demo-order-01', orderNo: 'SN00000001',
+      roomId: ROOM_IDS.doubleA, checkIn: dayOffset(200), checkOut: dayOffset(202),
+      nights: 2, guestCount: 2, paymentMethod: 'LINE Pay', totalAmount: 5200,
+      status: 'pending-payment', expiresAt: iso(3), cancelReason: null, createdAt: iso(-1)
+    },
+    {
+      ...base, id: 'demo-order-02', orderNo: 'SN00000002',
+      roomId: ROOM_IDS.suiteA, checkIn: dayOffset(210), checkOut: dayOffset(213),
+      nights: 3, guestCount: 2, paymentMethod: 'credit-card', totalAmount: 16800,
+      status: 'confirmed', expiresAt: iso(-5), cancelReason: null, createdAt: iso(-6)
+    },
+    {
+      ...base, id: 'demo-order-03', orderNo: 'SN00000003',
+      roomId: ROOM_IDS.family, checkIn: dayOffset(220), checkOut: dayOffset(222),
+      nights: 2, guestCount: 4, paymentMethod: 'bank-transfer', totalAmount: 8400,
+      status: 'refund-pending', expiresAt: iso(-8), cancelReason: null, createdAt: iso(-9)
+    },
+    {
+      ...base, id: 'demo-order-04', orderNo: 'SN00000004',
+      roomId: ROOM_IDS.doubleC, checkIn: dayOffset(230), checkOut: dayOffset(232),
+      nights: 2, guestCount: 2, paymentMethod: 'LINE Pay', totalAmount: 5600,
+      status: 'refunded', expiresAt: iso(-14), cancelReason: null, createdAt: iso(-15)
+    },
+    {
+      ...base, id: 'demo-order-05', orderNo: 'SN00000005',
+      roomId: ROOM_IDS.twinB, checkIn: dayOffset(240), checkOut: dayOffset(242),
+      nights: 2, guestCount: 3, paymentMethod: 'credit-card', totalAmount: 6400,
+      status: 'cancelled', expiresAt: iso(-2), cancelReason: 'payment-timeout', createdAt: iso(-3)
+    },
+    {
+      ...base, id: 'demo-order-06', orderNo: 'SN00000006',
+      roomId: ROOM_IDS.twinA, checkIn: dayOffset(-12), checkOut: dayOffset(-9),
+      nights: 3, guestCount: 2, paymentMethod: 'credit-card', totalAmount: 8700,
+      status: 'completed', expiresAt: iso(-20), cancelReason: null, createdAt: iso(-21)
+    },
+    {
+      // 第二筆已完成訂單，讓「一訂單一評論」的限制有東西可測
+      ...base, id: 'demo-order-07', orderNo: 'SN00000007',
+      roomId: ROOM_IDS.doubleB, checkIn: dayOffset(-30), checkOut: dayOffset(-28),
+      nights: 2, guestCount: 2, paymentMethod: 'LINE Pay', totalAmount: 5200,
+      status: 'completed', expiresAt: iso(-35), cancelReason: null, createdAt: iso(-36)
+    }
+  ];
+}
+
+/** 已公開的評論會讓房源產生平均評分，排序功能才測得出來 */
+function buildReviews() {
+  const iso = (days) => new Date(Date.now() + days * 86400_000).toISOString();
+  return [
+    {
+      id: 'demo-review-01', orderId: 'demo-order-06', roomId: ROOM_IDS.twinA,
+      userId: GUEST_ID, rating: 5,
+      comment: '房間比照片看起來更寬敞，床墊軟硬適中，一夜好眠。櫃檯人員也很親切。',
+      category: 'cleanliness', status: 'approved',
+      autoVerdict: 'auto-pass', autoRules: [], adminNote: null, createdAt: iso(-8)
+    }
+  ];
+}
+
+function buildRefunds() {
+  const iso = (days) => new Date(Date.now() + days * 86400_000).toISOString();
+  return [
+    {
+      id: 'demo-refund-01', orderId: 'demo-order-03', userId: GUEST_ID,
+      reason: '出差行程臨時取消，需要取消這次的訂房。', amount: 8400,
+      status: 'pending', adminNote: null, createdAt: iso(-2), reviewedAt: null
+    },
+    {
+      id: 'demo-refund-02', orderId: 'demo-order-04', userId: GUEST_ID,
+      reason: '家中臨時有事無法前往，麻煩協助辦理退款。', amount: 5600,
+      status: 'approved',
+      adminNote: '已確認符合入住前 7 天以上的全額退款條件。',
+      createdAt: iso(-5), reviewedAt: iso(-3)
+    }
+  ];
+}
+
 /** 建立一份全新的種子資料集合 */
 export function buildSeedData() {
+  const rooms = buildRooms();
+  const reviews = buildReviews();
+
+  // 讓房源的平均評分與已公開的評論一致，與 Supabase 的 trigger 行為對齊
+  reviews.filter((r) => r.status === 'approved').forEach((review) => {
+    const room = rooms.find((r) => r.id === review.roomId);
+    if (room) room.averageRating = review.rating;
+  });
+
   return {
     users: buildUsers(),
-    rooms: buildRooms(),
-    orders: [],
-    reviews: [],
-    refunds: [],
+    rooms,
+    orders: buildOrders(),
+    reviews,
+    refunds: buildRefunds(),
     favorites: [],
     riskChecks: [],
     channelPrices: buildChannelPrices(),

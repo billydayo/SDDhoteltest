@@ -1,90 +1,147 @@
-/* admin.css — 後台版面與十一個模組的導覽 */
+/* admin.css — 後台版面、統計磚與資料表 */
 
 .admin-layout {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: var(--sp-5);
+  grid-template-columns: 232px 1fr;
+  gap: var(--sp-7);
   align-items: start;
 }
 
+/* ------------------------------------------------------------- 模組導覽 */
+
 .admin-nav {
   background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  padding: var(--sp-3);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
   position: sticky;
-  top: var(--sp-4);
+  top: 92px;
+  box-shadow: var(--shadow-sm);
 }
 .admin-nav h2 {
-  font-size: var(--f-small);
-  text-transform: none;
+  font-family: var(--font-body);
+  font-size: var(--f-tiny);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 600;
   color: var(--c-text-muted);
-  margin-bottom: var(--sp-2);
+  margin-bottom: var(--sp-3);
 }
 .admin-nav ul { list-style: none; margin: 0; padding: 0; }
+.admin-nav li { margin: 0; }
 .admin-nav a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-sm);
   font-size: var(--f-small);
-  color: var(--c-text);
+  color: var(--c-text-muted);
   text-decoration: none;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.admin-nav a:hover { background: var(--c-surface-alt); }
+.admin-nav a:hover { background: var(--c-brand-soft); color: var(--c-text); text-decoration: none; }
 .admin-nav a[aria-current="page"] {
-  background: var(--c-brand-soft);
-  color: var(--c-brand-strong);
+  background: var(--c-forest-soft);
+  color: var(--c-forest);
   font-weight: 600;
 }
 
 .admin-panel { min-width: 0; }
 
+/* --------------------------------------------------------------- 統計磚 */
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-5);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
 }
+
 .stat-tile {
   background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius);
-  padding: var(--sp-4);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-sm);
 }
 .stat-tile__label {
-  font-size: var(--f-small);
+  font-size: var(--f-tiny);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--c-text-muted);
-  margin-bottom: var(--sp-1);
+  margin-bottom: var(--sp-2);
 }
+/* 數字用襯線體，是後台唯一需要被一眼看到的東西 */
 .stat-tile__value {
-  font-family: var(--font-heading);
+  font-family: var(--font-display);
   font-size: var(--f-h1);
-  font-weight: 700;
-  color: var(--c-brand-strong);
-  line-height: 1.2;
+  line-height: 1.1;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
 }
-/* 無資料時顯示破折號，不顯示 0，也不做除以零的計算 */
-.stat-tile__value--empty { color: var(--c-text-muted); }
+/* 無資料時顯示破折號。不顯示 0，也不做除以零的計算。 */
+.stat-tile__value--empty { color: var(--c-text-muted); opacity: 0.5; }
 
-.data-table-wrap { overflow-x: auto; }
+/* --------------------------------------------------------------- 資料表 */
+
+.data-table-wrap {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--c-surface);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--f-small);
-  background: var(--c-surface);
 }
 .data-table th,
 .data-table td {
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--c-border);
+  padding: 0.7rem 0.9rem;
   text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--c-border-soft);
   white-space: nowrap;
 }
 .data-table th {
-  background: var(--c-surface-alt);
+  font-size: var(--f-tiny);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   font-weight: 600;
   color: var(--c-text-muted);
+  background: var(--c-bg);
+  border-bottom: 1px solid var(--c-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
-.data-table tr:last-child td { border-bottom: none; }
-.data-table td.is-numeric { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--c-brand-soft); }
+
+.data-table td.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 賤賣預警等需要一眼看見的列 */
 .data-table tr.is-alert { background: var(--c-danger-soft); }
+.data-table tr.is-alert:hover { background: var(--c-danger-soft); }
+
+/* 表格內的動作按鈕縮小，避免把列撐高 */
+.data-table .btn {
+  padding: 0.34rem 0.8rem;
+  font-size: var(--f-tiny);
+  letter-spacing: 0.06em;
+}
+.data-table select {
+  padding: 0.34rem 0.5rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: var(--f-tiny);
+}
+.data-table details summary { white-space: nowrap; }
+.data-table details ul { white-space: normal; min-width: 220px; }

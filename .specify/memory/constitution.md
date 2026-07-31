@@ -1,5 +1,21 @@
 <!--
 Sync Impact Report
+- Version change: 2.3.0 → 2.4.0
+- Bump rationale: MINOR。視覺基調由「圓體大標」改為「襯線大標」，並明確化
+  配色與對比度的要求。此為擴充既有指引與調整風格宣告，不使既有的資料層、
+  安全或訂房規則失效，故非 MAJOR。
+- Modified sections:
+  - 品質標準與技術約束 →「視覺基調」條改寫：明訂暖象牙／深林綠／黃銅三色、
+    襯線大標、標題字重 400、禁止 webfont；新增「對比度稽核」條要求所有承載
+    文字的顏色都必須在 base.css 標註對比度。
+- 依據：使用者於 2026-07-31 指定參考 sunny-booking-prototype2 的視覺設計。
+  企劃書「視覺設計」欄原寫「圓體大標」，此次以使用者的明確指示為準；
+  「米色系配色」與「橫向房源列表」兩項維持不變。
+- Modified principles: 無
+- Added principles: 無
+- Removed sections: 無
+
+Sync Impact Report（前一版）
 - Version change: 2.2.0 → 2.3.0
 - Bump rationale: MINOR。依《Sunny 訂房平台產品企劃書》修訂版納入新模組。
   主要為放寬原則 VI 的照片禁令（區分兩種照片來源）並新增「模擬外部整合」條款。
@@ -224,9 +240,14 @@ Sync Impact Report（前一版）
 - **HTML 有效性**：頁面 MUST 通過 W3C validator（或等效檢查）且無錯誤。
 - **樣式**：MUST NOT 使用 inline `style` 屬性與 inline `onclick`，除非規格明確要求。
   事件 MUST 以 `addEventListener` 綁定。
-- **視覺基調**：米色系配色、圓體大標、橫向房源卡片。基調 MUST 全站一致；
-  配色值與字級 MUST 集中於單一樣式來源（CSS 自訂屬性或單一變數區塊），
-  MUST NOT 於各頁重複硬編碼。
+- **視覺基調**：暖象牙底色搭配深林綠主墨色與黃銅強調色（仍屬米色系）、
+  **襯線大標**、橫向房源卡片。標題字重 MUST 保持 400——精品調性靠字形與尺寸
+  經營，加粗反而顯得廉價。基調 MUST 全站一致；配色值與字級 MUST 集中於單一
+  樣式來源（`styles/base.css` 的 CSS 自訂屬性），MUST NOT 於各頁重複硬編碼。
+  MUST NOT 引入 webfont：CJK 字型檔動輒數 MB，且會使離線可用性失效。
+- **對比度稽核**：新增或調整任何承載文字的顏色時，MUST 於 `base.css` 的註解
+  標註其與背景的對比度。米色與黃銅這類低飽和配色特別容易在不知不覺中掉到
+  4.5:1 以下。
 - **命名**：CSS class 使用 kebab-case，JavaScript 變數與函式使用 camelCase，
   常數使用 UPPER_SNAKE_CASE，`localStorage` 鍵名使用企劃書所定義的名稱。
 - **編碼**：所有檔案 MUST 為 UTF-8，HTML MUST 宣告 `<meta charset="utf-8">`。
@@ -322,4 +343,4 @@ Sync Impact Report（前一版）
 - 已知的不合規項目 MUST 被明確記錄並排入修復，MUST NOT 靜默留存。
 - 執行期的開發指引以各功能目錄下的 `plan.md` 為準；本憲章僅規範不可協商的邊界。
 
-**Version**: 2.3.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-07-31
+**Version**: 2.4.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-07-31

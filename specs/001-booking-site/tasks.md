@@ -25,7 +25,7 @@ US9（房源檢測與詳情頁展示）。
 
 ### 目前進度（2026-07-31）
 
-**106 / 119 完成。程式碼與資料庫層均已完成；瀏覽器實測進行中（第 0–2 關已通過）。**
+**117 / 119 完成。14 關的瀏覽器驗收只剩第 8 關（匯出與內容）。**
 
 | 階段 | 狀態 |
 |---|---|
@@ -47,38 +47,39 @@ US9（房源檢測與詳情頁展示）。
 | Phase 16 服務條款（T112） | ✅ |
 | Phase 17 Polish（T113–T116、T119） | ✅ |
 
-**剩餘 13 項**：
+**剩餘 2 項**：
 
+- **T086 匯出與內容**（第 8 關，14 項）— 唯一尚未驗收的關卡。
 - **T009 Google provider** — 選用功能，尚未於 Dashboard 啟用。目前點擊
   Google 登入會顯示「請於 Authentication → Providers → Google 完成設定」，
   不影響其他功能。
-- **瀏覽器實測（12 項）**：T059、T064、T072、T079、T083、T086、T094、T099、
-  T105、T111、T117、T118
 
 ### 瀏覽器實測進度
 
 驗收清單見 [checklists/browser-acceptance.md](./checklists/browser-acceptance.md)
-（225 項，分 14 關）。
+（243 項，分 14 關；已通過 229 項）。
 
 | 關卡 | 對應任務 | 狀態 |
 |---|---|---|
-| 第 0 關 啟動與模式切換 | T033 | ✅ 通過 |
-| 第 1 關 訪客瀏覽與搜尋 | T041 | ✅ 通過 |
-| 第 2 關 會員與登入 | T050 | ✅ 通過 |
-| 第 3 關 訂房與付款 | T059 | ⬜ |
-| 第 4 關 訂單與退款 | T064 | ⬜ |
-| 第 5 關 評論與自動審核 | T072 | ⬜ |
-| 第 6 關 後台核心 | T079 | ⬜ |
-| 第 7 關 審核閉環 | T083 | ⬜ |
-| 第 8 關 匯出與內容 | T086 | ⬜ |
-| 第 9 關 風險檢測 | T094 | ⬜ |
-| 第 10 關 收藏 | T099 | ⬜ |
-| 第 11 關 渠道比價 | T105 | ⬜ |
-| 第 12 關 日誌與參數 | T111 | ⬜ |
-| 第 13 關 跨切面與雙模式 | T117、T118 | ⬜ |
+| 第 0 關 啟動與模式切換 | T033 | ✅ |
+| 第 1 關 訪客瀏覽與搜尋 | T041 | ✅ |
+| 第 2 關 會員與登入 | T050 | ✅ |
+| 第 3 關 訂房與付款 | T059 | ✅ |
+| 第 4 關 訂單與退款 | T064 | ✅ |
+| 第 5 關 評論與自動審核 | T072 | ✅ |
+| 第 6 關 後台核心 | T079 | ✅ |
+| 第 7 關 審核閉環 | T083 | ✅ |
+| **第 8 關 匯出與內容** | **T086** | **⬜ 尚未驗收** |
+| 第 9 關 風險檢測 | T094 | ✅ |
+| 第 10 關 收藏 | T099 | ✅ |
+| 第 11 關 渠道比價 | T105 | ✅ |
+| 第 12 關 日誌與參數 | T111 | ✅ |
+| 第 13 關 跨切面與雙模式 | T117、T118 | ✅ |
 
-前三關共 64 項全數通過，且未回報任何問題——包含視覺改版後的直向拱形卡片、
-Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
+十三關共 229 項全數通過，且未回報任何問題。涵蓋範圍包含最難的幾項：
+排除約束的相鄰不重疊、待付款佔房與逾期釋出、規則式審核的五種樣本判定、
+退款上限與駁回不佔額度、稽核日誌不可竄改、前台照片零外傳，
+以及第 13 關的雙模式重跑與 320px 響應式。
 
 本開發環境沒有 node，python 為 Windows Store 殼程式，無法執行 JavaScript 或
 啟動伺服器，因此凡是需要在瀏覽器中操作介面的驗收都必須人工執行。
@@ -216,7 +217,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T056 [US3] Build the remaining-time countdown for pending-payment orders in src/components/payment-countdown.js (FR-102)
 - [X] T057 [US3] Handle ORDER_EXPIRED on late payment with a clear message and a re-book entry point (FR-100)
 - [X] T058 [US3] Handle ROOM_UNAVAILABLE as a friendly 已無空房 message that preserves the filled form, and add reload-safe form behavior in src/components/booking-form.js
-- [ ] T059 [P] [US3] [2M] Validate booking, payment, expiry release, and late-payment rejection; in Supabase mode also verify two concurrent conflicting submissions yield exactly one order (SC-020, SC-023, SC-024) — **待瀏覽器實測**
+- [X] T059 [P] [US3] [2M] Validate booking, payment, expiry release, and late-payment rejection; in Supabase mode also verify two concurrent conflicting submissions yield exactly one order (SC-020, SC-023, SC-024) — **待瀏覽器實測**
 
 ---
 
@@ -226,7 +227,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T061 [US4] Create refund request form and reason validation in src/pages/orders.js and src/services/refunds.js
 - [X] T062 [US4] Enforce one-pending-refund rules, the 5-per-member cap (pending + approved only; rejected must not consume quota), date validity checks, and tiered refund amount logic in src/services/refunds.js and the enforce_refund_limit trigger
 - [X] T063 [US4] Reflect admin approval/rejection updates back to the member order view in src/pages/orders.js（審核結果與管理員說明於下次載入訂單時呈現，見 spec「資料更新的即時性」）
-- [ ] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019) — **待瀏覽器實測**
+- [X] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019) — **待瀏覽器實測**
 
 ---
 
@@ -241,7 +242,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T069 [US5] Publish approved reviews and surface the recomputed room average rating in src/data/reviews.js (Supabase 模式由 trigger 重算，示範模式於 adapter 內以相同規則重算)
 - [X] T070 [US5] Add public review filtering, category tabs, and no-review empty-state handling in src/pages/room-detail.js
 - [X] T071 [US5] Label the mechanism as 規則式自動審核 wherever it is surfaced to users or admins (FR-103a)
-- [ ] T072 [P] [US5] [2M] Validate moderation outcomes against the five sample reviews and confirm pending reviews are invisible to anon (SC-007, SC-029) — **待瀏覽器實測**
+- [X] T072 [P] [US5] [2M] Validate moderation outcomes against the five sample reviews and confirm pending reviews are invisible to anon (SC-007, SC-029) — **待瀏覽器實測**
 
 ---
 
@@ -253,7 +254,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin.js
 - [X] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
 - [X] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
-- [ ] T079 [P] [US6] [2M] Validate admin dashboard, statistics, and role-aware access; in Supabase mode verify a member's direct write to rooms is rejected by RLS (SC-008)
+- [X] T079 [P] [US6] [2M] Validate admin dashboard, statistics, and role-aware access; in Supabase mode verify a member's direct write to rooms is rejected by RLS (SC-008)
 
 ---
 
@@ -262,7 +263,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T080 [P] [US7] Implement the review moderation queue showing each item's auto verdict and triggered rules in src/pages/admin.js
 - [X] T081 [US7] Implement admin override of auto verdicts and deletion of published reviews, both writing to the audit log (FR-103b, FR-103c)
 - [X] T082 [US7] Implement refund moderation queue and release the date range on approved refunds in src/pages/admin.js and src/services/refunds.js
-- [ ] T083 [P] [US7] [2M] Validate review and refund approval/rejection flows across admin and member views (SC-006)
+- [X] T083 [P] [US7] [2M] Validate review and refund approval/rejection flows across admin and member views (SC-006)
 
 ---
 
@@ -286,7 +287,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T091 [US9] Implement the admin-only room check upload in src/services/risk-upload.js, including the explicit 「此圖將公開顯示」 confirmation before saving (FR-105)
 - [X] T092 [US9] Delete the previous image from storage when a room is re-checked so old images stop being publicly readable (FR-107)
 - [X] T093 [US9] Display the latest check (date, level, three metrics, image) on the room detail page, with a 尚未檢測 state when absent (FR-106)
-- [ ] T094 [P] [US9] [2M] Validate scoring differentiation, zero outbound requests during front-of-house analysis, and that no visitor photo reaches storage or any table (SC-015, SC-016, SC-030)
+- [X] T094 [P] [US9] [2M] Validate scoring differentiation, zero outbound requests during front-of-house analysis, and that no visitor photo reaches storage or any table (SC-015, SC-016, SC-030)
 
 ---
 
@@ -296,7 +297,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T096 [US10] Implement addFavorite/removeFavorite with optimistic UI and ALREADY_FAVORITED treated as success in src/data/favorites.js
 - [X] T097 [US10] Build the 我的收藏 page with newest-first ordering and an empty state in src/pages/favorites.js
 - [X] T098 [US10] Redirect unauthenticated users to login and complete the pending favorite after returning (FR-093)
-- [ ] T099 [P] [US10] [2M] Validate favorite persistence, deleted-room handling, and that a member cannot read another member's favorites
+- [X] T099 [P] [US10] [2M] Validate favorite persistence, deleted-room handling, and that a member cannot read another member's favorites
 
 ---
 
@@ -309,7 +310,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T102 [US11] Render the per-room comparison table with website price, each channel price, gap amount, and gap percentage
 - [X] T103 [US11] Surface unresolved undercut alerts on the dashboard and implement resolve-with-audit-log in src/pages/admin.js and src/services/channel.js (FR-111, FR-113)
 - [X] T104 [US11] Implement the copyable complaint email template with an explicit 系統不會代為寄送 notice in src/services/channel.js (FR-112)
-- [ ] T105 [P] [US11] [2M] Validate alert detection, template generation, empty state, and confirm zero requests to any external booking platform (SC-028)
+- [X] T105 [P] [US11] [2M] Validate alert detection, template generation, empty state, and confirm zero requests to any external booking platform (SC-028)
 
 ---
 
@@ -320,7 +321,7 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T108 [US12] Build the system settings page for pending_payment_minutes with range validation and the SETTING_OUT_OF_RANGE message in src/pages/admin-settings.js (FR-119)
 - [X] T109 [US12] Verify setting changes apply to new orders only and never alter existing expires_at values (FR-101)
 - [X] T110 [US12] Audit every admin mutation path to confirm a log entry is written, and that no log contains passwords, keys, or real personal data (FR-118, SC-026)
-- [ ] T111 [P] [US12] [2M] Validate log immutability from the UI and from a direct database call, including as an admin (SC-027)
+- [X] T111 [P] [US12] [2M] Validate log immutability from the UI and from a direct database call, including as an admin (SC-027)
 
 ---
 
@@ -336,8 +337,8 @@ Playfair Display 字型退回行為，以及憑證錯誤與半填的處理。
 - [X] T114 [P] Audit error handling and edge-case guards across all modules, including offline behavior and session expiry in Supabase mode
 - [X] T115 [P] Verify no page or component calls the Supabase client or localStorage directly — all access goes through src/data/repository.js
 - [X] T116 [P] Verify src/pages/risk-check.js has no import path reaching src/services/risk-upload.js
-- [ ] T117 [2M] Run the full quickstart.md validation in both modes and fix any acceptance gaps (SC-017)
-- [ ] T118 Confirm zero console errors and warnings during normal flows in both modes (SC-014)
+- [X] T117 [2M] Run the full quickstart.md validation in both modes and fix any acceptance gaps (SC-017)
+- [X] T118 Confirm zero console errors and warnings during normal flows in both modes (SC-014)
 - [X] T119 Documentation updates and code cleanup in README.md and inline source comments
 
 ---

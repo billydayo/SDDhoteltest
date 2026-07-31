@@ -20,7 +20,7 @@ import { formatTWD, formatPercent } from '../utils/money.js';
 import { formatDateRange, formatDateTime } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
 
-let filters = { orderNo: '', status: '', from: '', to: '' };
+let filters = { orderNo: '', roomId: '', status: '', from: '', to: '' };
 
 const ORDER_EXPORT_COLUMNS = [
   { key: 'orderNo', label: '訂單編號' },
@@ -51,8 +51,8 @@ export async function renderAdminOrders(panel, context) {
   const frag = document.createDocumentFragment();
   frag.append(createPageHeader('訂單管理', `全站共 ${orders.length} 筆訂單。`));
   frag.append(buildStats(stats));
-  frag.append(buildFilterForm(panel, context));
-  frag.append(buildTable(filtered, roomById, panel, context));
+  frag.append(buildFilterForm(rooms, panel, context));
+  frag.append(buildTable(filtered, orders.length, roomById, panel, context));
 
   panel.replaceChildren(frag);
 }
@@ -111,6 +111,7 @@ function applyFilters(orders) {
       const haystack = `${o.orderNo ?? ''} ${o.id}`.toLowerCase();
       if (!haystack.includes(needle)) return false;
     }
+    if (filters.roomId && o.roomId !== filters.roomId) return false;
     if (filters.status && o.status !== filters.status) return false;
     // 以入住日落在區間內為準
     if (filters.from && o.checkIn < filters.from) return false;
@@ -119,12 +120,26 @@ function applyFilters(orders) {
   });
 }
 
-function buildFilterForm(panel, context) {
+const hasFilters = () => Object.values(filters).some((v) => v !== '');
+
+function buildFilterForm(rooms, panel, context) {
   const form = document.createElement('form');
   form.className = 'filter-bar';
   form.noValidate = true;
 
   const orderNo = textField({ id: 'ord-no', name: 'orderNo', label: '訂單編號', value: filters.orderNo });
+
+  // 依房源篩選：查某間房的所有訂單，是排查房況爭議時最常用的入口
+  const room = selectField({
+    id: 'ord-room', name: 'roomId', label: '房源', value: filters.roomId,
+    options: [
+      { value: '', label: '全部房源' },
+      ...[...rooms]
+        .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
+        .map((r) => ({ value: r.id, label: r.name }))
+    ]
+  });
+
   const status = selectField({
     id: 'ord-status', name: 'status', label: '狀態', value: filters.status,
     options: [{ value: '', label: '全部狀態' },
@@ -135,7 +150,7 @@ function buildFilterForm(panel, context) {
 
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
-  row.append(orderNo.wrap, status.wrap, from.wrap, to.wrap);
+  row.append(orderNo.wrap, room.wrap, status.wrap, from.wrap, to.wrap);
   form.append(row);
 
   const submit = document.createElement('button');
@@ -144,7 +159,7 @@ function buildFilterForm(panel, context) {
   submit.textContent = '篩選';
 
   const clear = actionButton('清除條件', () => {
-    filters = { orderNo: '', status: '', from: '', to: '' };
+    filters = { orderNo: '', roomId: '', status: '', from: '', to: '' };
     reload(panel, context);
   });
 
@@ -152,8 +167,16 @@ function buildFilterForm(panel, context) {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+
+    // 日期區間寫反時直接說明，而不是回傳空清單讓人以為沒有訂單
+    if (from.input.value && to.input.value && from.input.value > to.input.value) {
+      toast('入住日的起始不可晚於結束。', 'error');
+      return;
+    }
+
     filters = {
       orderNo: orderNo.input.value,
+      roomId: room.input.value,
       status: status.input.value,
       from: from.input.value,
       to: to.input.value
@@ -168,7 +191,7 @@ function buildFilterForm(panel, context) {
 // 訂單表格
 // ---------------------------------------------------------------------------
 
-function buildTable(orders, roomById, panel, context) {
+function buildTable(orders, totalCount, roomById, panel, context) {
   const section = document.createElement('section');
 
   const head = document.createElement('div');
@@ -180,11 +203,14 @@ function buildTable(orders, roomById, panel, context) {
 
   const h2 = document.createElement('h2');
   h2.style.margin = '0';
-  h2.textContent = `符合條件的訂單（${orders.length}）`;
+  // 有篩選時同時顯示符合筆數與總數，才看得出條件是不是下得太窄
+  h2.textContent = hasFilters()
+    ? `符合條件的訂單（${orders.length} / ${totalCount}）`
+    : `全部訂單（${orders.length}）`;
 
   // FR-058 / US8 場景 1：匯出「目前篩選結果」，而非全部訂單
   head.append(h2, createExportButton({
-    label: '匯出目前結果',
+    label: hasFilters() ? '匯出目前結果' : '匯出訂單',
     filename: 'sunny-orders',
     sheetName: '訂單',
     columns: ORDER_EXPORT_COLUMNS,
@@ -198,7 +224,11 @@ function buildTable(orders, roomById, panel, context) {
   section.append(head);
 
   if (!orders.length) {
-    section.append(createEmptyRow('沒有符合條件的訂單。請調整篩選條件後再試。'));
+    section.append(createEmptyRow(
+      hasFilters()
+        ? '沒有符合條件的訂單。請調整或清除篩選條件後再試。'
+        : '目前沒有任何訂單。'
+    ));
     return section;
   }
 

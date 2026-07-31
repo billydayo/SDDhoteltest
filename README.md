@@ -65,13 +65,24 @@ SDDhoteltest/
 ├── README.md
 ├── index.html
 ├── styles/
+├── assets/                  # 房源與主視覺的 SVG 示意圖
 ├── src/
 │   ├── config.js            # 憑證設定，預設留空 = 示範模式
-│   ├── lib/supabase.js
+│   ├── lib/supabase.js      # client 建立與模式偵測
 │   ├── data/
 │   │   ├── repository.js    # 唯一的資料存取入口
-│   │   └── adapters/        # supabase.js / local.js
-│   ├── services/ pages/ components/ state/ utils/
+│   │   ├── adapters/        # supabase.js / local.js（簽章相同）
+│   │   └── *.js             # 各實體的資料模組
+│   ├── services/
+│   │   ├── auth.js booking.js search.js refunds.js reviews.js
+│   │   ├── moderation.js    # 規則式評論審核（非 AI）
+│   │   ├── risk-score.js    # 照片指標計算（只算不存）
+│   │   ├── risk-upload.js   # 房源檢測圖上傳（唯一會存圖的模組）
+│   │   ├── channel.js       # 渠道比價（模擬資料）
+│   │   ├── audit.js         # 稽核日誌寫入
+│   │   └── export.js        # Excel / CSV 匯出
+│   ├── pages/               # 前台 9 頁 + 後台 11 模組
+│   ├── components/ state/ utils/
 │   └── main.js
 ├── supabase/
 │   ├── schema.sql           # 十一張表、約束、trigger、RLS 政策、Storage
@@ -107,6 +118,9 @@ python -m http.server 8000
 1. 建立 Supabase 專案，並於 Authentication → Providers → Email 關閉 "Confirm email"
 2. （選用）於 Authentication → Providers → Google 啟用第三方登入
 3. 於 SQL Editor 依序執行 `supabase/schema.sql` 與 `supabase/seed.sql`
+   - 若專案曾裝過舊版 schema（`public` 底下看得到 `users`、或看不到 `profiles`），
+     必須先執行 `supabase/reset-legacy.sql`。直接重跑 schema.sql 無效——
+     `create table if not exists` 會靜默跳過既有的舊表，留下結構錯誤的資料庫。
 4. 於 Authentication → Users 建立示範帳號，並執行 `schema.sql` 末端的 UPDATE 指定管理員
 5. 將 Project URL 與 **anon** key 填入 `src/config.js`
 6. 以上述任一方式開啟 `index.html`
@@ -146,6 +160,18 @@ python -m http.server 8000
 - 介面契約：[`specs/001-booking-site/contracts/README.md`](specs/001-booking-site/contracts/README.md)
 - 任務清單：[`specs/001-booking-site/tasks.md`](specs/001-booking-site/tasks.md)
 - 快速驗收：[`specs/001-booking-site/quickstart.md`](specs/001-booking-site/quickstart.md)
+
+## 三條不可跨越的界線
+
+這三件事在程式碼結構上被強制隔離，不是靠註解或旗標約束：
+
+1. **頁面與元件不得直接碰資料。** 所有存取都走 `src/data/repository.js`。
+   切換示範模式與資料庫模式不需要改動任何頁面。
+2. **前台安全檢測的照片沒有上傳路徑。** `src/pages/risk-check.js` 完全不引用
+   `services/risk-upload.js`——那是使用者的私人照片，程式碼裡根本沒有能上傳它的函式。
+   只有管理員的房源檢測會存圖，且該圖明示會公開。
+3. **操作日誌只能新增。** `src/data/admin-logs.js` 沒有 update 或 delete 函式，
+   資料庫端也沒有對應的 RLS 政策且已 REVOKE。任何角色都改不了，包含管理員本人。
 
 ## 注意事項
 

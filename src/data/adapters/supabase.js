@@ -706,7 +706,18 @@ export async function signInWithGoogle() {
     provider: 'google',
     options: { redirectTo: window.location.origin + window.location.pathname }
   });
-  if (error) throw translate(error);
+  if (error) {
+    // Google provider 未於 Supabase Dashboard 啟用時的訊息，若不特別處理會被
+    // 歸到通用的「操作未能完成」，使用者與維運者都無從得知該去哪裡設定。
+    if (/provider is not enabled|Unsupported provider/i.test(error.message ?? '')) {
+      throw appError(
+        'CONFIG_ERROR',
+        'Google 登入尚未啟用。請於 Supabase Dashboard 的 Authentication → Providers → Google 完成設定，或改用電子郵件登入。',
+        { cause: error }
+      );
+    }
+    throw translate(error);
+  }
   return true;   // 瀏覽器隨即導向 Google，本函式不會有後續回傳
 }
 

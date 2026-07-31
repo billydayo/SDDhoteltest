@@ -16,8 +16,8 @@ import * as repo from '../data/repository.js';
 import { getRoom } from '../data/rooms.js';
 import { getPendingPaymentMinutes } from '../data/settings.js';
 import { appError } from '../utils/errors.js';
-import { nightsBetween, validateStayRange, daysUntil } from '../utils/dates.js';
-import { calculateTotal, calculateRefund } from '../utils/money.js';
+import { nightsBetween, validateStayRange } from '../utils/dates.js';
+import { calculateTotal } from '../utils/money.js';
 import { validateGuestCount, validatePhone, validateEmail, required, collectErrors, hasErrors }
   from '../utils/validation.js';
 
@@ -92,43 +92,7 @@ export async function payBooking(orderId) {
 /** 保留時間（分鐘），供畫面顯示「請於 N 分鐘內完成付款」 */
 export const holdMinutes = () => getPendingPaymentMinutes();
 
-// ---------------------------------------------------------------------------
-// 退款
-// ---------------------------------------------------------------------------
-
-/**
- * 退款試算（FR-041）。回傳 null 代表不可退款。
- * 級距：7 天以上全額、3–6 天 50%、1–2 天 20%、當日起不可退。
- */
-export function quoteRefund(order) {
-  if (!order || order.status !== 'confirmed') return null;
-  return calculateRefund(order.totalAmount, daysUntil(order.checkIn));
-}
-
-export function refundUnavailableReason(order) {
-  if (!order) return '查無此訂單。';
-  if (order.status === 'pending-payment') return '訂單尚未完成付款，請直接等待逾期取消或完成付款。';
-  if (order.status === 'refund-pending') return '此訂單已有審核中的退款申請。';
-  if (order.status === 'refunded') return '此訂單已完成退款。';
-  if (order.status === 'cancelled') return '此訂單已取消。';
-  if (order.status === 'completed') return '入住日已過，無法申請退款。';
-  if (daysUntil(order.checkIn) < 1) return '入住當日或已入住後不可申請退款。';
-  return null;
-}
-
-export async function submitRefundRequest(order, reason) {
-  const blocked = refundUnavailableReason(order);
-  if (blocked) throw appError('REFUND_NOT_ALLOWED', blocked);
-
-  const quoteResult = quoteRefund(order);
-  if (!quoteResult) throw appError('REFUND_NOT_ALLOWED', '此訂單目前不可申請退款。');
-
-  return repo.requestRefund({
-    orderId: order.id,
-    reason: reason.trim(),
-    amount: quoteResult.amount
-  });
-}
+// 退款相關邏輯集中於 src/services/refunds.js，本模組不重複實作。
 
 // ---------------------------------------------------------------------------
 // 房況

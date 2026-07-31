@@ -11,18 +11,23 @@
  * 不得表現為一般性當機，也不得悄悄退回示範模式。
  */
 
-import { initRepository, getMode, getSystemSettings } from './data/repository.js';
+import { initRepository, getSystemSettings } from './data/repository.js';
 import { verifyConnection, isSupabaseConfigured, isPartiallyConfigured } from './lib/supabase.js';
 import { initAuth, consumeOAuthResult, takePostAuthRedirect } from './services/auth.js';
-import { initShell, render, renderError, refreshHeader, toast } from './app.js';
+import { initShell, renderError, refreshHeader, toast } from './app.js';
 import * as store from './state/store.js';
 import * as router from './router.js';
 import { renderHome } from './pages/home.js';
 import { renderRoomDetail } from './pages/room-detail.js';
 import { renderLogin } from './pages/login.js';
 import { renderAccount } from './pages/account.js';
+import { renderBooking } from './pages/booking.js';
+import { renderOrders, renderOrderDetail } from './pages/orders.js';
+import { renderFavorites } from './pages/favorites.js';
+import { renderRiskCheck } from './pages/risk-check.js';
+import { renderTerms } from './pages/terms.js';
+import { renderAdmin } from './pages/admin.js';
 import { placeholderPage } from './pages/placeholder.js';
-import { createAdminLayout, guardAdminAccess } from './components/admin-panel.js';
 import { renderModeBanner } from './components/demo-badge.js';
 
 async function boot() {
@@ -79,6 +84,12 @@ function initShellSafely() {
   }
 }
 
+const ADMIN_ROUTES = [
+  '#/admin', '#/admin/rooms', '#/admin/orders', '#/admin/users',
+  '#/admin/reviews', '#/admin/refunds', '#/admin/export', '#/admin/content',
+  '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings'
+];
+
 function registerRoutes() {
   router.register('#/', renderHome);
 
@@ -87,38 +98,16 @@ function registerRoutes() {
   router.register('#/login', renderLogin);
   router.register('#/account', renderAccount);
 
-  router.register('#/orders', placeholderPage({
-    title: '我的訂單',
-    story: 'User Story 3 與 4（含待付款倒數與退款申請）',
-    taskRange: 'Phase 6 與 Phase 7'
-  }));
+  router.register('#/booking/:id', renderBooking);
+  router.register('#/orders', renderOrders);
+  router.register('#/orders/:id', renderOrderDetail);
 
-  router.register('#/favorites', placeholderPage({
-    title: '我的收藏',
-    story: 'User Story 10',
-    taskRange: 'Phase 13 的 T095–T099'
-  }));
+  router.register('#/favorites', renderFavorites);
+  router.register('#/risk-check', renderRiskCheck);
+  router.register('#/terms', renderTerms);
 
-  router.register('#/risk-check', placeholderPage({
-    title: '安全檢測',
-    story: 'User Story 9（前台路徑：照片全程留在瀏覽器內，不會上傳）',
-    taskRange: 'Phase 12 的 T087–T090'
-  }));
-
-  router.register('#/terms', placeholderPage({
-    title: '服務條款與隱私聲明',
-    story: '跨切面需求 FR-121 與 FR-122',
-    taskRange: 'Phase 16 的 T112',
-    description: '本站為展示用專案，不提供真實住宿服務，不進行真實交易，也不蒐集真實個人資料。'
-  }));
-
-  // 後台：所有模組共用同一個守衛與版面
-  const adminModuleRoutes = [
-    '#/admin', '#/admin/rooms', '#/admin/orders', '#/admin/users',
-    '#/admin/reviews', '#/admin/refunds', '#/admin/export', '#/admin/content',
-    '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings'
-  ];
-  adminModuleRoutes.forEach((route) => router.register(route, renderAdminShell));
+  // 後台：十一個模組共用同一個守衛與版面，由 pages/admin.js 分派
+  ADMIN_ROUTES.forEach((route) => router.register(route, renderAdmin));
 
   router.setNotFound(placeholderPage({
     title: '找不到頁面',
@@ -131,37 +120,6 @@ function registerRoutes() {
     refreshHeader();
     if (blocked && message) toast(message, 'error');
   });
-}
-
-/** 後台外殼：導覽 + 尚未實作的模組內容 */
-function renderAdminShell(context) {
-  const guard = guardAdminAccess();
-  if (!guard.allowed) {
-    toast(guard.message, 'error');
-    router.navigate(guard.redirect, { replace: true });
-    return;
-  }
-
-  const { layout, panel } = createAdminLayout(context.path);
-
-  const h1 = document.createElement('h1');
-  h1.textContent = '後台管理';
-  const note = document.createElement('div');
-  note.className = 'empty-state';
-  note.style.textAlign = 'left';
-
-  const h2 = document.createElement('h2');
-  h2.textContent = '模組尚未實作';
-  const p = document.createElement('p');
-  p.textContent = '十一個後台模組屬 User Story 6–12（Phase 9 之後）。目前已完成的是角色守衛、'
-    + '模組導覽與稽核寫入層 src/services/audit.js。';
-  const p2 = document.createElement('p');
-  p2.textContent = `目前登入身分：${store.currentProfile()?.displayName ?? '—'}（管理員）。`
-    + `資料來源：${getMode() === 'demo' ? '瀏覽器 localStorage' : 'Supabase'}。`;
-
-  note.append(h2, p, p2);
-  panel.append(h1, note);
-  render(layout);
 }
 
 boot();

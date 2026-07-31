@@ -77,7 +77,14 @@ as $$
   );
 $$;
 
--- 一般使用者不得自行升級角色
+-- 一般使用者不得自行升級角色。
+--
+-- `auth.uid() is null` 代表這不是來自瀏覽器的請求，而是 SQL Editor、migration
+-- 或 service_role 等特權情境——第一個管理員只能在這種情境下產生（bootstrap）。
+-- 放行它是安全的：匿名的 PostgREST 請求雖然 auth.uid() 也是 null，但 anon 角色
+-- 對 profiles 根本沒有 UPDATE 權限（見下方 grants），在觸發本 trigger 之前就已被擋下。
+--
+-- 少了這個條件，schema 會陷入無解的死結：沒有管理員 → 沒人能升權 → 永遠沒有管理員。
 create or replace function public.prevent_role_escalation()
 returns trigger
 language plpgsql
@@ -85,7 +92,9 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.role is distinct from old.role and not public.is_admin() then
+  if new.role is distinct from old.role
+     and auth.uid() is not null
+     and not public.is_admin() then
     raise exception '僅管理員可變更角色' using errcode = '42501';
   end if;
   return new;
@@ -718,17 +727,16 @@ grant execute on function public.expire_stale_orders() to anon, authenticated;
 grant execute on function public.pending_payment_minutes() to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- 建立示範帳號（手動步驟，無法純以 SQL 完成）
+-- 建立示範帳號
 --
--- 1. Dashboard → Authentication → Users → Add user，分別建立：
---      guest@sunny.com / guest123
---      admin@sunny.com / admin123
---    （勾選 Auto Confirm User）
--- 2. 回到 SQL Editor 執行下列指令，把 admin 帳號升為管理員：
+-- 帳號本身可由應用程式的註冊頁自行建立（handle_new_user trigger 會自動產生
+-- 對應的 profiles 資料列，預設角色為 member）。
+--
+-- 但**第一個管理員只能在此處產生**——應用程式內沒有任何路徑能把自己升權，
+-- 那正是 prevent_role_escalation trigger 的用意。
+--
+-- 完整步驟見 supabase/bootstrap-admin.sql。
 -- ---------------------------------------------------------------------------
 
--- update public.profiles set role = 'admin', display_name = '系統管理員'
+-- update public.profiles set role = 'admin'
 -- where id = (select id from auth.users where email = 'admin@sunny.com');
---
--- update public.profiles set display_name = '示範會員'
--- where id = (select id from auth.users where email = 'guest@sunny.com');

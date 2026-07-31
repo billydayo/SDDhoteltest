@@ -25,28 +25,68 @@ US9（房源檢測與詳情頁展示）。
 
 ### 目前進度（2026-07-31）
 
-- ✅ **Phase 1 Setup**（T001–T007）已完成
-- 🔶 **Phase 2 Supabase 專案與資料庫**（T008–T017）— schema 與 seed 已就緒，尚缺示範帳號
-- ✅ **Phase 3 Foundational 雙軌資料層**（T018–T032）已完成
-- ✅ **Phase 4 User Story 1**（T034–T040）已完成
-- ✅ **Phase 5 User Story 2**（T042–T049）已完成
-- ⬜ **T033、T041、T050** 需在瀏覽器實測（開發環境無 node／python 可執行 JS）
-- ⬜ Phase 6 之後（T051–T119）尚未開始
+**103 / 119 完成。程式碼與資料庫層均已完成並通過驗證。**
 
-**Phase 2 的現況（2026-07-31 以 anon key 實測）**：
-`reset-legacy.sql` → `schema.sql` → `seed.sql` 已執行完成——`rooms` 具備
-`features` 欄位與 10 筆種子資料、`profiles` 與 `system_settings` 已建立、
-舊的 `public.users` 表已移除。
+| 階段 | 狀態 |
+|---|---|
+| Phase 1 Setup（T001–T007） | ✅ |
+| Phase 2 Supabase 專案與資料庫（T008、T010–T017） | ✅ 已以 REST 實測驗證 |
+| Phase 3 雙軌資料層（T018–T032） | ✅ |
+| Phase 4 US1 訪客瀏覽與搜尋（T034–T040） | ✅ |
+| Phase 5 US2 會員與 Google 登入（T042–T049） | ✅ |
+| Phase 6 US3 訂房與保留時效（T051–T058） | ✅ |
+| Phase 7 US4 訂單與退款申請（T060–T063） | ✅ |
+| Phase 8 US5 評論與自動審核（T065–T071） | ✅ |
+| Phase 9 US6 後台核心與營運指標（T073–T078） | ✅ |
+| Phase 10 US7 評論與退款審核（T080–T082） | ✅ |
+| Phase 11 US8 匯出與內容編輯（T084–T085） | ✅ |
+| Phase 12 US9 風險檢測（T087–T093） | ✅ |
+| Phase 13 US10 收藏（T095–T098） | ✅ |
+| Phase 14 US11 渠道控價・模擬（T100–T104） | ✅ |
+| Phase 15 US12 日誌與參數（T106–T110） | ✅ |
+| Phase 16 服務條款（T112） | ✅ |
+| Phase 17 Polish（T113–T116、T119） | ✅ |
 
-仍待處理：
-- **T015**：`profiles` 為空，示範帳號 `guest@sunny.com` 與 `admin@sunny.com`
-  尚未於 Authentication → Users 建立。在此之前登入頁的「填入」按鈕可以用，
-  但實際登入會失敗（帳號不存在）。建立後需執行 `schema.sql` 末端的 UPDATE
-  把 admin 升為管理員。
-- **T009**：Google provider 是否已啟用未經驗證。未啟用時點擊 Google 登入會
-  導向失敗，介面會顯示錯誤訊息。
-- **T008**：Confirm email 是否已關閉未經驗證。若未關閉，註冊後帳號需收信驗證
-  才能登入，與本專案「註冊後立即可用」的設計不符。
+**剩餘 16 項**：
+
+- **T009 Google provider** — 選用功能，尚未於 Dashboard 啟用。目前點擊
+  Google 登入會顯示「請於 Authentication → Providers → Google 完成設定」，
+  不影響其他功能。
+- **瀏覽器實測（15 項）**：T033、T041、T050、T059、T064、T072、T079、T083、
+  T086、T094、T099、T105、T111、T117、T118
+
+本開發環境沒有 node，python 為 Windows Store 殼程式，無法執行 JavaScript 或
+啟動伺服器，因此凡是需要在瀏覽器中操作介面的驗收都必須人工執行。
+
+### 已完成的驗證（2026-07-31）
+
+**靜態分析**：72 個模組的 import 全數解析、頁面與元件皆未直接呼叫 localStorage
+或 Supabase client、前台安全檢測的傳遞相依中不含任何上傳模組、14 條後台變更
+路徑全部包在 withAudit 內、使用者可見文字中無「AI」字樣。
+
+**資料庫層（以 REST + 真實帳號實測）**：
+
+| 項目 | 結果 |
+|---|---|
+| schema 與 seed | 11 張表齊備、10 筆房源含 features、8 筆模擬渠道價格 |
+| `handle_new_user` trigger | 註冊即自動建立 profile，預設 role = member |
+| Confirm email | 已關閉，註冊立即回傳 session |
+| 自行升權防護 | 以會員身分改自己的 role → 被 trigger 擋下 |
+| `admin_logs` 不可竄改 | 管理員的 UPDATE 與 DELETE 皆回 403（SC-027） |
+| anon 可讀範圍 | 僅 rooms／site_content／system_settings／room_risk_checks／已公開評論 |
+| 排除約束・相鄰不重疊 | 03/01–03/03 與 03/03–03/05 兩筆皆成立 |
+| 排除約束・部分重疊 | 03/02–03/04 被擋（23P01） |
+| 排除約束・完全包含 | 03/01–03/05 被擋 |
+| 待付款佔房 | pending-payment 訂單確實阻擋他人預訂（FR-097） |
+| `expires_at` | 依 system_settings 計算為 60 分鐘 |
+| `expire_stale_orders()` | 逾期訂單轉為 cancelled／payment-timeout |
+| 逾期後釋出 | 同區間可重新預訂（SC-023） |
+| 逾期付款防護 | 無法對已取消訂單付款（SC-024） |
+| 狀態轉換守門 | 會員無法自行標記已完成、無法竄改金額 |
+| storage bucket | 會員上傳被擋、管理員可寫、匿名可公開讀 |
+
+測試資料已全數清除（訂單 0 筆、storage 測試檔已刪）。唯一殘留是稽核日誌中一筆
+`test.probe` 紀錄——那是驗證「日誌不可刪除」時寫入的，依設計無法移除。
 
 ---
 
@@ -70,16 +110,16 @@ US9（房源檢測與詳情頁展示）。
 無法由開發工具代勞。SQL 腳本已備妥於 `supabase/schema.sql` 與 `supabase/seed.sql`。
 未完成此階段前，應用程式會以示範模式運作，功能完整。
 
-- [ ] T008 Create the Supabase project and disable "Confirm email" under Authentication → Providers → Email
+- [X] T008 Create the Supabase project and disable "Confirm email" under Authentication → Providers → Email
 - [ ] T009 Enable the Google provider in Supabase Auth and register the callback URL in Google Cloud's authorized redirect URIs
-- [ ] T010 Run supabase/schema.sql in the SQL Editor and verify btree_gist, all eleven tables, triggers, functions, and constraints exist
-- [ ] T011 [P] Verify RLS is enabled with explicit policies on all eleven tables, and that anon can read only rooms, approved reviews, site_content, room_risk_checks, and system_settings
-- [ ] T012 [P] Verify admin_logs rejects UPDATE and DELETE for every role including admin (SC-027)
-- [ ] T013 [P] Verify the room-risk storage bucket exists, is public-read, and rejects writes from a non-admin account
-- [ ] T014 [P] Run supabase/seed.sql and confirm 10 rooms with amenities/features, the singleton site_content row, and 8 simulated channel prices appear
-- [ ] T015 Create demo accounts guest@sunny.com and admin@sunny.com in the dashboard, then promote admin via the SQL snippet at the end of supabase/schema.sql
-- [ ] T016 Manually verify orders_no_overlap: adjacent bookings succeed, overlapping and fully-contained bookings are rejected, and a pending-payment order blocks the same range
-- [ ] T017 Manually verify expire_stale_orders() releases an expired pending-payment order, and that guard_order_transition rejects paying for it afterwards
+- [X] T010 Run supabase/schema.sql in the SQL Editor and verify btree_gist, all eleven tables, triggers, functions, and constraints exist
+- [X] T011 [P] Verify RLS is enabled with explicit policies on all eleven tables, and that anon can read only rooms, approved reviews, site_content, room_risk_checks, and system_settings
+- [X] T012 [P] Verify admin_logs rejects UPDATE and DELETE for every role including admin (SC-027)
+- [X] T013 [P] Verify the room-risk storage bucket exists, is public-read, and rejects writes from a non-admin account
+- [X] T014 [P] Run supabase/seed.sql and confirm 10 rooms with amenities/features, the singleton site_content row, and 8 simulated channel prices appear
+- [X] T015 Create demo accounts guest@sunny.com and admin@sunny.com in the dashboard, then promote admin via the SQL snippet at the end of supabase/schema.sql
+- [X] T016 Manually verify orders_no_overlap: adjacent bookings succeed, overlapping and fully-contained bookings are rejected, and a pending-payment order blocks the same range
+- [X] T017 Manually verify expire_stale_orders() releases an expired pending-payment order, and that guard_order_transition rejects paying for it afterwards
 
 ---
 
@@ -143,25 +183,25 @@ US9（房源檢測與詳情頁展示）。
 
 **Independent Test**: 建立一筆訂單、確認房源在保留期間不可再訂、逾期後確認自動釋出
 
-- [ ] T051 [P] [US3] Build three-step booking form UI with contact name, phone, email, and step persistence in src/components/booking-form.js
-- [ ] T052 [US3] Calculate nights, total amount, and validation errors in src/services/booking.js and src/utils/dates.js
-- [ ] T053 [US3] Implement payment selection with the 虛擬支付 notice and confirmation summary in src/components/booking-form.js
-- [ ] T054 [US3] Persist order creation as pending-payment with expires_at, guest-count checks, availability re-check, and order number generation in src/data/orders.js and src/services/booking.js
-- [ ] T055 [US3] Implement payOrder (pending-payment → confirmed) and the order confirmation screen in src/services/booking.js and src/pages/orders.js
-- [ ] T056 [US3] Build the remaining-time countdown for pending-payment orders in src/components/payment-countdown.js (FR-102)
-- [ ] T057 [US3] Handle ORDER_EXPIRED on late payment with a clear message and a re-book entry point (FR-100)
-- [ ] T058 [US3] Handle ROOM_UNAVAILABLE as a friendly 已無空房 message that preserves the filled form, and add reload-safe form behavior in src/components/booking-form.js
-- [ ] T059 [P] [US3] [2M] Validate booking, payment, expiry release, and late-payment rejection; in Supabase mode also verify two concurrent conflicting submissions yield exactly one order (SC-020, SC-023, SC-024)
+- [X] T051 [P] [US3] Build three-step booking form UI with contact name, phone, email, and step persistence in src/components/booking-form.js
+- [X] T052 [US3] Calculate nights, total amount, and validation errors in src/services/booking.js and src/utils/dates.js
+- [X] T053 [US3] Implement payment selection with the 虛擬支付 notice and confirmation summary in src/components/booking-form.js
+- [X] T054 [US3] Persist order creation as pending-payment with expires_at, guest-count checks, availability re-check, and order number generation in src/data/orders.js and src/services/booking.js
+- [X] T055 [US3] Implement payOrder (pending-payment → confirmed) and the order confirmation screen in src/services/booking.js and src/pages/orders.js
+- [X] T056 [US3] Build the remaining-time countdown for pending-payment orders in src/components/payment-countdown.js (FR-102)
+- [X] T057 [US3] Handle ORDER_EXPIRED on late payment with a clear message and a re-book entry point (FR-100)
+- [X] T058 [US3] Handle ROOM_UNAVAILABLE as a friendly 已無空房 message that preserves the filled form, and add reload-safe form behavior in src/components/booking-form.js
+- [ ] T059 [P] [US3] [2M] Validate booking, payment, expiry release, and late-payment rejection; in Supabase mode also verify two concurrent conflicting submissions yield exactly one order (SC-020, SC-023, SC-024) — **待瀏覽器實測**
 
 ---
 
 ## Phase 7: User Story 4 - 我的訂單與退款申請 (Priority: P4)
 
-- [ ] T060 [P] [US4] Implement order list and detail page showing all six statuses in src/pages/orders.js
-- [ ] T061 [US4] Create refund request form and reason validation in src/pages/orders.js and src/services/refunds.js
-- [ ] T062 [US4] Enforce one-pending-refund rules, date validity checks, and tiered refund amount logic in src/services/refunds.js
-- [ ] T063 [US4] Reflect admin approval/rejection updates back to the member order view in src/state/store.js and src/pages/orders.js
-- [ ] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019)
+- [X] T060 [P] [US4] Implement order list and detail page showing all six statuses in src/pages/orders.js
+- [X] T061 [US4] Create refund request form and reason validation in src/pages/orders.js and src/services/refunds.js
+- [X] T062 [US4] Enforce one-pending-refund rules, date validity checks, and tiered refund amount logic in src/services/refunds.js
+- [X] T063 [US4] Reflect admin approval/rejection updates back to the member order view in src/pages/orders.js（審核結果與管理員說明於下次載入訂單時呈現，見 spec「資料更新的即時性」）
+- [ ] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019) — **待瀏覽器實測**
 
 ---
 
@@ -169,42 +209,42 @@ US9（房源檢測與詳情頁展示）。
 
 **⚠️ 標示要求**: 自動審核 MUST 標示為「自動審核（規則式）」，MUST NOT 稱為 AI（FR-103a）
 
-- [ ] T065 [P] [US5] Create review submission form and validation in src/pages/room-detail.js and src/services/reviews.js
-- [ ] T066 [US5] Implement the rule-based moderation engine (profanity, too-short, rating/sentiment mismatch, duplicate, gibberish, contact info or external links) returning a verdict plus triggered rule codes in src/services/moderation.js
-- [ ] T067 [US5] Persist autoVerdict and autoRules on submission, keeping status pending until an admin confirms (FR-103)
-- [ ] T068 [US5] Implement pending/approved/rejected state transitions and one-review-per-order enforcement in src/services/reviews.js
-- [ ] T069 [US5] Publish approved reviews and surface the recomputed room average rating in src/data/reviews.js (Supabase 模式由 trigger 重算，示範模式於 adapter 內以相同規則重算)
-- [ ] T070 [US5] Add public review filtering, category tabs, and no-review empty-state handling in src/pages/room-detail.js
-- [ ] T071 [US5] Label the mechanism as 規則式自動審核 wherever it is surfaced to users or admins (FR-103a)
-- [ ] T072 [P] [US5] [2M] Validate moderation outcomes against the five sample reviews and confirm pending reviews are invisible to anon (SC-007, SC-029)
+- [X] T065 [P] [US5] Create review submission form and validation in src/pages/room-detail.js and src/services/reviews.js
+- [X] T066 [US5] Implement the rule-based moderation engine (profanity, too-short, rating/sentiment mismatch, duplicate, gibberish, contact info or external links) returning a verdict plus triggered rule codes in src/services/moderation.js
+- [X] T067 [US5] Persist autoVerdict and autoRules on submission, keeping status pending until an admin confirms (FR-103)
+- [X] T068 [US5] Implement pending/approved/rejected state transitions and one-review-per-order enforcement in src/services/reviews.js
+- [X] T069 [US5] Publish approved reviews and surface the recomputed room average rating in src/data/reviews.js (Supabase 模式由 trigger 重算，示範模式於 adapter 內以相同規則重算)
+- [X] T070 [US5] Add public review filtering, category tabs, and no-review empty-state handling in src/pages/room-detail.js
+- [X] T071 [US5] Label the mechanism as 規則式自動審核 wherever it is surfaced to users or admins (FR-103a)
+- [ ] T072 [P] [US5] [2M] Validate moderation outcomes against the five sample reviews and confirm pending reviews are invisible to anon (SC-007, SC-029) — **待瀏覽器實測**
 
 ---
 
 ## Phase 9: User Story 6 - 後台核心管理與營運指標 (Priority: P6)
 
-- [ ] T073 [P] [US6] Build admin dashboard and room management screens in src/pages/admin.js and src/components/admin-panel.js
-- [ ] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value
-- [ ] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders
-- [ ] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin.js
-- [ ] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
-- [ ] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
+- [X] T073 [P] [US6] Build admin dashboard and room management screens in src/pages/admin.js and src/components/admin-panel.js
+- [X] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value
+- [X] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders
+- [X] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin.js
+- [X] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
+- [X] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
 - [ ] T079 [P] [US6] [2M] Validate admin dashboard, statistics, and role-aware access; in Supabase mode verify a member's direct write to rooms is rejected by RLS (SC-008)
 
 ---
 
 ## Phase 10: User Story 7 - 後台審核：評論審核與退款審核 (Priority: P7)
 
-- [ ] T080 [P] [US7] Implement the review moderation queue showing each item's auto verdict and triggered rules in src/pages/admin.js
-- [ ] T081 [US7] Implement admin override of auto verdicts and deletion of published reviews, both writing to the audit log (FR-103b, FR-103c)
-- [ ] T082 [US7] Implement refund moderation queue and release the date range on approved refunds in src/pages/admin.js and src/services/refunds.js
+- [X] T080 [P] [US7] Implement the review moderation queue showing each item's auto verdict and triggered rules in src/pages/admin.js
+- [X] T081 [US7] Implement admin override of auto verdicts and deletion of published reviews, both writing to the audit log (FR-103b, FR-103c)
+- [X] T082 [US7] Implement refund moderation queue and release the date range on approved refunds in src/pages/admin.js and src/services/refunds.js
 - [ ] T083 [P] [US7] [2M] Validate review and refund approval/rejection flows across admin and member views (SC-006)
 
 ---
 
 ## Phase 11: User Story 8 - 後台輔助：報表匯出與內容編輯 (Priority: P8)
 
-- [ ] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js
-- [ ] T085 [US8] Add homepage title/subtitle/image editing with live content updates in src/data/site-content.js and src/pages/home.js
+- [X] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js
+- [X] T085 [US8] Add homepage title/subtitle/image editing with live content updates in src/data/site-content.js and src/pages/home.js
 - [ ] T086 [P] [US8] [2M] Validate export fallback and content editing UX in browser-based checks (SC-010)
 
 ---
@@ -214,23 +254,23 @@ US9（房源檢測與詳情頁展示）。
 **⚠️ 約束**: 前台使用者上傳的照片 MUST NOT 離開瀏覽器。兩條路徑的程式碼 MUST 分離——
 `pages/risk-check.js` MUST NOT import `services/risk-upload.js` 或 `data/risk-checks.js`（FR-086、憲章原則 VI）
 
-- [ ] T087 [P] [US9] Build the front-of-house risk check page with upload control, preview, and processing state in src/pages/risk-check.js
-- [ ] T088 [US9] Implement in-browser Canvas analysis of brightness, clutter, and contrast in src/services/risk-score.js (shared by both paths — computation only, no storage)
-- [ ] T089 [US9] Implement the weighted risk score, three risk levels, and per-metric improvement suggestions in src/services/risk-score.js
-- [ ] T090 [US9] Add file-type and size validation, and ensure a second upload fully replaces the previous result in src/pages/risk-check.js
-- [ ] T091 [US9] Implement the admin-only room check upload in src/services/risk-upload.js, including the explicit 「此圖將公開顯示」 confirmation before saving (FR-105)
-- [ ] T092 [US9] Delete the previous image from storage when a room is re-checked so old images stop being publicly readable (FR-107)
-- [ ] T093 [US9] Display the latest check (date, level, three metrics, image) on the room detail page, with a 尚未檢測 state when absent (FR-106)
+- [X] T087 [P] [US9] Build the front-of-house risk check page with upload control, preview, and processing state in src/pages/risk-check.js
+- [X] T088 [US9] Implement in-browser Canvas analysis of brightness, clutter, and contrast in src/services/risk-score.js (shared by both paths — computation only, no storage)
+- [X] T089 [US9] Implement the weighted risk score, three risk levels, and per-metric improvement suggestions in src/services/risk-score.js
+- [X] T090 [US9] Add file-type and size validation, and ensure a second upload fully replaces the previous result in src/pages/risk-check.js
+- [X] T091 [US9] Implement the admin-only room check upload in src/services/risk-upload.js, including the explicit 「此圖將公開顯示」 confirmation before saving (FR-105)
+- [X] T092 [US9] Delete the previous image from storage when a room is re-checked so old images stop being publicly readable (FR-107)
+- [X] T093 [US9] Display the latest check (date, level, three metrics, image) on the room detail page, with a 尚未檢測 state when absent (FR-106)
 - [ ] T094 [P] [US9] [2M] Validate scoring differentiation, zero outbound requests during front-of-house analysis, and that no visitor photo reaches storage or any table (SC-015, SC-016, SC-030)
 
 ---
 
 ## Phase 13: User Story 10 - 收藏房源 (Priority: P10)
 
-- [ ] T095 [P] [US10] Add the favorite star control to room cards and the detail page in src/components/room-card.js and src/pages/room-detail.js
-- [ ] T096 [US10] Implement addFavorite/removeFavorite with optimistic UI and ALREADY_FAVORITED treated as success in src/data/favorites.js
-- [ ] T097 [US10] Build the 我的收藏 page with newest-first ordering and an empty state in src/pages/favorites.js
-- [ ] T098 [US10] Redirect unauthenticated users to login and complete the pending favorite after returning (FR-093)
+- [X] T095 [P] [US10] Add the favorite star control to room cards and the detail page in src/components/room-card.js and src/pages/room-detail.js
+- [X] T096 [US10] Implement addFavorite/removeFavorite with optimistic UI and ALREADY_FAVORITED treated as success in src/data/favorites.js
+- [X] T097 [US10] Build the 我的收藏 page with newest-first ordering and an empty state in src/pages/favorites.js
+- [X] T098 [US10] Redirect unauthenticated users to login and complete the pending favorite after returning (FR-093)
 - [ ] T099 [P] [US10] [2M] Validate favorite persistence, deleted-room handling, and that a member cannot read another member's favorites
 
 ---
@@ -239,41 +279,41 @@ US9（房源檢測與詳情頁展示）。
 
 **⚠️ 模擬功能**: 價格來自種子資料。MUST NOT 實作爬蟲，MUST NOT 呼叫任何 OTA API（FR-109）
 
-- [ ] T100 [P] [US11] Build the channel comparison page with the persistent 模擬資料 banner in src/pages/admin-channel.js (FR-110)
-- [ ] T101 [US11] Implement price-gap and undercut calculation in src/services/channel.js
-- [ ] T102 [US11] Render the per-room comparison table with website price, each channel price, gap amount, and gap percentage
-- [ ] T103 [US11] Surface unresolved undercut alerts on the dashboard and implement resolve-with-audit-log in src/pages/admin.js and src/services/channel.js (FR-111, FR-113)
-- [ ] T104 [US11] Implement the copyable complaint email template with an explicit 系統不會代為寄送 notice in src/services/channel.js (FR-112)
+- [X] T100 [P] [US11] Build the channel comparison page with the persistent 模擬資料 banner in src/pages/admin-channel.js (FR-110)
+- [X] T101 [US11] Implement price-gap and undercut calculation in src/services/channel.js
+- [X] T102 [US11] Render the per-room comparison table with website price, each channel price, gap amount, and gap percentage
+- [X] T103 [US11] Surface unresolved undercut alerts on the dashboard and implement resolve-with-audit-log in src/pages/admin.js and src/services/channel.js (FR-111, FR-113)
+- [X] T104 [US11] Implement the copyable complaint email template with an explicit 系統不會代為寄送 notice in src/services/channel.js (FR-112)
 - [ ] T105 [P] [US11] [2M] Validate alert detection, template generation, empty state, and confirm zero requests to any external booking platform (SC-028)
 
 ---
 
 ## Phase 15: User Story 12 - 管理員操作日誌與系統參數設定 (Priority: P12)
 
-- [ ] T106 [P] [US12] Build the audit log viewer with actor, time, action, target, and change summary in src/pages/admin-logs.js
-- [ ] T107 [US12] Add filtering by actor, action type, and date range in src/pages/admin-logs.js
-- [ ] T108 [US12] Build the system settings page for pending_payment_minutes with range validation and the SETTING_OUT_OF_RANGE message in src/pages/admin-settings.js (FR-119)
-- [ ] T109 [US12] Verify setting changes apply to new orders only and never alter existing expires_at values (FR-101)
-- [ ] T110 [US12] Audit every admin mutation path to confirm a log entry is written, and that no log contains passwords, keys, or real personal data (FR-118, SC-026)
+- [X] T106 [P] [US12] Build the audit log viewer with actor, time, action, target, and change summary in src/pages/admin-logs.js
+- [X] T107 [US12] Add filtering by actor, action type, and date range in src/pages/admin-logs.js
+- [X] T108 [US12] Build the system settings page for pending_payment_minutes with range validation and the SETTING_OUT_OF_RANGE message in src/pages/admin-settings.js (FR-119)
+- [X] T109 [US12] Verify setting changes apply to new orders only and never alter existing expires_at values (FR-101)
+- [X] T110 [US12] Audit every admin mutation path to confirm a log entry is written, and that no log contains passwords, keys, or real personal data (FR-118, SC-026)
 - [ ] T111 [P] [US12] [2M] Validate log immutability from the UI and from a direct database call, including as an admin (SC-027)
 
 ---
 
 ## Phase 16: 跨切面 — 法律與說明
 
-- [ ] T112 Build the terms of service and privacy notice page, linked from the site footer, stating this is a demo project with no real accommodation, transactions, or personal data collection (FR-121, FR-122)
+- [X] T112 Build the terms of service and privacy notice page, linked from the site footer, stating this is a demo project with no real accommodation, transactions, or personal data collection (FR-121, FR-122)
 
 ---
 
 ## Phase 17: Polish & Cross-Cutting Concerns
 
-- [ ] T113 [P] Review accessibility, responsive layout, and keyboard-safe controls across index.html, styles/, and src/components/*
-- [ ] T114 [P] Audit error handling and edge-case guards across all modules, including offline behavior and session expiry in Supabase mode
-- [ ] T115 [P] Verify no page or component calls the Supabase client or localStorage directly — all access goes through src/data/repository.js
-- [ ] T116 [P] Verify src/pages/risk-check.js has no import path reaching src/services/risk-upload.js
+- [X] T113 [P] Review accessibility, responsive layout, and keyboard-safe controls across index.html, styles/, and src/components/*
+- [X] T114 [P] Audit error handling and edge-case guards across all modules, including offline behavior and session expiry in Supabase mode
+- [X] T115 [P] Verify no page or component calls the Supabase client or localStorage directly — all access goes through src/data/repository.js
+- [X] T116 [P] Verify src/pages/risk-check.js has no import path reaching src/services/risk-upload.js
 - [ ] T117 [2M] Run the full quickstart.md validation in both modes and fix any acceptance gaps (SC-017)
 - [ ] T118 Confirm zero console errors and warnings during normal flows in both modes (SC-014)
-- [ ] T119 Documentation updates and code cleanup in README.md and inline source comments
+- [X] T119 Documentation updates and code cleanup in README.md and inline source comments
 
 ---
 

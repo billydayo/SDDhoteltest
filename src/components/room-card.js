@@ -4,17 +4,18 @@
  * 憲章「視覺基調」：橫向卡片。窄螢幕由 CSS 改為直向堆疊。
  * FR-013：卡片必須顯示照片、房名、房型、每晚價格、人數上限與平均評分。
  *
- * 收藏星號屬 US10（T095），屆時在 __footer 加入即可，不需改動其他部分。
+ * 收藏星號（US10）在 __footer 內，未登入時會導向登入頁再回來。
  */
 
 import { formatTWD, calculateTotal } from '../utils/money.js';
 import { formatRating } from '../data/rooms.js';
 import { typeLabel, roomStatusLabel, ROOM_STATUS } from '../data/vocabulary.js';
 import { nightsBetween } from '../utils/dates.js';
+import { createFavoriteButton } from './favorite-button.js';
 
 /**
  * @param {object} room
- * @param {{ checkIn?: string, checkOut?: string }} [context] 已選日期時顯示總金額
+ * @param {{ checkIn?: string, checkOut?: string, hideFavorite?: boolean }} [context]
  */
 export function createRoomCard(room, context = {}) {
   const li = document.createElement('li');
@@ -81,6 +82,8 @@ function buildBody(room, context) {
   // 已選日期時直接顯示夜數與總金額（FR-017）
   const total = buildTotal(room, context);
   if (total) footer.append(total);
+
+  if (!context.hideFavorite) footer.append(createFavoriteButton(room));
 
   const cta = document.createElement('a');
   cta.className = 'btn btn--primary';

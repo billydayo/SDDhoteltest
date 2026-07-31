@@ -58,11 +58,23 @@ where table_schema = 'public' order by table_name;
 
 ### 3. 建立示範帳號
 
-1. **Authentication → Users → Add user**，勾選 *Auto Confirm User*，建立：
-   - `guest@sunny.com` / `guest123`
-   - `admin@sunny.com` / `admin123`
-2. 回到 SQL Editor，執行 `supabase/schema.sql` 末端註解區的兩段 UPDATE，
-   把 `admin@sunny.com` 升為管理員並設定兩者的顯示名稱。
+1. 建立兩個帳號，任一方式皆可：
+   - 於應用程式的註冊頁自行註冊（`handle_new_user` trigger 會自動建立 profile）
+   - 或 **Authentication → Users → Add user**，勾選 *Auto Confirm User*
+   ```
+   guest@sunny.com / guest123
+   admin@sunny.com / admin123
+   ```
+2. 於 SQL Editor 執行 [`supabase/bootstrap-admin.sql`](../../supabase/bootstrap-admin.sql)，
+   把 `admin@sunny.com` 升為管理員。
+
+**為什麼升權需要獨立一步**：應用程式內沒有任何路徑能讓使用者把自己升為管理員，
+那是 `prevent_role_escalation` trigger 刻意造成的。第一個管理員只能在 SQL Editor
+這種特權情境下產生。
+
+> ⚠️ 若你的專案是在 2026-07-31 修正前執行 schema.sql 的，該 trigger 會連 SQL Editor
+> 的升權也一併擋下（此處 `auth.uid()` 為 null，`is_admin()` 因而回傳 false）。
+> `bootstrap-admin.sql` 的第一段會一併修好這個問題。
 
 ### 4. 填入憑證
 

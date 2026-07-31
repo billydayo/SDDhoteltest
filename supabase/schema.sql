@@ -747,6 +747,31 @@ create policy room_risk_write on storage.objects
   with check (bucket_id = 'room-risk' and public.is_admin());
 
 -- ---------------------------------------------------------------------------
+-- Storage：房源展示照片
+--
+-- 公開讀取（照片會顯示在房源列表與詳情頁），僅管理員可寫入。
+-- 與 room-risk 分開是因為兩者的生命週期不同：檢測圖每次重測就整批替換，
+-- 展示照片則由管理員逐張增刪。混在同一個 bucket 會讓清理邏輯互相干擾。
+--
+-- ⚠️ 前台使用者的安全檢測照片同樣不得進入此 bucket。
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('room-photos', 'room-photos', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists room_photos_read on storage.objects;
+create policy room_photos_read on storage.objects
+  for select to anon, authenticated
+  using (bucket_id = 'room-photos');
+
+drop policy if exists room_photos_write on storage.objects;
+create policy room_photos_write on storage.objects
+  for all to authenticated
+  using (bucket_id = 'room-photos' and public.is_admin())
+  with check (bucket_id = 'room-photos' and public.is_admin());
+
+-- ---------------------------------------------------------------------------
 -- Grants（RLS 之上仍需表層權限）
 -- ---------------------------------------------------------------------------
 

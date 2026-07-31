@@ -106,6 +106,16 @@ export const createRoom = (input) => adapter.createRoom(input);
 export const updateRoom = (id, patch) => adapter.updateRoom(id, patch);
 export const deleteRoom = (id) => adapter.deleteRoom(id);
 
+/** 房源展示照片。僅管理員可寫入（bucket 政策與 adapter 各擋一層）。 */
+export const uploadRoomPhoto = (roomId, blob) => adapter.uploadRoomPhoto(roomId, blob);
+export const deleteRoomPhoto = (ref) => adapter.deleteRoomPhoto(ref);
+
+/**
+ * 把 images 陣列的一項轉成可顯示的網址。
+ * 同步函式——顯示路徑上不該為了組一個字串而等待。
+ */
+export const resolveRoomPhotoUrl = (value) => adapter.resolveRoomPhotoUrl(value);
+
 export async function getFutureOrdersForRoom(roomId) {
   await sweepExpired();
   return adapter.getFutureOrdersForRoom(roomId);

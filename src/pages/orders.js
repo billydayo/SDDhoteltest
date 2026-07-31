@@ -185,7 +185,7 @@ function buildDetail(order, room, refunds, quota, context) {
   frag.append(card);
 
   // 退款區塊：申請紀錄在前，可申請時再顯示表單（US4）
-  if (refunds.length) frag.append(buildRefundHistory(refunds));
+  if (refunds.length) frag.append(buildRefundHistory(order, refunds));
   frag.append(buildRefundSection(order, quota, context));
 
   return frag;
@@ -196,7 +196,7 @@ function buildDetail(order, room, refunds, quota, context) {
 // ---------------------------------------------------------------------------
 
 /** 歷次申請與審核結果。駁回說明必須讓會員看得到（FR-039）。 */
-function buildRefundHistory(refunds) {
+function buildRefundHistory(order, refunds) {
   const section = document.createElement('section');
   section.className = 'card';
   section.style.marginTop = 'var(--sp-4)';
@@ -204,6 +204,24 @@ function buildRefundHistory(refunds) {
   const h2 = document.createElement('h2');
   h2.textContent = '退款申請紀錄';
   section.append(h2);
+
+  /*
+   * FR-039：退款遭駁回後訂單回到「已確認」，會員可再次申請。
+   *
+   * 但畫面上會同時出現「已確認」（訂單）與「退款已駁回」（申請）兩個標籤，
+   * 使用者很容易誤以為訂單出了問題。這句話把兩者的關係講明白。
+   */
+  const latest = refunds[0];
+  if (latest?.status === 'rejected' && order.status === 'confirmed') {
+    const note = document.createElement('p');
+    note.className = 'tag tag--info';
+    note.style.display = 'block';
+    note.style.padding = 'var(--sp-2) var(--sp-3)';
+    note.style.marginBottom = 'var(--sp-3)';
+    note.textContent = '退款申請未通過審核，你的訂單維持「已確認」狀態，'
+      + '住宿權益不受影響。若仍需取消，可再次提出申請。';
+    section.append(note);
+  }
 
   const ul = document.createElement('ul');
   ul.className = 'review-list';
@@ -218,7 +236,9 @@ function buildRefundHistory(refunds) {
     const status = document.createElement('span');
     const tone = REFUND_STATUS[refund.status]?.tone ?? 'neutral';
     status.className = `tag tag--${tone}`;
-    status.textContent = refundStatusLabel(refund.status);
+    // 加上「退款」前綴：這個標籤緊鄰訂單狀態標籤，兩者樣式相同，
+    // 單寫「已駁回」會讓人分不清被駁回的是訂單還是退款申請。
+    status.textContent = `退款${refundStatusLabel(refund.status)}`;
 
     const when = document.createElement('span');
     when.textContent = `申請於 ${formatDateTime(refund.createdAt)}`;

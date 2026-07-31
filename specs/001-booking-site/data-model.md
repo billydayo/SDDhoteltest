@@ -70,7 +70,7 @@
 | type | `type` | text | 房型，例如 double / twin / suite |
 | maxGuests | `max_guests` | integer | > 0 |
 | nightlyPrice | `nightly_price` | integer | 新臺幣整數，> 0 |
-| images | `images` | jsonb | 圖片網址字串陣列 |
+| images | `images` | jsonb | 照片參照字串陣列，最多 8 筆。第一筆為封面 |
 | amenities | `amenities` | jsonb | 設施字串陣列（陽台、浴缸、免費 Wi-Fi…） |
 | features | `features` | jsonb | 房型特色字串陣列（親子友善、寵物友善、無障礙…） |
 | description | `description` | text | 文案 |
@@ -83,6 +83,19 @@
 - `maxGuests` 必須大於 0
 - `status` 必須為允許值之一
 - `averageRating` 無通過審核的評論時 MUST 為 `null`，前端顯示「尚無評分」而非 0 分
+
+**`images` 的四種形式**（可於同一陣列混用）：
+
+| 形式 | 範例 | 說明 |
+|---|---|---|
+| 相對路徑 | `assets/rooms/suite-a.svg` | 專案內的種子圖 |
+| 外部網址 | `https://…/photo.jpg` | 管理員貼入的網址 |
+| 儲存參照 | `storage:<roomId>/<ts>.jpg` | 由後台上傳，存於 `room-photos` bucket |
+| Data URL | `data:image/jpeg;base64,…` | 示範模式的上傳結果（無雲端可用） |
+
+以 `storage:` 前綴而非直接存公開網址，是為了刪除時能還原出物件路徑。
+存完整網址就得反解析 URL 才知道要刪哪個檔，那在儲存服務改版時很容易失效。
+轉換由 `repository.resolveRoomPhotoUrl()` 負責，顯示端不需要知道來源形式。
 
 **Relationships**: One room → many orders / reviews
 

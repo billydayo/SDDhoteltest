@@ -25,7 +25,7 @@ US9（房源檢測與詳情頁展示）。
 
 ### 目前進度（2026-07-31）
 
-**117 / 119 完成。14 關的瀏覽器驗收只剩第 8 關（匯出與內容）。**
+**121 / 122 完成。14 關的瀏覽器驗收全數走過一輪；第 6 關因後續新增功能而有補測項。**
 
 | 階段 | 狀態 |
 |---|---|
@@ -47,17 +47,20 @@ US9（房源檢測與詳情頁展示）。
 | Phase 16 服務條款（T112） | ✅ |
 | Phase 17 Polish（T113–T116、T119） | ✅ |
 
-**剩餘 2 項**：
+**剩餘 1 項任務 + 1 組補測**：
 
-- **T086 匯出與內容**（第 8 關，14 項）— 唯一尚未驗收的關卡。
 - **T009 Google provider** — 選用功能，尚未於 Dashboard 啟用。目前點擊
   Google 登入會顯示「請於 Authentication → Providers → Google 完成設定」，
   不影響其他功能。
+- **第 6 關的 19 項補測** — 房源照片管理（12）、上傳邊界（3）、
+  訂單管理的房源篩選（4）。這些項目是在第 6 關通過**之後**才依需求新增的功能，
+  因此 T079 的「已完成」不再涵蓋整關。補測前需先於 SQL Editor 重跑
+  `supabase/schema.sql` 以建立 `room-photos` bucket，否則上傳必定失敗。
 
 ### 瀏覽器實測進度
 
 驗收清單見 [checklists/browser-acceptance.md](./checklists/browser-acceptance.md)
-（243 項，分 14 關；已通過 229 項）。
+（272 項，分 14 關；已通過 253 項）。
 
 | 關卡 | 對應任務 | 狀態 |
 |---|---|---|
@@ -67,19 +70,23 @@ US9（房源檢測與詳情頁展示）。
 | 第 3 關 訂房與付款 | T059 | ✅ |
 | 第 4 關 訂單與退款 | T064 | ✅ |
 | 第 5 關 評論與自動審核 | T072 | ✅ |
-| 第 6 關 後台核心 | T079 | ✅ |
+| **第 6 關 後台核心** | **T079** | **⚠️ 原有項目通過，新增 19 項待補測** |
 | 第 7 關 審核閉環 | T083 | ✅ |
-| **第 8 關 匯出與內容** | **T086** | **⬜ 尚未驗收** |
+| 第 8 關 匯出與內容 | T086 | ✅ |
 | 第 9 關 風險檢測 | T094 | ✅ |
 | 第 10 關 收藏 | T099 | ✅ |
 | 第 11 關 渠道比價 | T105 | ✅ |
 | 第 12 關 日誌與參數 | T111 | ✅ |
 | 第 13 關 跨切面與雙模式 | T117、T118 | ✅ |
 
-十三關共 229 項全數通過，且未回報任何問題。涵蓋範圍包含最難的幾項：
+十四關共 253 項通過，且未回報任何問題。涵蓋範圍包含最難的幾項：
 排除約束的相鄰不重疊、待付款佔房與逾期釋出、規則式審核的五種樣本判定、
 退款上限與駁回不佔額度、稽核日誌不可竄改、前台照片零外傳，
 以及第 13 關的雙模式重跑與 320px 響應式。
+
+未通過的 19 項全數集中在第 6 關，且都是**該關通過後才新增的功能**
+（房源照片管理 FR-050a–f、上傳邊界情形、訂單管理的房源篩選）。
+這是需求持續演進造成的驗收覆蓋落差，不是既有功能的迴歸。
 
 本開發環境沒有 node，python 為 Windows Store 殼程式，無法執行 JavaScript 或
 啟動伺服器，因此凡是需要在瀏覽器中操作介面的驗收都必須人工執行。
@@ -251,7 +258,10 @@ US9（房源檢測與詳情頁展示）。
 - [X] T073 [P] [US6] Build admin dashboard and room management screens in src/pages/admin.js and src/components/admin-panel.js
 - [X] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value
 - [X] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders
-- [X] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin.js
+- [X] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin-rooms.js
+- [X] T076a [US6] Add keyword/type/status/price-range filtering to 房源管理, with the export button following the filtered result
+- [X] T076b [US6] Multi-photo management (up to 8, cover first, reorder, remove) with local upload into the room-photos bucket plus URL entry, client-side compression before upload, and orphan cleanup on cancel — src/components/image-manager.js, src/utils/image.js (FR-050a–f)
+- [X] T076c [US1] Render the cover photo on room cards with a photo-count badge, and a switchable thumbnail gallery on the detail page (FR-014)
 - [X] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
 - [X] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
 - [X] T079 [P] [US6] [2M] Validate admin dashboard, statistics, and role-aware access; in Supabase mode verify a member's direct write to rooms is rejected by RLS (SC-008)
@@ -271,7 +281,7 @@ US9（房源檢測與詳情頁展示）。
 
 - [X] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js, surfaced as a reusable export button embedded in each admin data page (訂單管理／房源管理) rather than a standalone 報表匯出 module — the export scope must be the page's current filter result (FR-058)
 - [X] T085 [US8] Add homepage title/subtitle/image editing with live content updates in src/data/site-content.js and src/pages/home.js
-- [ ] T086 [P] [US8] [2M] Validate export fallback and content editing UX in browser-based checks (SC-010)
+- [X] T086 [P] [US8] [2M] Validate export fallback and content editing UX in browser-based checks (SC-010)
 
 ---
 

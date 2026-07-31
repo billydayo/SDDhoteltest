@@ -18,6 +18,7 @@ import {
   checkboxGroup, actionButton, confirmAction, inlineError, showInlineError,
   statusTag, buttonRow, createExportButton
 } from '../components/admin-ui.js';
+import { createImageManager } from '../components/image-manager.js';
 import { AMENITIES, ROOM_FEATURES, ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel }
   from '../data/vocabulary.js';
 import { formatTWD } from '../utils/money.js';
@@ -25,6 +26,9 @@ import { formatDateRange } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
 
 let editing = null;   // 目前編輯中的房源，null 代表新增模式
+
+/** 目前表單上的照片管理器，供離開頁面時清理未保存的上傳 */
+let activePhotos = null;
 
 let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '' };
 
@@ -177,18 +181,21 @@ function buildForm(panel, context) {
     options: Object.keys(ROOM_STATUS).map((s) => ({ value: s, label: roomStatusLabel(s) })),
     hint: '「整理中」與「已預訂」都會被排除於可訂清單之外。'
   });
-  const image = textField({
-    id: 'rm-image', name: 'image', label: '照片網址', value: editing?.images?.[0] ?? '',
-    hint: '相對路徑或完整網址，例如 assets/rooms/double-a.svg'
-  });
   const description = textareaField({
     id: 'rm-desc', name: 'description', label: '房源描述', value: editing?.description ?? ''
   });
 
+  // 多張照片：可本地上傳，也可貼網址；第一張為封面
+  const photos = createImageManager({
+    roomId: editing?.id ?? null,
+    images: editing?.images ?? []
+  });
+  activePhotos = photos;
+
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
   row.append(name.wrap, type.wrap, maxGuests.wrap, price.wrap, status.wrap);
-  form.append(row, image.wrap, description.wrap);
+  form.append(row, photos.element, description.wrap);
 
   const amenities = checkboxGroup({
     name: 'amenities', legend: '設施', options: AMENITIES, selected: editing?.amenities ?? []
@@ -206,8 +213,14 @@ function buildForm(panel, context) {
   submit.className = 'btn btn--primary';
   submit.textContent = editing ? '儲存變更' : '新增房源';
 
+  // 取消編輯時清掉本次上傳但沒被保存的照片，避免 storage 留下沒人引用的檔案
   const cancel = editing
-    ? actionButton('取消編輯', () => { editing = null; reload(panel, context); })
+    ? actionButton('取消編輯', async () => {
+        await photos.discardUnsaved();
+        activePhotos = null;
+        editing = null;
+        reload(panel, context);
+      })
     : null;
 
   form.append(buttonRow(submit, cancel));
@@ -223,7 +236,7 @@ function buildForm(panel, context) {
       nightlyPrice: Number(price.input.value),
       status: status.input.value,
       description: description.input.value.trim(),
-      images: image.input.value.trim() ? [image.input.value.trim()] : [],
+      images: photos.getImages(),
       amenities: [...form.querySelectorAll('input[name="amenities"]:checked')].map((i) => i.value),
       features: [...form.querySelectorAll('input[name="features"]:checked')].map((i) => i.value)
     };
@@ -255,6 +268,9 @@ function buildForm(panel, context) {
         );
         toast('房源已新增。', 'ok');
       }
+      // 儲存成功後這些照片已被房源引用，不再是待清理的暫存檔
+      photos.commit();
+      activePhotos = null;
       reload(panel, context);
     } catch (err) {
       showInlineError(error, toUserMessage(err));

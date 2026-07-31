@@ -447,13 +447,154 @@
 }
 
 /* 詳情頁主圖同樣採拱形，維持全站語彙一致 */
-.detail-gallery {
+.detail-gallery { margin-bottom: var(--sp-6); }
+
+.detail-gallery__main {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: var(--arch);
-  overflow: hidden;
   box-shadow: var(--shadow-sm);
-  margin-bottom: var(--sp-6);
+  background: var(--c-surface-alt);
 }
-.detail-gallery img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+
+/* 縮圖列。窄螢幕改為橫向捲動，不換行擠壓——整頁本體永遠不橫向捲動 */
+.detail-gallery__thumbs {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--sp-1);
+}
+
+.detail-gallery__thumb {
+  flex: none;
+  width: 84px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+  opacity: 0.7;
+}
+.detail-gallery__thumb img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+.detail-gallery__thumb:hover { opacity: 1; }
+.detail-gallery__thumb[aria-pressed="true"] {
+  border-color: var(--c-brand-accent);
+  opacity: 1;
+}
+
+/* 卡片上的照片張數標示 */
+.room-card__photo-count {
+  position: absolute;
+  right: var(--sp-3);
+  bottom: var(--sp-3);
+  z-index: 2;
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(27, 42, 36, 0.62);
+  color: var(--c-text-invert);
+  font-size: var(--f-tiny);
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(4px);
+}
+
+/* --------------------------------------------------- 後台照片管理器 */
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
+}
+
+.photo-grid__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--sp-5);
+  text-align: center;
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius);
+  color: var(--c-text-muted);
+  font-size: var(--f-small);
+}
+
+.photo-tile {
+  position: relative;
+  margin: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-border);
+}
+.photo-tile img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-tile__badge {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  padding: 0.14rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--c-brand);
+  color: var(--c-text-invert);
+  font-size: var(--f-tiny);
+}
+
+/* 操作鈕常駐顯示，不做 hover 才出現——觸控裝置沒有 hover */
+.photo-tile__actions {
+  position: absolute;
+  right: var(--sp-2);
+  bottom: var(--sp-2);
+  display: flex;
+  gap: 4px;
+}
+
+.photo-tile__btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--c-text);
+  font-size: var(--f-small);
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.photo-tile__btn:hover { background: var(--c-surface); }
+.photo-tile__btn--danger:hover { background: var(--c-danger); color: var(--c-text-invert); }
+
+.photo-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  align-items: center;
+}
+.photo-controls__url { display: flex; gap: var(--sp-2); }
+.photo-controls__url input { flex: 1; min-width: 0; }
+.photo-controls input {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: var(--f-small);
+}
 
 .detail-aside { position: sticky; top: 92px; }
 

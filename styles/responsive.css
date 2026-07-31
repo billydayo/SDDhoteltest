@@ -56,6 +56,10 @@
   .filter-bar { padding: var(--sp-4); }
   .filter-bar__row { grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 
+  .photo-controls { grid-template-columns: 1fr; }
+  .photo-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .detail-gallery__thumb { width: 68px; }
+
   .stat-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); }
   .stat-tile { padding: var(--sp-4); }
 

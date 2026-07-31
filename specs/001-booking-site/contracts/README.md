@@ -95,9 +95,17 @@ Google 帳號會進入同一個 `auth.users`，`profiles` 僅有一筆（FR-088�
 | Bucket | 讀取 | 寫入 | 內容 |
 |---|---|---|---|
 | `room-risk` | 公開 | 僅管理員 | 管理員對自家房源的品質檢測圖，公開顯示於房源詳情頁 |
+| `room-photos` | 公開 | 僅管理員 | 房源展示照片，顯示於房源列表與詳情頁 |
 
-前台「安全檢測」的照片 **MUST NOT** 進入此 bucket 或任何 bucket。該路徑在程式碼中
-完全沒有上傳函式可用（`pages/risk-check.js` 不 import `services/risk-upload.js`）。
+兩個 bucket 分開，是因為生命週期不同：檢測圖每次重測就整批替換，展示照片則由
+管理員逐張增刪。混在同一個 bucket 會讓清理邏輯互相干擾。
+
+前台「安全檢測」的照片 **MUST NOT** 進入任何 bucket。該路徑在程式碼中
+完全沒有上傳函式可用（`pages/risk-check.js` 不 import `services/risk-upload.js`，
+也不 import `components/image-manager.js`）。
+
+**照片參照格式**：`rooms.images` 中由上傳產生的項目為 `storage:<path>`，
+而非公開網址——見 [data-model.md](../data-model.md) 的說明。
 
 ### 5. 錯誤轉譯契約
 
@@ -130,7 +138,8 @@ Google 帳號會進入同一個 `auth.users`，`profiles` 僅有一筆（FR-088�
 - **service_role key** — 任何情況下都不得出現於前端或版控（FR-085）
 - **email 相關流程** — 不寄送驗證信、密碼重設信、通知信或申訴信。
   渠道控價的申訴郵件僅產生範本供管理員自行複製寄出（FR-112）
-- **Storage（除 `room-risk` 外）** — 房源展示照片以圖片網址提供，不做檔案上傳
+- **Storage（除 `room-risk` 與 `room-photos` 外）** — 不建立其他 bucket；
+  首頁主視覺仍以圖片網址提供
 - **任何 OTA 平台的爬蟲或 API** — 渠道價格為種子資料（FR-109）。
   跨網域抓取會被 CORS 擋下，伺服器端抓取需自建後端且可能違反對方服務條款
 - **任何 LLM / AI 服務** — 評論自動審核為規則式引擎（FR-103a）。

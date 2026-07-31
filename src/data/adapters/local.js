@@ -195,6 +195,37 @@ export async function deleteRoom(id) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// 房源展示照片
+//
+// 示範模式沒有雲端儲存，改以 data URL 存在房源資料裡。
+// utils/image.js 會先把圖片壓到約 900px 寬，否則 localStorage 的配額
+// 撐不過幾張照片。
+// ---------------------------------------------------------------------------
+
+export async function uploadRoomPhoto(roomId, blobOrDataUrl) {
+  requireAdmin();
+  if (typeof blobOrDataUrl === 'string') return blobOrDataUrl;   // 已是 data URL
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(appError('UNKNOWN', '讀取圖片失敗，請換一張再試。'));
+    reader.readAsDataURL(blobOrDataUrl);
+  });
+}
+
+/** data URL 隨房源資料一起刪除，沒有額外的檔案要清 */
+export async function deleteRoomPhoto() {
+  requireAdmin();
+  return true;
+}
+
+/** 示範模式的圖片參照本身就能直接顯示 */
+export function resolveRoomPhotoUrl(value) {
+  return value;
+}
+
 /** 某房源尚未到期的有效訂單，供刪除前的二次確認使用 */
 export async function getFutureOrdersForRoom(roomId) {
   const today = todayInTaipei();

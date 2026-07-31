@@ -10,7 +10,7 @@
  */
 
 import { render, renderLoading, renderError, createEmptyState, toast } from '../app.js';
-import { getRoom, formatRating } from '../data/rooms.js';
+import { getRoom, formatRating, resolveImageUrl } from '../data/rooms.js';
 import { listPublicReviews } from '../data/reviews.js';
 import { getLatestRiskCheck } from '../data/risk-checks.js';
 import { formatTWD, calculateTotal } from '../utils/money.js';
@@ -98,12 +98,7 @@ function buildMain(room, data, context) {
   const { reviews, riskCheck, eligibleOrders, myReviews } = data;
   const main = document.createElement('div');
 
-  const gallery = document.createElement('div');
-  gallery.className = 'detail-gallery';
-  const img = document.createElement('img');
-  img.src = room.images?.[0] ?? 'assets/hero.svg';
-  img.alt = `${room.name}的房間照片`;
-  gallery.append(img);
+  const gallery = buildGallery(room);
 
   const h1 = document.createElement('h1');
   h1.textContent = room.name;
@@ -129,6 +124,57 @@ function buildMain(room, data, context) {
   main.append(buildReviewForm(room, eligibleOrders, context));
 
   return main;
+}
+
+/**
+ * 相簿：一張主圖加上可點選的縮圖列。
+ *
+ * 只有一張照片時不顯示縮圖列——一排只有一格的縮圖看起來像壞掉。
+ */
+function buildGallery(room) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-gallery';
+
+  const images = (room.images ?? []).map(resolveImageUrl).filter(Boolean);
+  const sources = images.length ? images : ['assets/hero.svg'];
+
+  const main = document.createElement('img');
+  main.className = 'detail-gallery__main';
+  main.src = sources[0];
+  main.alt = `${room.name}的房間照片`;
+  wrap.append(main);
+
+  if (sources.length < 2) return wrap;
+
+  const thumbs = document.createElement('div');
+  thumbs.className = 'detail-gallery__thumbs';
+  thumbs.setAttribute('role', 'group');
+  thumbs.setAttribute('aria-label', `${room.name}的照片選擇`);
+
+  sources.forEach((src, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'detail-gallery__thumb';
+    btn.setAttribute('aria-label', `檢視第 ${index + 1} 張照片`);
+    btn.setAttribute('aria-pressed', String(index === 0));
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';                 // 裝飾性：主圖已有完整說明
+    img.loading = 'lazy';
+    btn.append(img);
+
+    btn.addEventListener('click', () => {
+      main.src = src;
+      main.alt = `${room.name}的房間照片，第 ${index + 1} 張`;
+      [...thumbs.children].forEach((el, i) => el.setAttribute('aria-pressed', String(i === index)));
+    });
+
+    thumbs.append(btn);
+  });
+
+  wrap.append(thumbs);
+  return wrap;
 }
 
 function ratingText(room) {

@@ -8,7 +8,7 @@
  */
 
 import { formatTWD, calculateTotal } from '../utils/money.js';
-import { formatRating } from '../data/rooms.js';
+import { formatRating, primaryImage } from '../data/rooms.js';
 import { typeLabel, roomStatusLabel, ROOM_STATUS } from '../data/vocabulary.js';
 import { nightsBetween } from '../utils/dates.js';
 import { createFavoriteButton } from './favorite-button.js';
@@ -31,11 +31,20 @@ function buildMedia(room) {
   media.className = 'room-card__media';
 
   const img = document.createElement('img');
-  img.src = room.images?.[0] ?? 'assets/hero.svg';
+  img.src = primaryImage(room) ?? 'assets/hero.svg';
   // 憲章原則 V：所有圖片必須有有意義的 alt
   img.alt = `${room.name}的房間照片`;
   img.loading = 'lazy';
   media.append(img);
+
+  // 有多張照片時標示張數，讓使用者知道詳情頁還有得看
+  const count = room.images?.length ?? 0;
+  if (count > 1) {
+    const badge = document.createElement('span');
+    badge.className = 'room-card__photo-count';
+    badge.textContent = `${count} 張照片`;
+    media.append(badge);
+  }
 
   return media;
 }

@@ -8,7 +8,7 @@
  * （contracts/README.md §5）。
  */
 
-import { getSupabaseClient } from '../../lib/supabase.js';
+import { getSupabaseClient, supabaseConfig } from '../../lib/supabase.js';
 import { AppError, appError } from '../../utils/errors.js';
 import { nightsBetween } from '../../utils/dates.js';
 
@@ -243,6 +243,47 @@ export async function deleteRoom(id) {
   const sb = await client();
   await run(sb.from('rooms').delete().eq('id', id));
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// 房源展示照片（僅管理員可寫）
+// ---------------------------------------------------------------------------
+
+const PHOTO_BUCKET = 'room-photos';
+const STORAGE_PREFIX = 'storage:';
+
+/**
+ * 上傳一張房源照片。
+ * @returns {Promise<string>} `storage:<path>` 形式的參照，直接存進 rooms.images
+ */
+export async function uploadRoomPhoto(roomId, blob) {
+  const sb = await client();
+  const path = `${roomId}/${Date.now()}-${Math.random().toString(16).slice(2, 8)}.jpg`;
+
+  const { error } = await sb.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (error) throw translate(error);
+
+  return `${STORAGE_PREFIX}${path}`;
+}
+
+/** 刪除已上傳的照片。外部網址或相對路徑不需要刪檔，直接略過。 */
+export async function deleteRoomPhoto(ref) {
+  if (typeof ref !== 'string' || !ref.startsWith(STORAGE_PREFIX)) return true;
+  const sb = await client();
+  const { error } = await sb.storage.from(PHOTO_BUCKET).remove([ref.slice(STORAGE_PREFIX.length)]);
+  if (error) throw translate(error);
+  return true;
+}
+
+/** `storage:<path>` → 公開網址；其餘形式原樣回傳 */
+export function resolveRoomPhotoUrl(value) {
+  if (typeof value !== 'string' || !value.startsWith(STORAGE_PREFIX)) return value;
+  const path = value.slice(STORAGE_PREFIX.length);
+  // getPublicUrl 是純字串組合，不發請求，因此可以同步取得
+  const base = supabaseConfig.url.replace(/\/$/, '');
+  return `${base}/storage/v1/object/public/${PHOTO_BUCKET}/${path}`;
 }
 
 export async function getFutureOrdersForRoom(roomId) {

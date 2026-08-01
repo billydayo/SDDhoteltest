@@ -171,8 +171,14 @@ export async function getRooms(filters = {}) {
   if (Number(guests) > 0) q = q.gte('max_guests', Number(guests));
   if (Number(priceCap) > 0) q = q.lte('nightly_price', Number(priceCap));
   // jsonb 包含運算子＝AND 邏輯：須同時具備所選全部項目（FR-010）
-  if (amenities.length) q = q.contains('amenities', amenities);
-  if (features.length) q = q.contains('features', features);
+  //
+  // 必須先 JSON.stringify。直接傳 JS 陣列的話，supabase-js 會序列化成
+  // Postgres 的陣列字面值 `cs.{浴缸,陽台}`——那是給 text[] 欄位用的語法，
+  // 但這兩欄是 jsonb，Postgres 會拿它去 parse JSON 然後炸掉：
+  //   22P02 invalid input syntax for type json / Token "浴缸" is invalid
+  // 傳字串時 supabase-js 原樣帶過去，得到正確的 `cs.["浴缸","陽台"]`。
+  if (amenities.length) q = q.contains('amenities', JSON.stringify(amenities));
+  if (features.length) q = q.contains('features', JSON.stringify(features));
   if (keyword) {
     const k = `%${String(keyword).trim()}%`;
     q = q.or(`name.ilike.${k},description.ilike.${k}`);

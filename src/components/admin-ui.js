@@ -189,6 +189,58 @@ export function confirmAction(message) {
   return window.confirm(message);
 }
 
+/**
+ * 後台的浮窗。新增／編輯表單放這裡，不佔用列表的版面。
+ *
+ * 用原生 <dialog> 而不是自刻的疊層：焦點鎖定、Esc 關閉、背景 inert 與
+ * `::backdrop` 都由瀏覽器處理，自刻一份只會少掉其中幾項。
+ *
+ * 刻意**不做**點背景關閉：裡面是表單，誤觸一下就把填到一半的內容清掉，
+ * 代價遠高於少按一次「取消」。要關就按 ✕、Esc 或取消鈕。
+ *
+ * onClose 在任何關閉途徑後都會執行一次（✕、Esc、close()），
+ * 因此清理未保存的上傳只要掛在這裡，不必在每個按鈕上各寫一遍。
+ *
+ * @param {{ title: string, content: Node, onClose?: () => void|Promise<void> }} config
+ * @returns {HTMLDialogElement}
+ */
+export function openModal({ title, content, onClose }) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'modal';
+
+  const head = document.createElement('div');
+  head.className = 'modal__head';
+
+  const h2 = document.createElement('h2');
+  h2.className = 'modal__title';
+  h2.textContent = title;
+  dialog.setAttribute('aria-label', title);
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'modal__close';
+  close.textContent = '✕';
+  close.setAttribute('aria-label', '關閉');
+  close.title = '關閉';
+  close.addEventListener('click', () => dialog.close());
+
+  head.append(h2, close);
+
+  const body = document.createElement('div');
+  body.className = 'modal__body';
+  body.append(content);
+
+  dialog.append(head, body);
+  dialog.addEventListener('close', async () => {
+    dialog.remove();
+    await onClose?.();
+  });
+
+  document.getElementById('modal-root')?.append(dialog);
+  dialog.showModal();
+  return dialog;
+}
+
 export function inlineError() {
   const p = document.createElement('p');
   p.className = 'error-state';

@@ -801,5 +801,74 @@ dialog {
 }
 dialog::backdrop { background: rgba(27, 42, 36, 0.45); backdrop-filter: blur(3px); }
 
+/* --------------------------------------------------------- 後台浮窗 */
+
+.modal {
+  /* 視窗高度受限，超出的部分由 __body 內捲，標題與關閉鈕永遠看得到 */
+  width: min(940px, calc(100vw - 2 * var(--sp-4)));
+  max-height: calc(100vh - 2 * var(--sp-5));
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--c-border-soft);
+  background: var(--c-surface);
+}
+
+.modal__title { margin: 0; font-size: var(--f-h3, 1.25rem); }
+
+.modal__close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+}
+.modal__close:hover { background: var(--c-surface-alt); color: var(--c-text); }
+.modal__close:focus-visible { outline: 2px solid var(--c-brand-accent); outline-offset: 2px; }
+
+.modal__body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--sp-5);
+}
+
+/* 浮窗內的表單已經有自己的外框，不需要再套一層卡片的邊框與陰影 */
+.modal__body > .card {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .modal {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .modal__head { padding: var(--sp-3) var(--sp-4); }
+  .modal__body { padding: var(--sp-4); }
+}
+
 details > summary { color: var(--c-text-muted); font-size: var(--f-small); }
 details[open] > summary { margin-bottom: var(--sp-2); }

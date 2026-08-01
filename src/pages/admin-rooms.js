@@ -17,7 +17,7 @@ import { withAudit, ACTIONS, diffSummary } from '../services/audit.js';
 import {
   createDataTable, createEmptyRow, textField, selectField, textareaField,
   checkboxGroup, actionButton, confirmAction, inlineError, showInlineError,
-  statusTag, buttonRow, createExportButton
+  statusTag, buttonRow, createExportButton, openModal
 } from '../components/admin-ui.js';
 import { createImageManager } from '../components/image-manager.js';
 import { AMENITIES, ROOM_FEATURES, ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel }
@@ -32,10 +32,8 @@ import { toUserMessage } from '../utils/errors.js';
  */
 const MANUAL_ROOM_STATUSES = ['available', 'maintenance'];
 
-let editing = null;   // 目前編輯中的房源，null 代表新增模式
-
-/** 目前表單上的照片管理器，供離開頁面時清理未保存的上傳 */
-let activePhotos = null;
+// 編輯中的房源改為參數傳遞，不再是模組層的狀態——
+// 表單只存在於浮窗的生命週期內，用模組變數保存反而要處理它何時該被清掉。
 
 let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' };
 
@@ -55,11 +53,46 @@ export async function renderAdminRooms(panel, context) {
 
   const frag = document.createDocumentFragment();
   frag.append(createPageHeader('房源管理', roomsSummary(rooms.length)));
-  frag.append(buildForm(panel, context));
+  frag.append(buildCreateBar(panel, context));
   frag.append(buildFilterForm(panel, context));
   frag.append(buildTable(filtered, rooms.length, occupied, panel, context));
 
   panel.replaceChildren(frag);
+}
+
+/**
+ * 新增入口。表單本體改放浮窗，列表因此能待在第一屏——
+ * 原本的做法是把整份表單常駐在頁首，光是設施與特色的勾選框就把清單推到摺線以下，
+ * 而管理員進這一頁十次有九次是來看清單的。
+ */
+function buildCreateBar(panel, context) {
+  const bar = document.createElement('div');
+  bar.className = 'filter-bar__actions';
+  bar.style.marginBottom = 'var(--sp-4)';
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'btn btn--primary';
+  add.textContent = '新增房源';
+  add.addEventListener('click', () => openRoomForm(panel, context));
+
+  bar.append(add);
+  return bar;
+}
+
+/**
+ * 開啟新增／編輯浮窗。
+ *
+ * 未保存的上傳一律由浮窗的 onClose 清掉，不論使用者是按取消、按 ✕ 還是按 Esc——
+ * 只掛在取消鈕上的話，按 Esc 就會在 storage 留下沒人引用的檔案（憲章「上傳」條）。
+ */
+function openRoomForm(panel, context, room = null) {
+  const photosRef = {};
+  const dialog = openModal({
+    title: room ? `編輯房源：${room.name}` : '新增房源',
+    content: buildForm(panel, context, room, photosRef, () => dialog.close()),
+    onClose: () => photosRef.current?.discardUnsaved()
+  });
 }
 
 function roomsSummary(total) {
@@ -122,7 +155,7 @@ function buildFilterForm(panel, context) {
   const dateHint = document.createElement('p');
   dateHint.id = 'rm-f-date-hint';
   dateHint.className = 'field__hint';
-  dateHint.textContent = '查該日的房況。房態逐日獨立，8/1 已預訂不代表 8/2 也已預訂。';
+  dateHint.textContent = '房態逐日獨立：8/1 已預訂不代表 8/2 也已預訂。';
   date.wrap.append(dateHint);
 
   const status = selectField({
@@ -200,28 +233,24 @@ const reload = (panel, context) => renderAdminRooms(panel, context);
 // 新增 / 編輯表單
 // ---------------------------------------------------------------------------
 
-function buildForm(panel, context) {
+function buildForm(panel, context, room, photosRef, close) {
+  // 標題由浮窗的 __head 提供，表單自己不再放一個 h2，否則畫面上會出現兩行一樣的字
   const form = document.createElement('form');
   form.className = 'card';
-  form.style.marginBottom = 'var(--sp-5)';
   form.noValidate = true;
 
-  const h2 = document.createElement('h2');
-  h2.textContent = editing ? `編輯房源：${editing.name}` : '新增房源';
-  form.append(h2);
-
-  const name = textField({ id: 'rm-name', name: 'name', label: '房名', value: editing?.name ?? '' });
+  const name = textField({ id: 'rm-name', name: 'name', label: '房名', value: room?.name ?? '' });
   const type = selectField({
-    id: 'rm-type', name: 'type', label: '房型', value: editing?.type ?? 'double',
+    id: 'rm-type', name: 'type', label: '房型', value: room?.type ?? 'double',
     options: ROOM_TYPES.map((t) => ({ value: t.value, label: t.label }))
   });
   const maxGuests = textField({
     id: 'rm-guests', name: 'maxGuests', label: '人數上限', type: 'number',
-    value: editing?.maxGuests ?? 2, attrs: { min: '1', step: '1' }
+    value: room?.maxGuests ?? 2, attrs: { min: '1', step: '1' }
   });
   const price = textField({
     id: 'rm-price', name: 'nightlyPrice', label: '每晚價格（新臺幣）', type: 'number',
-    value: editing?.nightlyPrice ?? 2000,
+    value: room?.nightlyPrice ?? 2000,
     // step 為 1：價格可以是任意正整數，不該被限制成 100 的倍數
     attrs: { min: '1', step: '1', inputmode: 'numeric', class: 'no-spin' }
   });
@@ -229,21 +258,22 @@ function buildForm(panel, context) {
   // 實際狀況推翻，而且沒有任何機制在退房後把它改回來——留著只會讓房間永久下架。
   const status = selectField({
     id: 'rm-status', name: 'status', label: '房態',
-    value: editing?.status === 'maintenance' ? 'maintenance' : 'available',
+    value: room?.status === 'maintenance' ? 'maintenance' : 'available',
     options: MANUAL_ROOM_STATUSES.map((s) => ({ value: s, label: roomStatusLabel(s) })),
     hint: '「整理中」會被排除於可訂清單之外。'
       + '「已預訂」由當日訂單自動判定，不需要也無法在此設定。'
   });
   const description = textareaField({
-    id: 'rm-desc', name: 'description', label: '房源描述', value: editing?.description ?? ''
+    id: 'rm-desc', name: 'description', label: '房源描述', value: room?.description ?? ''
   });
 
   // 多張照片：可本地上傳，也可貼網址；第一張為封面
   const photos = createImageManager({
-    roomId: editing?.id ?? null,
-    images: editing?.images ?? []
+    roomId: room?.id ?? null,
+    images: room?.images ?? []
   });
-  activePhotos = photos;
+  // 交給浮窗，讓它在任何關閉途徑後都能清掉未保存的上傳
+  photosRef.current = photos;
 
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
@@ -251,10 +281,10 @@ function buildForm(panel, context) {
   form.append(row, photos.element, description.wrap);
 
   const amenities = checkboxGroup({
-    name: 'amenities', legend: '設施', options: AMENITIES, selected: editing?.amenities ?? []
+    name: 'amenities', legend: '設施', options: AMENITIES, selected: room?.amenities ?? []
   });
   const features = checkboxGroup({
-    name: 'features', legend: '房型特色', options: ROOM_FEATURES, selected: editing?.features ?? []
+    name: 'features', legend: '房型特色', options: ROOM_FEATURES, selected: room?.features ?? []
   });
   form.append(amenities, features);
 
@@ -264,17 +294,10 @@ function buildForm(panel, context) {
   const submit = document.createElement('button');
   submit.type = 'submit';
   submit.className = 'btn btn--primary';
-  submit.textContent = editing ? '儲存變更' : '新增房源';
+  submit.textContent = room ? '儲存變更' : '新增房源';
 
-  // 取消編輯時清掉本次上傳但沒被保存的照片，避免 storage 留下沒人引用的檔案
-  const cancel = editing
-    ? actionButton('取消編輯', async () => {
-        await photos.discardUnsaved();
-        activePhotos = null;
-        editing = null;
-        reload(panel, context);
-      })
-    : null;
+  // 未保存的上傳由浮窗的 onClose 統一清掉，這裡只要關窗即可
+  const cancel = actionButton(room ? '取消編輯' : '取消', () => close());
 
   form.append(buttonRow(submit, cancel));
 
@@ -304,16 +327,15 @@ function buildForm(panel, context) {
 
     submit.disabled = true;
     try {
-      if (editing) {
+      if (room) {
         await withAudit(
           {
-            action: ACTIONS.ROOM_UPDATE, targetTable: 'rooms', targetId: editing.id,
-            summary: diffSummary(editing, input)
+            action: ACTIONS.ROOM_UPDATE, targetTable: 'rooms', targetId: room.id,
+            summary: diffSummary(room, input)
           },
-          () => updateRoom(editing.id, input)
+          () => updateRoom(room.id, input)
         );
         toast('房源已更新。', 'ok');
-        editing = null;
       } else {
         await withAudit(
           { action: ACTIONS.ROOM_CREATE, targetTable: 'rooms', summary: { name: input.name } },
@@ -321,9 +343,11 @@ function buildForm(panel, context) {
         );
         toast('房源已新增。', 'ok');
       }
-      // 儲存成功後這些照片已被房源引用，不再是待清理的暫存檔
+      // 儲存成功後這些照片已被房源引用，不再是待清理的暫存檔。
+      // 必須在關窗之前 commit——onClose 會呼叫 discardUnsaved，
+      // 沒先 commit 的話剛存好的照片會被當成孤兒檔刪掉。
       photos.commit();
-      activePhotos = null;
+      close();
       reload(panel, context);
     } catch (err) {
       showInlineError(error, toUserMessage(err));
@@ -422,11 +446,8 @@ function buildRowActions(room, panel, context) {
   wrap.style.display = 'flex';
   wrap.style.gap = 'var(--sp-1)';
 
-  wrap.append(actionButton('編輯', () => {
-    editing = room;
-    reload(panel, context);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }));
+  // 表單開在浮窗裡，因此不必再重繪整頁、也不必把畫面捲回頂端
+  wrap.append(actionButton('編輯', () => openRoomForm(panel, context, room)));
 
   // 房態快速切換（FR-051）
   const nextStatus = room.status === 'maintenance' ? 'available' : 'maintenance';
@@ -488,7 +509,7 @@ async function handleDelete(room, panel, context) {
       () => deleteRoom(room.id)
     );
     toast('房源已刪除。', 'ok');
-    if (editing?.id === room.id) editing = null;
+    // 不必再清編輯狀態：表單在浮窗裡，開著的時候背景列表是 inert，按不到刪除
     reload(panel, context);
   } catch (err) {
     toastError(err);

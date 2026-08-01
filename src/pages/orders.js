@@ -25,11 +25,32 @@ import * as router from '../router.js';
 // 訂單列表
 // ---------------------------------------------------------------------------
 
+/**
+ * 目前選取的狀態子分頁。'' 代表全部。
+ *
+ * 放在模組層而非區域變數：付款倒數結束、完成付款等動作都會重跑 renderOrders()，
+ * 每次都跳回「全部」的話，使用者剛才篩到的分頁就沒了。
+ */
+let statusTab = '';
+
+/**
+ * 訂單在畫面上的實際狀態。
+ *
+ * 逾期未付款的訂單在資料上仍是 pending-payment（要等 sweepExpiredOrders 掃過才會
+ * 真的變成 cancelled），但標籤已經顯示「已取消（逾期未付款）」。分頁必須跟著
+ * 看得到的標籤走，否則使用者會在「待付款」裡看到一筆寫著已取消的訂單。
+ */
+const displayStatus = (order) => (isPaymentTimeout(order) ? 'cancelled' : order.status);
+
+/** 取消與退款：已經沒有住宿權益的訂單，列表上以底色與其他筆區隔 */
+const INACTIVE_STATUSES = ['cancelled', 'refunded'];
+
 export async function renderOrders() {
   renderLoading('正在載入訂單…');
   try {
     const orders = await listOrders();
     if (!orders.length) {
+      statusTab = '';
       render([
         createPageHeader('我的訂單'),
         createEmptyState({
@@ -46,13 +67,82 @@ export async function renderOrders() {
     const rooms = await Promise.all(orders.map((o) => getRoom(o.roomId).catch(() => null)));
     const roomById = new Map(rooms.filter(Boolean).map((r) => [r.id, r]));
 
-    render([
-      createPageHeader('我的訂單', `共 ${orders.length} 筆，依入住日排序。`),
-      buildOrderList(orders, roomById)
-    ]);
+    const shown = statusTab
+      ? orders.filter((o) => displayStatus(o) === statusTab)
+      : orders;
+
+    const nodes = [
+      createPageHeader('我的訂單', listSummary(orders.length, shown.length)),
+      createStatusTabs(orders)
+    ];
+
+    nodes.push(shown.length
+      ? buildOrderList(shown, roomById)
+      : createEmptyState({
+          title: `沒有${orderStatusLabel(statusTab)}的訂單`,
+          body: '切換到其他分頁可以查看你的其他訂單。'
+        }));
+
+    render(nodes);
   } catch (err) {
     renderError(err, { retry: renderOrders });
   }
+}
+
+function listSummary(total, shown) {
+  return statusTab
+    ? `${orderStatusLabel(statusTab)} ${shown} 筆／全部 ${total} 筆，依入住日排序。`
+    : `共 ${total} 筆，依入住日排序。`;
+}
+
+/**
+ * 狀態子分頁。
+ *
+ * 每個分頁都帶筆數，且**沒有訂單的狀態不顯示**——一個永遠是空的分頁只是雜訊。
+ * 但「全部」永遠在，使用者才有回得去的地方。
+ */
+function createStatusTabs(orders) {
+  const counts = new Map();
+  orders.forEach((o) => {
+    const s = displayStatus(o);
+    counts.set(s, (counts.get(s) ?? 0) + 1);
+  });
+
+  const nav = document.createElement('div');
+  nav.className = 'type-tabs';
+  nav.setAttribute('role', 'group');
+  nav.setAttribute('aria-label', '訂單狀態分類');
+
+  const tabs = [
+    { value: '', label: '全部', count: orders.length },
+    // 依 ORDER_STATUS 的順序排，而不是依資料出現的先後——
+    // 分頁的位置必須固定，否則新增一筆訂單就會讓整排跳動
+    ...Object.keys(ORDER_STATUS)
+      .filter((s) => counts.has(s))
+      .map((s) => ({ value: s, label: orderStatusLabel(s), count: counts.get(s) }))
+  ];
+
+  tabs.forEach(({ value, label, count }) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', String(value === statusTab));
+    btn.setAttribute('aria-label', `${label}，${count} 筆`);
+
+    btn.append(document.createTextNode(label));
+    const badge = document.createElement('span');
+    badge.className = 'type-tabs__count';
+    badge.textContent = String(count);
+    badge.setAttribute('aria-hidden', 'true');   // 筆數已寫進 aria-label
+    btn.append(badge);
+
+    btn.addEventListener('click', () => {
+      statusTab = value;
+      renderOrders();
+    });
+    nav.append(btn);
+  });
+
+  return nav;
 }
 
 function buildOrderList(orders, roomById) {
@@ -61,7 +151,12 @@ function buildOrderList(orders, roomById) {
 
   orders.forEach((order) => {
     const li = document.createElement('li');
-    li.className = 'card';
+    li.className = 'card order-card';
+
+    // 已取消與已退款整張卡片加底色，掃過列表時一眼就能跳過它們
+    if (INACTIVE_STATUSES.includes(displayStatus(order))) {
+      li.classList.add('order-card--inactive');
+    }
 
     const head = document.createElement('div');
     head.style.display = 'flex';

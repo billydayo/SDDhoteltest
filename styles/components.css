@@ -317,6 +317,41 @@
 }
 .type-tabs li { margin: 0; list-style: none; }
 
+/* 分頁上的筆數。用底色小圓角而非括號，數字才不會被讀成標籤的一部分 */
+.type-tabs__count {
+  display: inline-block;
+  margin-inline-start: var(--sp-2);
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: var(--f-tiny);
+  font-weight: 400;
+  color: var(--c-text-muted);
+  background: var(--c-surface-alt);
+}
+.type-tabs button[aria-pressed="true"] .type-tabs__count {
+  color: var(--c-brand-strong);
+  background: var(--c-surface-deep);
+}
+
+/* --------------------------------------------------------- 訂單卡片 */
+
+/*
+ * 已取消／已退款的訂單。
+ *
+ * 只靠狀態標籤區分是不夠的：標籤在卡片右上角，而使用者是整片掃過列表的。
+ * 整張卡片換底色才讓「這筆已經結束了」在餘光裡就成立。
+ *
+ * 底色之外再加一條左側色帶——不能只用顏色傳達狀態（憲章原則 V），
+ * 而且文字對比維持不變，避免為了「看起來淡」而犧牲可讀性。
+ */
+.order-card--inactive {
+  background: var(--c-surface-alt);
+  border-color: var(--c-border);
+  box-shadow: none;
+  border-inline-start: 3px solid var(--c-border-strong);
+}
+.order-card--inactive .room-card__meta { color: var(--c-text-muted); }
+
 /* --------------------------------------------------------- 房源卡片 */
 
 /*

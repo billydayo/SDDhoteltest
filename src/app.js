@@ -53,7 +53,12 @@ export function renderLoading(message = '載入中…') {
  * 錯誤畫面。永遠顯示可理解的訊息，不顯示原始技術錯誤。
  * 開發時的細節走 console.debug，不干擾使用者，也不算 console 錯誤。
  */
-export function renderError(err, { retry } = {}) {
+/**
+ * 錯誤區塊本身。與 renderError 的差別只在於「放在哪裡」——
+ * 整頁失敗時取代 #main，區域性失敗時由呼叫端嵌進版面的某一段，
+ * 讓使用者原本填好的表單留在畫面上。兩者外觀必須一致，因此共用這支。
+ */
+export function createErrorState(err, { retry } = {}) {
   const box = document.createElement('div');
   box.className = 'error-state';
   box.setAttribute('role', 'alert');
@@ -86,7 +91,11 @@ export function renderError(err, { retry } = {}) {
     btn.addEventListener('click', retry);
     box.append(btn);
   }
-  render(box);
+  return box;
+}
+
+export function renderError(err, { retry } = {}) {
+  render(createErrorState(err, { retry }));
 }
 
 /** 頁面級的空狀態（FR-018） */

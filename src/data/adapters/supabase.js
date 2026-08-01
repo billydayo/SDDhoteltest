@@ -157,6 +157,19 @@ export async function expireStaleOrders() {
 // 房源
 // ---------------------------------------------------------------------------
 
+/**
+ * 把值包成 PostgREST 邏輯樹裡安全的字面值。
+ *
+ * `or=(...)` 的內容是 PostgREST 自己解析的迷你語法，逗號是條件分隔符。
+ * 使用者在關鍵字裡打一個逗號（「和風,雙人」）就會把一條 ilike 拆成兩半，
+ * 整棵樹解析失敗，回 400 PGRST100，前端顯示「操作未能完成」。
+ *
+ * 包成雙引號字面值即可，內部的 `"` 與 `\` 要再跳脫。
+ * 對不含特殊字元的關鍵字，加引號與否結果完全相同（實測驗證過），
+ * 因此一律加，不必判斷哪些字元才需要。
+ */
+const pgrstValue = (value) => `"${String(value).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+
 export async function getRooms(filters = {}) {
   const sb = await client();
   const {
@@ -181,7 +194,7 @@ export async function getRooms(filters = {}) {
   if (features.length) q = q.contains('features', JSON.stringify(features));
   if (keyword) {
     const k = `%${String(keyword).trim()}%`;
-    q = q.or(`name.ilike.${k},description.ilike.${k}`);
+    q = q.or(`name.ilike.${pgrstValue(k)},description.ilike.${pgrstValue(k)}`);
   }
   if (bookableOnly || (checkIn && checkOut)) q = q.eq('status', 'available');
 

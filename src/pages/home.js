@@ -4,7 +4,8 @@
  * 搜尋條件存在 store，因此進出詳情頁再回來時條件仍在（T040）。
  */
 
-import { render, renderLoading, renderError, createEmptyState } from '../app.js';
+import { render, renderLoading, renderError, createEmptyState, createErrorState }
+  from '../app.js';
 import { getSiteContent } from '../data/site-content.js';
 import { searchRooms, buildNoResultHints } from '../services/search.js';
 import { createRoomCard } from '../components/room-card.js';
@@ -17,12 +18,28 @@ let cachedContent = null;
 export async function renderHome() {
   renderLoading('正在載入房源…');
   try {
+    // 網站內容拿不到就沒有主視覺可畫，那是整頁級的失敗，仍走 renderError。
     if (!cachedContent) cachedContent = await getSiteContent();
-    const result = await searchRooms();
-    render(buildPage(cachedContent, result));
   } catch (err) {
     renderError(err, { retry: renderHome });
+    return;
   }
+
+  /*
+   * 查詢失敗**不**取代整頁。
+   *
+   * 原本是整個 #main 換成錯誤畫面，連搜尋列一起消失——使用者填了三個必填欄位、
+   * 勾了幾項設施，只因為關鍵字裡有個逗號就全部歸零，還得從頭再填一次。
+   * 改成只讓結果區顯示錯誤，搜尋列與目前的條件都留在畫面上，
+   * 使用者可以直接改掉那個字元再按一次搜尋。
+   */
+  let result;
+  try {
+    result = await searchRooms();
+  } catch (err) {
+    result = { rooms: [], error: null, failure: err, filters: store.getSearchFilters() };
+  }
+  render(buildPage(cachedContent, result));
 }
 
 /** 條件變更後重新查詢。patch 為 null 代表已被清空。 */
@@ -46,11 +63,18 @@ function buildPage(content, result) {
   // 頁籤只改房型，其他條件維持有效（FR-012）
   frag.append(createTypeTabs(filters.type, (type) => applyFilters({ type })));
 
+  // 條件本身寫錯：使用者改一下就好，不需要重試按鈕
   if (result.error) {
     frag.append(createEmptyState({
       title: '搜尋條件有誤',
       body: result.error
     }));
+    return frag;
+  }
+
+  // 查詢真的失敗：可能是暫時性的，給重試入口。搜尋列已在上方，條件不會消失。
+  if (result.failure) {
+    frag.append(createErrorState(result.failure, { retry: renderHome }));
     return frag;
   }
 

@@ -1,0 +1,17 @@
+{
+  "name": "sunny-tests",
+  "private": true,
+  "type": "module",
+  "description": "Sunny 訂房平台的自動化測試。依憲章，此處的依賴僅供測試使用，應用程式不 import 任何一支；刪掉整個 tests/ 目錄，應用仍完整可用。",
+  "scripts": {
+    "serve": "npx --yes http-server .. -p 8000 -c-1",
+    "test": "node e2e/unit-page.e2e.mjs && node e2e/search.e2e.mjs && node e2e/orders.e2e.mjs && node e2e/admin.e2e.mjs",
+    "test:unit": "node e2e/unit-page.e2e.mjs",
+    "test:search": "node e2e/search.e2e.mjs",
+    "test:orders": "node e2e/orders.e2e.mjs",
+    "test:admin": "node e2e/admin.e2e.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}

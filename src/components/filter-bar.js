@@ -35,6 +35,14 @@ export function createFilterBar(onChange, vocabulary) {
   const main = buildMainRow(filters);
 
   form.append(main.row);
+
+  // 條件式必填的規則要先說，不要等使用者按了搜尋才用紅字告訴他
+  const stayHint = document.createElement('p');
+  stayHint.className = 'field__hint';
+  stayHint.style.marginTop = 'calc(var(--sp-2) * -1)';
+  stayHint.textContent = '不填日期也可以搜尋，只是不會排除當天訂滿的房源。'
+    + '要查特定日期的空房時，入住日、退房日與入住人數請一起填寫。';
+  form.append(stayHint);
   // 清單為空時整組不畫：一個沒有任何選項的 fieldset 看起來像壞掉
   if (amenityOptions.length) {
     form.append(buildCheckGroup('設施條件', 'amenities', amenityOptions, filters.amenities));
@@ -46,7 +54,7 @@ export function createFilterBar(onChange, vocabulary) {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!validateRequired(main.fields)) return;
+    if (!validateStayInputs(main.fields)) return;
     onChange(readForm(form));
   });
 
@@ -54,35 +62,55 @@ export function createFilterBar(onChange, vocabulary) {
 }
 
 /**
- * 按下「搜尋」時的必填檢查。
+ * 按下「搜尋」時的檢查。
  *
- * 只在送出時檢查，不在頁面載入時檢查——首頁一進來就滿版紅字會嚇到人，
- * 而且此時使用者根本還沒做任何事。房型頁籤與「清除全部條件」也不走這裡：
- * 前者依 FR-012 只改房型、不得動到其他條件，後者的用途正是把欄位清空。
+ * **條件式必填**（2026-08-01 由無條件必填改為此規則，FR-010）。
+ *
+ * 原本三個欄位一律必填，結果是「我只想看有浴缸的房」也得先填兩個日期和人數，
+ * 否則按下搜尋完全沒有反應——那不是驗證，是把篩選器鎖住了。
+ *
+ * 現在的規則：
+ *   ・三個都空 → 放行。使用者只用設施／特色／關鍵字／價格篩選是完全合理的。
+ *   ・碰了日期（任一個）→ 入住日、退房日、人數都要補齊。
+ *     日期只填一半是問不出答案的：可訂性需要一整段區間，而 services/search.js
+ *     遇到單邊日期會靜靜地略過可訂性篩選，使用者只會覺得「日期沒有作用」。
+ *     人數一併要求，是因為填了日期就是在查「這幾天有沒有房可以住」，
+ *     而住幾個人決定了哪些房型排得進來。
+ *   ・沒碰日期但填了人數 → 放行，那是一個獨立可用的篩選條件。
+ *
+ * 只在送出時檢查，不在頁面載入時檢查——首頁一進來就滿版紅字會嚇到人。
+ * 房型頁籤與「清除全部條件」也不走這裡：前者依 FR-012 不得動到其他條件，
+ * 後者的用途正是把欄位清空。
  *
  * @returns {boolean} 全部通過才回傳 true
  */
-function validateRequired(fields) {
-  const checks = [
-    { field: fields.checkIn, message: '請選擇入住日。' },
-    { field: fields.checkOut, message: '請選擇退房日。' },
-    { field: fields.guests, message: '請填寫入住人數。' }
-  ];
+function validateStayInputs(fields) {
+  const value = (field) => field.input.value.trim();
+  const usingDates = Boolean(value(fields.checkIn) || value(fields.checkOut));
+
+  const errors = new Map();
+
+  if (usingDates) {
+    if (!value(fields.checkIn)) errors.set(fields.checkIn, '選了日期就要填入住日。');
+    if (!value(fields.checkOut)) errors.set(fields.checkOut, '選了日期就要填退房日。');
+    if (!value(fields.guests)) errors.set(fields.guests, '查詢特定日期時請填寫入住人數。');
+  }
+
+  // 人數只要填了就得是正整數，與有沒有填日期無關。
+  // 填了 0 卻回「請填寫入住人數」是答非所問——欄位有填，只是值不對。
+  const guests = value(fields.guests);
+  if (guests && !errors.has(fields.guests)) {
+    const n = Number(guests);
+    if (!Number.isInteger(n) || n < 1) {
+      errors.set(fields.guests, '入住人數需為大於 0 的整數。');
+    }
+  }
 
   let firstInvalid = null;
-
-  checks.forEach(({ field, message }) => {
-    const value = field.input.value.trim();
-    let error = value ? null : message;
-
-    // 人數填了但填成 0 或負數時，「請填寫」是答非所問，要講清楚哪裡不對
-    if (!error && field.input.name === 'guests') {
-      const n = Number(value);
-      if (!Number.isInteger(n) || n < 1) error = '入住人數需為大於 0 的整數。';
-    }
-
-    setFieldError(field, error);
-    if (error && !firstInvalid) firstInvalid = field;
+  [fields.checkIn, fields.checkOut, fields.guests].forEach((field) => {
+    const message = errors.get(field) ?? null;
+    setFieldError(field, message);
+    if (message && !firstInvalid) firstInvalid = field;
   });
 
   // 把焦點送到第一個有問題的欄位，使用者才不必自己找紅字在哪
@@ -103,12 +131,15 @@ function buildMainRow(filters) {
 
   const fields = {
     keyword: field('關鍵字', 'keyword', 'text', filters.keyword, { placeholder: '房名或描述' }),
+    // 這三項是條件式必填：碰了日期才要求補齊，因此標籤不寫「（必填）」——
+    // 寫了會讓人以為不填就不能搜尋，那正是先前把篩選器鎖住的原因。
+    // 改用一句提示說明它們的連動關係。
     checkIn: field('入住日', 'checkIn', 'date', filters.checkIn,
-      { min: earliestCheckIn() }, { required: true }),
+      { min: earliestCheckIn() }, { validated: true }),
     checkOut: field('退房日', 'checkOut', 'date', filters.checkOut,
-      { min: earliestCheckIn() }, { required: true }),
+      { min: earliestCheckIn() }, { validated: true }),
     guests: field('入住人數', 'guests', 'number', filters.guests,
-      { min: '1', step: '1' }, { required: true }),
+      { min: '1', step: '1' }, { validated: true }),
     // step 必須是 1：若設成 100，瀏覽器只接受 1、101、201…，
     // 使用者輸入 2500 會被原生驗證擋下而送不出表單。
     priceCap: field('每晚價格上限', 'priceCap', 'number', filters.priceCap, {
@@ -121,14 +152,20 @@ function buildMainRow(filters) {
   return { row, fields };
 }
 
-function field(label, name, type, value, attrs = {}, { required = false } = {}) {
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.validated] 這一欄會被送出時的檢查標記錯誤，
+ *        因此需要一個 aria-describedby 指得到的訊息節點。
+ *        不等於「必填」——入住日等三欄是條件式的，見 validateStayInputs。
+ */
+function field(label, name, type, value, attrs = {}, { validated = false } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'field';
 
   const id = `filter-${name}`;
   const l = document.createElement('label');
   l.htmlFor = id;
-  l.textContent = required ? `${label}（必填）` : label;
+  l.textContent = label;
 
   const input = document.createElement('input');
   input.id = id;
@@ -145,8 +182,7 @@ function field(label, name, type, value, attrs = {}, { required = false } = {}) 
   error.hidden = true;
   error.setAttribute('role', 'alert');
 
-  if (required) {
-    input.setAttribute('aria-required', 'true');
+  if (validated) {
     input.setAttribute('aria-describedby', error.id);
     // 填好就把紅字收掉，不必等到再按一次搜尋
     input.addEventListener('input', () => {

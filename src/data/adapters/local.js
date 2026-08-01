@@ -126,11 +126,19 @@ export async function getRooms(filters = {}) {
     rooms = rooms.filter((r) => r.nightlyPrice <= Number(priceCap));
   }
   // AND 邏輯：須同時具備所選的全部設施／特色（FR-010）
+  // 舊資料或編輯中的房源可能缺少 amenities/features 陣列；這裡必須先正規化，
+  // 否則多選時會在 `includes` 上觸發型別錯誤（NUG）。
   if (amenities.length) {
-    rooms = rooms.filter((r) => amenities.every((a) => r.amenities.includes(a)));
+    rooms = rooms.filter((r) => {
+      const roomAmenities = Array.isArray(r.amenities) ? r.amenities : [];
+      return amenities.every((a) => roomAmenities.includes(a));
+    });
   }
   if (features.length) {
-    rooms = rooms.filter((r) => features.every((f) => r.features.includes(f)));
+    rooms = rooms.filter((r) => {
+      const roomFeatures = Array.isArray(r.features) ? r.features : [];
+      return features.every((f) => roomFeatures.includes(f));
+    });
   }
 
   // 房態與日期可訂性

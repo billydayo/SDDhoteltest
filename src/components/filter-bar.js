@@ -163,6 +163,14 @@ function buildActions(onChange) {
   return actions;
 }
 
+function normalizeChecklist(values) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => String(value ?? '').trim())
+      .filter(Boolean)
+  )];
+}
+
 function readForm(form) {
   const data = new FormData(form);
   return {
@@ -172,8 +180,8 @@ function readForm(form) {
     guests: (data.get('guests') ?? '').toString(),
     priceCap: (data.get('priceCap') ?? '').toString(),
     sort: (data.get('sort') ?? '').toString(),
-    amenities: data.getAll('amenities').map(String),
-    features: data.getAll('features').map(String)
+    amenities: normalizeChecklist(data.getAll('amenities')),
+    features: normalizeChecklist(data.getAll('features'))
   };
 }
 

@@ -136,7 +136,7 @@ function buildGallery(room) {
   wrap.className = 'detail-gallery';
 
   const images = (room.images ?? []).map(resolveImageUrl).filter(Boolean);
-  const sources = images.length ? images : ['assets/hero.svg'];
+  const sources = images.length ? images : ['assets/rooms/room-fallback.svg'];
 
   const main = document.createElement('img');
   main.className = 'detail-gallery__main';

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="房間示意圖">
+  <defs>
+    <linearGradient id="wall" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8f0e7"/>
+      <stop offset="100%" stop-color="#e5d2b3"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#d8b987"/>
+      <stop offset="100%" stop-color="#b8864b"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#dff5ff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#bfe6ff" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="bed" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7efe3"/>
+      <stop offset="100%" stop-color="#d7c3a4"/>
+    </linearGradient>
+    <linearGradient id="sofa" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#d7b18a"/>
+      <stop offset="100%" stop-color="#af7c56"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#wall)"/>
+  <rect y="700" width="1600" height="300" fill="url(#floor)"/>
+
+  <rect x="120" y="170" width="540" height="360" rx="18" fill="rgba(255,255,255,0.45)" stroke="#d5bb8d" stroke-width="6"/>
+  <rect x="150" y="200" width="480" height="300" rx="12" fill="url(#glass)" stroke="#b9d8e8" stroke-width="8"/>
+
+  <path d="M170 220 H610" stroke="#d0dfe8" stroke-width="6" opacity="0.9"/>
+  <path d="M170 320 H610" stroke="#d0dfe8" stroke-width="6" opacity="0.9"/>
+  <path d="M170 420 H610" stroke="#d0dfe8" stroke-width="6" opacity="0.9"/>
+  <path d="M300 198 V500" stroke="#d0dfe8" stroke-width="6" opacity="0.9"/>
+  <path d="M480 198 V500" stroke="#d0dfe8" stroke-width="6" opacity="0.9"/>
+
+  <rect x="840" y="520" width="720" height="220" rx="30" fill="#f3e9dc" stroke="#d9bf86" stroke-width="6"/>
+  <rect x="900" y="610" width="600" height="80" rx="18" fill="url(#bed)" stroke="#c4a26e" stroke-width="5"/>
+  <rect x="940" y="575" width="520" height="40" rx="18" fill="#e0c9a1"/>
+  <rect x="940" y="560" width="520" height="18" rx="9" fill="#cfaa74"/>
+  <rect x="1180" y="510" width="120" height="70" rx="12" fill="#dcae7b"/>
+  <rect x="1240" y="620" width="100" height="40" rx="10" fill="#c58d63"/>
+
+  <rect x="720" y="570" width="120" height="170" rx="18" fill="url(#sofa)"/>
+  <rect x="760" y="520" width="110" height="70" rx="18" fill="#b7805a"/>
+  <rect x="780" y="430" width="200" height="130" rx="22" fill="#f6efe8" stroke="#d1b788" stroke-width="5"/>
+  <rect x="810" y="470" width="140" height="70" rx="12" fill="#eee1cb"/>
+
+  <rect x="90" y="690" width="230" height="120" rx="18" fill="#6a9c7c" opacity="0.9"/>
+  <circle cx="150" cy="670" r="50" fill="#7aae88"/>
+  <circle cx="230" cy="680" r="55" fill="#84b98c"/>
+  <circle cx="300" cy="670" r="46" fill="#6b9d7c"/>
+
+  <rect x="1280" y="660" width="160" height="150" rx="18" fill="#c6bca8" opacity="0.85"/>
+  <rect x="1315" y="610" width="90" height="60" rx="12" fill="#b89a75"/>
+
+  <circle cx="1420" cy="250" r="50" fill="#f4d7a1" opacity="0.8"/>
+  <circle cx="1420" cy="250" r="22" fill="#fff6d6" opacity="0.9"/>
+
+  <rect x="885" y="250" width="300" height="130" rx="22" fill="#f3eddf" stroke="#d6b27d" stroke-width="6"/>
+  <rect x="930" y="300" width="210" height="35" rx="12" fill="#dfc49d"/>
+  <rect x="980" y="280" width="110" height="18" rx="9" fill="#c89d64"/>
+
+  <text x="130" y="860" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="70" font-weight="700" fill="#704f2f">Sunny Stay</text>
+  <text x="130" y="920" font-family="'Segoe UI', 'Noto Sans TC', sans-serif" font-size="36" fill="#7a654d">舒適房間 · 安靜休息 · 現代簡約</text>
+</svg>

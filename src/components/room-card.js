@@ -31,7 +31,7 @@ function buildMedia(room) {
   media.className = 'room-card__media';
 
   const img = document.createElement('img');
-  img.src = primaryImage(room) ?? 'assets/hero.svg';
+  img.src = primaryImage(room) ?? 'assets/rooms/room-fallback.svg';
   // 憲章原則 V：所有圖片必須有有意義的 alt
   img.alt = `${room.name}的房間照片`;
   img.loading = 'lazy';

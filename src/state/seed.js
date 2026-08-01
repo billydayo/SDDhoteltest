@@ -13,7 +13,7 @@
  * 提高版本號會讓既有使用者的 localStorage 在下次載入時重建為新的種子資料。
  * 新增房源或示範訂單後務必遞增，否則舊資料不會更新。
  */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 5;
 
 const ROOM_IDS = {
   singleA: '11111111-1111-4111-8111-000000000001',

@@ -50,5 +50,9 @@ export const resolveImageUrl = (value) => repo.resolveRoomPhotoUrl(value);
 /** 第一張圖，沒有圖片時回傳 null 由呼叫端決定佔位方式 */
 export function primaryImage(room) {
   const first = room?.images?.[0];
-  return first ? resolveImageUrl(first) : null;
+  if (first) {
+    const url = resolveImageUrl(first);
+    if (url) return url;
+  }
+  return 'assets/rooms/room-fallback.svg';
 }

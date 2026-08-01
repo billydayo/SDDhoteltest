@@ -145,6 +145,7 @@ export async function createOrder(input) {
 }
 
 export const payOrder = (id) => adapter.payOrder(id);
+export const cancelOrder = (id) => adapter.cancelOrder(id);
 export const updateOrderStatus = (id, status, extra) => adapter.updateOrderStatus(id, status, extra);
 
 export async function getOrderStats() {

@@ -242,11 +242,16 @@ begin
       if old.status <> 'confirmed' then
         raise exception '只有已確認的訂單可以申請退款' using errcode = '42501';
       end if;
-    -- 逾期自動取消：expire_stale_orders() 由任何登入者觸發，須放行
-    elsif new.status = 'cancelled'
-          and old.status = 'pending-payment'
-          and old.expires_at < now()
-          and new.cancel_reason = 'payment-timeout' then
+    -- 取消：僅允許 待付款 → 已取消。
+    --   ・payment-timeout   逾期自動取消，由 expire_stale_orders() 觸發
+    --   ・member-cancelled  會員主動取消（FR-035a）
+    -- 已確認的訂單不得從這裡取消——錢已經付了，必須走退款申請與審核，
+    -- 否則會繞過 FR-041 的退款級距與管理員把關。
+    elsif new.status = 'cancelled' and old.status = 'pending-payment'
+          and (
+            (new.cancel_reason = 'payment-timeout' and old.expires_at < now())
+            or new.cancel_reason = 'member-cancelled'
+          ) then
       return new;
     else
       raise exception '不允許的訂單狀態變更' using errcode = '42501';
@@ -578,8 +583,11 @@ create policy orders_update on public.orders
   using (user_id = auth.uid() or public.is_admin())
   with check (
     public.is_admin()
-    -- 會員僅能：完成付款（待付款 → 已確認），或申請退款（已確認 → 退款審核中）
-    or (user_id = auth.uid() and status in ('confirmed', 'refund-pending'))
+    -- 會員僅能：完成付款（待付款 → 已確認）、申請退款（已確認 → 退款審核中），
+    -- 或取消尚未付款的訂單（待付款 → 已取消）。
+    -- 「必須是待付款」由 guard_order_transition trigger 把關——
+    -- WITH CHECK 看不到舊資料列，光靠這裡擋不住「已確認 → 已取消」。
+    or (user_id = auth.uid() and status in ('confirmed', 'refund-pending', 'cancelled'))
   );
 
 drop policy if exists orders_delete on public.orders;

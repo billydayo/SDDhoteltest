@@ -6,6 +6,7 @@ export const listOrders = (filters) => repo.getOrders(filters);
 export const getOrder = (id) => repo.getOrderById(id);
 export const createOrder = (input) => repo.createOrder(input);
 export const payOrder = (id) => repo.payOrder(id);
+export const cancelOrder = (id) => repo.cancelOrder(id);
 export const updateOrderStatus = (id, status, extra) => repo.updateOrderStatus(id, status, extra);
 export const getOrderStats = () => repo.getOrderStats();
 

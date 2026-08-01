@@ -25,6 +25,7 @@ export class AppError extends Error {
 export const MESSAGES = Object.freeze({
   ROOM_UNAVAILABLE:      '此房源於所選日期已無空房。',
   ORDER_EXPIRED:         '此訂單已因逾期未付款而取消，請重新訂房。',
+  ORDER_NOT_CANCELLABLE: '只有尚未付款的訂單可以直接取消。已付款的訂單請改用申請退款。',
   REFUND_ALREADY_PENDING:'此訂單已有審核中的退款申請。',
   REFUND_NOT_ALLOWED:    '此訂單目前不可申請退款。',
   REFUND_LIMIT_REACHED:  '你的退款申請已達上限 5 筆，無法再提出新的申請。',

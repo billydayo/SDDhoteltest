@@ -333,6 +333,28 @@ export async function payOrder(id) {
   return updateOrderFields(id, { status: 'confirmed' });
 }
 
+/**
+ * 會員主動取消尚未付款的訂單。
+ *
+ * 只開放「待付款」——已確認的訂單牽涉到已付的錢，取消必須走退款申請與審核
+ * （FR-035 起），從這裡直接取消會繞過退款級距與管理員審核。
+ *
+ * 逾期的訂單也放行：它實際上已經被視為取消，讓使用者按下按鈕把它收乾淨，
+ * 比丟一個錯誤要求他「等系統掃過」合理。
+ */
+export async function cancelOrder(id) {
+  const user = requireUser();
+  const order = store.read('orders').find((o) => o.id === id);
+  if (!order || (user.role !== 'admin' && order.userId !== user.id)) throw appError('NOT_FOUND');
+  if (order.status !== 'pending-payment') throw appError('ORDER_NOT_CANCELLABLE');
+
+  return updateOrderFields(id, {
+    status: 'cancelled',
+    // 與逾期取消區分開：營運指標與客服都需要知道是誰取消的
+    cancelReason: Date.parse(order.expiresAt) < Date.now() ? 'payment-timeout' : 'member-cancelled'
+  });
+}
+
 export async function updateOrderStatus(id, status, extra = {}) {
   requireUser();
   return updateOrderFields(id, { status, ...extra });
@@ -352,7 +374,9 @@ export async function getOrderStats() {
   requireAdmin();
   const orders = store.read('orders');
   const paid = orders.filter((o) => ['confirmed', 'completed', 'refunded', 'refund-pending'].includes(o.status));
-  const unpaidCancelled = orders.filter((o) => o.status === 'cancelled' && o.cancelReason === 'payment-timeout');
+  // 逾期與會員自行取消都算「未付款就取消」，只算逾期會低估這個指標
+  const UNPAID_CANCEL = ['payment-timeout', 'member-cancelled'];
+  const unpaidCancelled = orders.filter((o) => o.status === 'cancelled' && UNPAID_CANCEL.includes(o.cancelReason));
   const revenue = paid.reduce((sum, o) => sum + o.totalAmount, 0);
   return {
     totalOrders: orders.length,

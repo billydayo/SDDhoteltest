@@ -6,7 +6,8 @@
  */
 
 import { render, renderLoading, renderError, createEmptyState, createPageHeader, toast, toastError } from '../app.js';
-import { listOrders, getOrder, payOrder, remainingMs, isPaymentTimeout } from '../data/orders.js';
+import { listOrders, getOrder, payOrder, cancelOrder, remainingMs, isPaymentTimeout }
+  from '../data/orders.js';
 import { getRoom } from '../data/rooms.js';
 import { createPaymentCountdown } from '../components/payment-countdown.js';
 import { formatTWD } from '../utils/money.js';
@@ -636,7 +637,48 @@ function buildPaymentPanel(order, context) {
     }
   });
 
-  panel.append(notice, pay, error);
+  /*
+   * 取消訂單。
+   *
+   * 只在待付款時出現。已確認的訂單牽涉到已付的錢，取消必須走退款申請與審核，
+   * 從這裡直接取消會繞過退款級距（FR-041）與管理員審核。
+   *
+   * 二次確認是必要的：取消不可復原，而且會立刻把房間釋出給別人，
+   * 使用者反悔時原本的日期可能已經訂不回來了。
+   */
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn';
+  cancel.style.display = 'block';
+  cancel.style.marginTop = 'var(--sp-3)';
+  cancel.textContent = '取消訂單';
+
+  cancel.addEventListener('click', async () => {
+    const ok = window.confirm(
+      '確定要取消這筆訂單嗎？\n\n'
+      + '取消後該日期區間會立即釋出給其他人預訂，此操作無法復原。'
+    );
+    if (!ok) return;
+
+    cancel.disabled = true;
+    pay.disabled = true;
+    cancel.textContent = '取消中…';
+    error.hidden = true;
+
+    try {
+      await cancelOrder(order.id);
+      toast('訂單已取消，該日期區間已釋出。', 'ok');
+      renderOrderDetail(context);
+    } catch (err) {
+      error.textContent = toUserMessage(err);
+      error.hidden = false;
+      cancel.disabled = false;
+      pay.disabled = false;
+      cancel.textContent = '取消訂單';
+    }
+  });
+
+  panel.append(notice, pay, cancel, error);
   return panel;
 }
 

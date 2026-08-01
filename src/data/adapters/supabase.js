@@ -378,6 +378,25 @@ export async function payOrder(id) {
   return toOrder(rows[0]);
 }
 
+/**
+ * 會員主動取消尚未付款的訂單。
+ *
+ * 只送 status 與 cancel_reason；「必須是待付款」這條規則由資料庫的
+ * guard_order_transition trigger 強制執行（FR-081：權限與狀態規則不得只靠前端）。
+ * 這裡不先查一次再更新——那中間有競態，而且 trigger 本來就會擋。
+ */
+export async function cancelOrder(id) {
+  const sb = await client();
+  const rows = await run(
+    sb.from('orders')
+      .update({ status: 'cancelled', cancel_reason: 'member-cancelled' })
+      .eq('id', id)
+      .select()
+  );
+  if (!rows.length) throw appError('NOT_FOUND');
+  return toOrder(rows[0]);
+}
+
 export async function updateOrderStatus(id, status, extra = {}) {
   const sb = await client();
   const payload = { status };
@@ -392,7 +411,9 @@ export async function getOrderStats() {
   // RLS 讓管理員取得全部訂單；一般會員只會拿到自己的，因此本函式僅供後台呼叫
   const rows = await run(sb.from('orders').select('status,total_amount,cancel_reason'));
   const paid = rows.filter((o) => ['confirmed', 'completed', 'refunded', 'refund-pending'].includes(o.status));
-  const unpaidCancelled = rows.filter((o) => o.status === 'cancelled' && o.cancel_reason === 'payment-timeout');
+  // 逾期與會員自行取消都算「未付款就取消」，只算逾期會低估這個指標
+  const UNPAID_CANCEL = ['payment-timeout', 'member-cancelled'];
+  const unpaidCancelled = rows.filter((o) => o.status === 'cancelled' && UNPAID_CANCEL.includes(o.cancel_reason));
   const revenue = paid.reduce((s, o) => s + o.total_amount, 0);
   return {
     totalOrders: rows.length,

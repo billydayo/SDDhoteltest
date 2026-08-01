@@ -102,6 +102,8 @@ export async function getRooms(filters = {}) {
 }
 
 export const getRoomById = (id) => adapter.getRoomById(id);
+export const getOccupiedRoomIds = (checkIn, checkOut) =>
+  adapter.getOccupiedRoomIds(checkIn, checkOut);
 export const createRoom = (input) => adapter.createRoom(input);
 export const updateRoom = (id, patch) => adapter.updateRoom(id, patch);
 export const deleteRoom = (id) => adapter.deleteRoom(id);

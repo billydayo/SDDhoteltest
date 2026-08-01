@@ -101,6 +101,11 @@ function occupiedRoomIds(checkIn, checkOut) {
   );
 }
 
+/** 後台查某段日期的已預訂房源。房態是逐日的，因此不能只看 rooms.status。 */
+export async function getOccupiedRoomIds(checkIn, checkOut) {
+  return occupiedRoomIds(checkIn, checkOut);
+}
+
 export async function getRooms(filters = {}) {
   const {
     keyword, type, guests, priceCap,

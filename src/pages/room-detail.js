@@ -127,9 +127,13 @@ function buildMain(room, data, context) {
 }
 
 /**
- * 相簿：一張主圖加上可點選的縮圖列。
+ * 相簿：一張主圖，附左右切換鈕與可點選的縮圖列。
  *
- * 只有一張照片時不顯示縮圖列——一排只有一格的縮圖看起來像壞掉。
+ * 只有一張照片時不顯示縮圖列與切換鈕——一排只有一格的縮圖看起來像壞掉。
+ *
+ * 切換鈕與縮圖列改動的是同一個 current，因此兩邊的狀態不會各走各的。
+ * 左右採循環（最後一張再往右回到第一張）：相簿只有幾張，走到底就卡住
+ * 會讓人以為壞了，而循環讓使用者一直按同一顆鈕就能看完。
  */
 function buildGallery(room) {
   const wrap = document.createElement('div');
@@ -137,6 +141,9 @@ function buildGallery(room) {
 
   const images = (room.images ?? []).map(resolveImageUrl).filter(Boolean);
   const sources = images.length ? images : [FALLBACK_IMAGE];
+
+  const frame = document.createElement('div');
+  frame.className = 'detail-gallery__frame';
 
   const main = document.createElement('img');
   main.className = 'detail-gallery__main';
@@ -148,7 +155,8 @@ function buildGallery(room) {
     if (main.src.endsWith(FALLBACK_IMAGE)) return;
     main.src = FALLBACK_IMAGE;
   });
-  wrap.append(main);
+  frame.append(main);
+  wrap.append(frame);
 
   if (sources.length < 2) return wrap;
 
@@ -156,6 +164,37 @@ function buildGallery(room) {
   thumbs.className = 'detail-gallery__thumbs';
   thumbs.setAttribute('role', 'group');
   thumbs.setAttribute('aria-label', `${room.name}的照片選擇`);
+
+  let current = 0;
+
+  function show(index) {
+    current = (index + sources.length) % sources.length;
+    main.src = sources[current];
+    main.alt = `${room.name}的房間照片，第 ${current + 1} 張`;
+    counter.textContent = `${current + 1} / ${sources.length}`;
+    [...thumbs.children].forEach((el, i) => el.setAttribute('aria-pressed', String(i === current)));
+    thumbs.children[current]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  const counter = document.createElement('span');
+  counter.className = 'detail-gallery__counter';
+  counter.setAttribute('aria-hidden', 'true');    // 張數已由切換鈕的 aria-label 傳達
+  counter.textContent = `1 / ${sources.length}`;
+
+  frame.append(
+    navButton('‹', '上一張照片', 'prev', () => show(current - 1)),
+    navButton('›', '下一張照片', 'next', () => show(current + 1)),
+    counter
+  );
+
+  // 左右方向鍵：相簿獲得焦點時鍵盤也能翻頁
+  frame.tabIndex = 0;
+  frame.setAttribute('role', 'group');
+  frame.setAttribute('aria-label', `${room.name}的照片，共 ${sources.length} 張`);
+  frame.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); show(current + 1); }
+  });
 
   sources.forEach((src, index) => {
     const btn = document.createElement('button');
@@ -171,17 +210,23 @@ function buildGallery(room) {
     img.addEventListener('error', () => { img.src = FALLBACK_IMAGE; }, { once: true });
     btn.append(img);
 
-    btn.addEventListener('click', () => {
-      main.src = src;
-      main.alt = `${room.name}的房間照片，第 ${index + 1} 張`;
-      [...thumbs.children].forEach((el, i) => el.setAttribute('aria-pressed', String(i === index)));
-    });
-
+    btn.addEventListener('click', () => show(index));
     thumbs.append(btn);
   });
 
   wrap.append(thumbs);
   return wrap;
+}
+
+function navButton(glyph, label, variant, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = `detail-gallery__nav detail-gallery__nav--${variant}`;
+  btn.textContent = glyph;
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 function ratingText(room) {

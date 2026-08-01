@@ -54,9 +54,17 @@ export function createImageManager({ roomId, images = [], onNotify = toast }) {
 
   // -------------------------------------------------------------------------
 
+  /**
+   * 失敗訊息同時走行內錯誤與 toast。
+   *
+   * 只有行內那行紅字時，成功會跳 toast、失敗卻只在照片格下方多一行 --f-tiny 的字，
+   * 而使用者的視線正停在畫面下方的「選擇檔案」按鈕上——驗收時就發生過
+   * 「選了非圖片檔卻以為沒反應」。成敗兩條路的顯眼程度必須對等。
+   */
   function fail(message) {
     error.textContent = message;
     error.hidden = false;
+    onNotify(message, 'error');
   }
 
   function clearError() {

@@ -216,6 +216,9 @@ async function occupiedRoomIds(checkIn, checkOut) {
   return new Set(rows.map((r) => r.room_id));
 }
 
+/** 後台查某段日期的已預訂房源。房態是逐日的，因此不能只看 rooms.status。 */
+export const getOccupiedRoomIds = (checkIn, checkOut) => occupiedRoomIds(checkIn, checkOut);
+
 export async function getRoomById(id) {
   const sb = await client();
   const rows = await run(sb.from('rooms').select('*').eq('id', id).limit(1));

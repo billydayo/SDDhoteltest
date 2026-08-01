@@ -456,6 +456,50 @@
   border-radius: var(--arch);
   box-shadow: var(--shadow-sm);
   background: var(--c-surface-alt);
+  display: block;
+}
+
+/* 主圖與左右切換鈕的定位容器 */
+.detail-gallery__frame { position: relative; }
+.detail-gallery__frame:focus-visible {
+  outline: 2px solid var(--c-brand-accent);
+  outline-offset: 3px;
+  border-radius: var(--arch);
+}
+
+.detail-gallery__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;                      /* 觸控目標下限 */
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+  border-radius: 50%;
+  color: var(--c-text);
+  background: rgb(255 255 255 / 0.82);
+  box-shadow: var(--shadow-sm);
+  transition: background 120ms ease;
+}
+.detail-gallery__nav:hover { background: rgb(255 255 255 / 0.96); }
+.detail-gallery__nav:focus-visible { outline: 2px solid var(--c-brand-accent); outline-offset: 2px; }
+.detail-gallery__nav--prev { inset-inline-start: var(--sp-3); }
+.detail-gallery__nav--next { inset-inline-end: var(--sp-3); }
+
+/* 第幾張 / 共幾張 */
+.detail-gallery__counter {
+  position: absolute;
+  inset-block-end: var(--sp-3);
+  inset-inline-end: var(--sp-3);
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius);
+  font-size: var(--f-tiny);
+  color: #FFF;
+  background: rgb(0 0 0 / 0.55);
 }
 
 /* 縮圖列。窄螢幕改為橫向捲動，不換行擠壓——整頁本體永遠不橫向捲動 */

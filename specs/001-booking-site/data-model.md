@@ -74,7 +74,7 @@
 | amenities | `amenities` | jsonb | 設施字串陣列（陽台、浴缸、免費 Wi-Fi…） |
 | features | `features` | jsonb | 房型特色字串陣列（親子友善、寵物友善、無障礙…） |
 | description | `description` | text | 文案 |
-| status | `status` | enum | `available`, `booked`, `maintenance` |
+| status | `status` | enum | `available`, `maintenance`（不分日期的營運狀態） |
 | averageRating | `average_rating` | numeric(3,2) | 由通過審核的評論導出，無評論時為 `null` |
 | createdAt | `created_at` | timestamptz | 建立時間 |
 
@@ -82,6 +82,9 @@
 - `nightlyPrice` 必須為新臺幣整數
 - `maxGuests` 必須大於 0
 - `status` 必須為允許值之一
+- **`booked`（已預訂）不是這個欄位的值**。它綁定日期，由該日的有效訂單即時推導
+  （見 FR-015、FR-051a）：`status !== 'maintenance'` 且當日有有效訂單即為已預訂。
+  介面上仍呈現三種房態，但只有 `available` 與 `maintenance` 會被保存
 - `averageRating` 無通過審核的評論時 MUST 為 `null`，前端顯示「尚無評分」而非 0 分
 
 **`images` 的四種形式**（可於同一陣列混用）：

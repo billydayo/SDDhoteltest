@@ -10,7 +10,8 @@
 
 import { createPageHeader, toast, toastError } from '../app.js';
 import {
-  listRooms, createRoom, updateRoom, deleteRoom, setRoomStatus, getFutureOrdersForRoom
+  listRooms, createRoom, updateRoom, deleteRoom, setRoomStatus, getFutureOrdersForRoom,
+  getOccupiedRoomIds, effectiveRoomStatus
 } from '../data/rooms.js';
 import { withAudit, ACTIONS, diffSummary } from '../services/audit.js';
 import {
@@ -22,27 +23,49 @@ import { createImageManager } from '../components/image-manager.js';
 import { AMENITIES, ROOM_FEATURES, ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel }
   from '../data/vocabulary.js';
 import { formatTWD } from '../utils/money.js';
-import { formatDateRange } from '../utils/dates.js';
+import { formatDateRange, formatDate, addDays, isValidDateString } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
+
+/**
+ * 可由管理員人工設定的房態。
+ * 'booked' 不在其中——它由當日訂單推導，見 data/rooms.js 的 effectiveRoomStatus。
+ */
+const MANUAL_ROOM_STATUSES = ['available', 'maintenance'];
 
 let editing = null;   // 目前編輯中的房源，null 代表新增模式
 
 /** 目前表單上的照片管理器，供離開頁面時清理未保存的上傳 */
 let activePhotos = null;
 
-let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '' };
+let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' };
+
+const emptyFilters = () =>
+  ({ keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' });
 
 export async function renderAdminRooms(panel, context) {
   const rooms = await listRooms({});
-  const filtered = applyFilters(rooms);
+
+  // 房態逐日獨立：選了日期才知道哪些房「當天」被訂走。
+  // 沒選日期時 occupied 為 null，房態退回房源本身的營運狀態。
+  const occupied = filters.date
+    ? await getOccupiedRoomIds(filters.date, addDays(filters.date, 1)).catch(() => null)
+    : null;
+
+  const filtered = applyFilters(rooms, occupied);
 
   const frag = document.createDocumentFragment();
-  frag.append(createPageHeader('房源管理', `共 ${rooms.length} 間房源。`));
+  frag.append(createPageHeader('房源管理', roomsSummary(rooms.length)));
   frag.append(buildForm(panel, context));
   frag.append(buildFilterForm(panel, context));
-  frag.append(buildTable(filtered, rooms.length, panel, context));
+  frag.append(buildTable(filtered, rooms.length, occupied, panel, context));
 
   panel.replaceChildren(frag);
+}
+
+function roomsSummary(total) {
+  return filters.date
+    ? `共 ${total} 間房源。房態為 ${formatDate(filters.date)} 當天的狀態。`
+    : `共 ${total} 間房源。選擇日期可查看該日的實際房態。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +75,7 @@ export async function renderAdminRooms(panel, context) {
 // 本地過濾比往返一趟快，也讓匯出能直接沿用同一份結果。
 // ---------------------------------------------------------------------------
 
-function applyFilters(rooms) {
+function applyFilters(rooms, occupied) {
   return rooms.filter((room) => {
     if (filters.keyword) {
       // 關鍵字同時涵蓋房名、描述、設施與特色，省下另外一組勾選框
@@ -63,7 +86,8 @@ function applyFilters(rooms) {
       if (!haystack.includes(filters.keyword.trim().toLowerCase())) return false;
     }
     if (filters.type && room.type !== filters.type) return false;
-    if (filters.status && room.status !== filters.status) return false;
+    // 比對推導後的房態，否則選了日期再篩「已預訂」永遠是空的
+    if (filters.status && effectiveRoomStatus(room, occupied) !== filters.status) return false;
 
     const min = Number(filters.minPrice);
     const max = Number(filters.maxPrice);
@@ -90,6 +114,17 @@ function buildFilterForm(panel, context) {
     options: [{ value: '', label: '全部房型' },
       ...ROOM_TYPES.map((t) => ({ value: t.value, label: t.label }))]
   });
+  // 日期在房態之前：先決定看哪一天，房態才有意義
+  const date = textField({
+    id: 'rm-f-date', name: 'date', label: '日期', type: 'date', value: filters.date,
+    attrs: { 'aria-describedby': 'rm-f-date-hint' }
+  });
+  const dateHint = document.createElement('p');
+  dateHint.id = 'rm-f-date-hint';
+  dateHint.className = 'field__hint';
+  dateHint.textContent = '查該日的房況。房態逐日獨立，8/1 已預訂不代表 8/2 也已預訂。';
+  date.wrap.append(dateHint);
+
   const status = selectField({
     id: 'rm-f-status', name: 'status', label: '房態', value: filters.status,
     options: [{ value: '', label: '全部房態' },
@@ -106,7 +141,7 @@ function buildFilterForm(panel, context) {
 
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
-  row.append(keyword.wrap, type.wrap, status.wrap, minPrice.wrap, maxPrice.wrap);
+  row.append(keyword.wrap, type.wrap, date.wrap, status.wrap, minPrice.wrap, maxPrice.wrap);
   form.append(row);
 
   const submit = document.createElement('button');
@@ -115,7 +150,7 @@ function buildFilterForm(panel, context) {
   submit.textContent = '篩選';
 
   const clear = actionButton('清除條件', () => {
-    filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '' };
+    filters = emptyFilters();
     reload(panel, context);
   });
 
@@ -132,12 +167,26 @@ function buildFilterForm(panel, context) {
       return;
     }
 
+    // 日期打錯就直說。若放行，推導出的房態會全部退回營運狀態，
+    // 畫面看起來正常但答案是錯的——那比報錯難查得多。
+    if (date.input.value && !isValidDateString(date.input.value)) {
+      toast('日期格式不正確，請重新選擇。', 'error');
+      return;
+    }
+
+    // 篩「已預訂」卻沒指定日期是問不出答案的：已預訂本來就綁日期
+    if (status.input.value === 'booked' && !date.input.value) {
+      toast('請先選擇日期，才能查詢當天的已預訂房源。', 'error');
+      return;
+    }
+
     filters = {
       keyword: keyword.input.value,
       type: type.input.value,
       status: status.input.value,
       minPrice: minPrice.input.value,
-      maxPrice: maxPrice.input.value
+      maxPrice: maxPrice.input.value,
+      date: date.input.value
     };
     reload(panel, context);
   });
@@ -176,10 +225,14 @@ function buildForm(panel, context) {
     // step 為 1：價格可以是任意正整數，不該被限制成 100 的倍數
     attrs: { min: '1', step: '1', inputmode: 'numeric', class: 'no-spin' }
   });
+  // 只提供可人工設定的兩種。「已預訂」由訂單推導，手動設了也會被下一筆訂單的
+  // 實際狀況推翻，而且沒有任何機制在退房後把它改回來——留著只會讓房間永久下架。
   const status = selectField({
-    id: 'rm-status', name: 'status', label: '房態', value: editing?.status ?? 'available',
-    options: Object.keys(ROOM_STATUS).map((s) => ({ value: s, label: roomStatusLabel(s) })),
-    hint: '「整理中」與「已預訂」都會被排除於可訂清單之外。'
+    id: 'rm-status', name: 'status', label: '房態',
+    value: editing?.status === 'maintenance' ? 'maintenance' : 'available',
+    options: MANUAL_ROOM_STATUSES.map((s) => ({ value: s, label: roomStatusLabel(s) })),
+    hint: '「整理中」會被排除於可訂清單之外。'
+      + '「已預訂」由當日訂單自動判定，不需要也無法在此設定。'
   });
   const description = textareaField({
     id: 'rm-desc', name: 'description', label: '房源描述', value: editing?.description ?? ''
@@ -296,7 +349,7 @@ const ROOM_EXPORT_COLUMNS = [
   { key: 'features', label: '房型特色' }
 ];
 
-function buildTable(rooms, totalCount, panel, context) {
+function buildTable(rooms, totalCount, occupied, panel, context) {
   const section = document.createElement('section');
 
   const head = document.createElement('div');
@@ -323,7 +376,8 @@ function buildTable(rooms, totalCount, panel, context) {
     getRows: () => rooms.map((r) => ({
       ...r,
       typeLabel: typeLabel(r.type),
-      statusLabel: roomStatusLabel(r.status),
+      // 匯出與畫面看到的房態必須是同一個，否則對帳時會各說各話
+      statusLabel: roomStatusLabel(effectiveRoomStatus(r, occupied)),
       // 尚無評分時輸出文字而非 0，與畫面一致（FR-047）
       ratingText: r.averageRating === null ? '尚無評分' : String(r.averageRating)
     }))
@@ -339,18 +393,25 @@ function buildTable(rooms, totalCount, panel, context) {
     return section;
   }
 
-  const rows = rooms.map((room) => [
-    room.name,
-    typeLabel(room.type),
-    `${room.maxGuests} 人`,
-    formatTWD(room.nightlyPrice),
-    statusTag(roomStatusLabel(room.status), ROOM_STATUS[room.status]?.tone ?? 'neutral'),
-    room.averageRating === null ? '尚無評分' : String(room.averageRating),
-    buildRowActions(room, panel, context)
-  ]);
+  const rows = rooms.map((room) => {
+    const status = effectiveRoomStatus(room, occupied);
+    return [
+      room.name,
+      typeLabel(room.type),
+      `${room.maxGuests} 人`,
+      formatTWD(room.nightlyPrice),
+      statusTag(roomStatusLabel(status), ROOM_STATUS[status]?.tone ?? 'neutral'),
+      room.averageRating === null ? '尚無評分' : String(room.averageRating),
+      buildRowActions(room, panel, context)
+    ];
+  });
 
   section.append(createDataTable(
-    ['房名', '房型', '人數', '價格', '房態', '評分', '操作'],
+    [
+      '房名', '房型', '人數', '價格',
+      filters.date ? `房態（${formatDate(filters.date)}）` : '房態',
+      '評分', '操作'
+    ],
     rows
   ));
   return section;

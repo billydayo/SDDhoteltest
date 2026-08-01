@@ -120,7 +120,10 @@ create table if not exists public.rooms (
   amenities jsonb not null default '[]'::jsonb,   -- 陽台、浴缸、免費 Wi-Fi…（可篩選）
   features jsonb not null default '[]'::jsonb,    -- 房型特色：親子友善、無障礙…（可篩選）
   description text not null default '',
-  status text not null default 'available' check (status in ('available', 'booked', 'maintenance')),
+  -- 只保存不分日期的營運狀態。「已預訂」不在此列——它綁定日期，
+  -- 由當日訂單即時推導（FR-015、FR-051a）。寫進欄位就得在退房時改回來，
+  -- 漏改一次該房源就永久無法販售。
+  status text not null default 'available' check (status in ('available', 'maintenance')),
   average_rating numeric(3,2),  -- null = 尚無評分（不可用 0 表示）
   created_at timestamptz not null default now()
 );

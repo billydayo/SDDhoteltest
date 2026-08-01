@@ -7,8 +7,8 @@
  * 篩選採 AND 邏輯：勾選多項時，房源必須同時具備全部所選項目（FR-010）。
  */
 
-/** 可作為篩選條件的設施 */
-export const AMENITIES = Object.freeze([
+/** 設施的預設值。實際清單可由後台增刪，見 data/room-vocabulary.js */
+export const DEFAULT_AMENITIES = Object.freeze([
   '免費 Wi-Fi',
   '冷氣',
   '獨立衛浴',
@@ -24,8 +24,8 @@ export const AMENITIES = Object.freeze([
   '嬰兒床可租借'
 ]);
 
-/** 可作為篩選條件的房型特色 */
-export const ROOM_FEATURES = Object.freeze([
+/** 房型特色的預設值。實際清單可由後台增刪，見 data/room-vocabulary.js */
+export const DEFAULT_ROOM_FEATURES = Object.freeze([
   '採光佳',
   '安靜樓層',
   '商務友善',

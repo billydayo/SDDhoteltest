@@ -134,13 +134,25 @@
  * 高度用 clamp 綁住：太高會把搜尋列推到摺線以下，而訂房網站最重要的
  * 元件就是搜尋列——它至少要露出一角來暗示「往下還有東西」。
  */
+/*
+ * 主視覺滿版。
+ *
+ * .site-main 是一個置中且有左右內距的容器，主視覺要跳出它才會貼齊視窗兩側：
+ * 左右各推 (50% - 50vw)，寬度就是 100vw。body 已設 overflow-x: hidden，
+ * 因此桌機捲軸佔掉的那幾像素不會變成橫向捲軸。
+ *
+ * 高度用 clamp 隨視窗寬度連續變化，不設斷點——訂房網站的第一屏最重要的是搜尋列，
+ * 主視覺再美也不該把它整個推到摺線以下，所以上限收在 520px。
+ */
 .hero {
   position: relative;
   display: flex;
   align-items: flex-end;
-  min-height: clamp(260px, 38vw, 440px);
-  margin-bottom: var(--sp-6);
-  border-radius: var(--radius-lg);
+  min-height: clamp(240px, 34vw, 520px);
+  margin-block: calc(var(--sp-7) * -1) var(--sp-6);
+  margin-inline: calc(50% - 50vw);
+  width: 100vw;
+  border-radius: 0;
   overflow: hidden;
   background: var(--c-surface-alt);
 }
@@ -171,11 +183,18 @@
     var(--c-bg) 100%);
 }
 
+/*
+ * 主視覺滿版之後，內文若也跟著貼邊，標題就會跑到比頁面其他內容更左的位置。
+ * 這裡把文字重新收回 .site-main 的量測線上：同樣的 max-width、同樣的左右內距，
+ * 標題才會和下方的搜尋列、房源清單對齊。
+ */
 .hero__inner {
   position: relative;
   z-index: 1;
   width: 100%;
-  padding: var(--sp-7) var(--sp-6) var(--sp-6);
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--sp-7) clamp(1.25rem, 4vw, 3.5rem) var(--sp-6);
 }
 
 .hero__inner h1 {

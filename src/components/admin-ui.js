@@ -284,6 +284,22 @@ export function buttonRow(...buttons) {
  * @param {() => object[]} config.getRows 取得當下要匯出的資料列
  * @param {(message: string, tone?: string) => void} config.notify
  */
+/**
+ * 靠右對齊的匯出列。
+ *
+ * 房源與訂單管理各自把匯出鈕塞進自己的區塊標題裡，那是因為它們的標題本來就是
+ * 一列 flex。其餘後台頁沒有那樣的結構，若各自再刻一次，四頁會出現四種間距。
+ * 這支只做對齊，按鈕本身仍是 createExportButton。
+ */
+export function createExportBar(config) {
+  const bar = document.createElement('div');
+  bar.style.display = 'flex';
+  bar.style.justifyContent = 'flex-end';
+  bar.style.marginBottom = 'var(--sp-4)';
+  bar.append(createExportButton(config));
+  return bar;
+}
+
 export function createExportButton({ label = '匯出報表', filename, sheetName, columns, getRows, notify }) {
   const btn = document.createElement('button');
   btn.type = 'button';

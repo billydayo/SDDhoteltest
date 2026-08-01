@@ -20,8 +20,10 @@ import {
   statusTag, buttonRow, createExportButton, openModal
 } from '../components/admin-ui.js';
 import { createImageManager } from '../components/image-manager.js';
-import { AMENITIES, ROOM_FEATURES, ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel }
-  from '../data/vocabulary.js';
+import { ROOM_TYPES, ROOM_STATUS, roomStatusLabel, typeLabel } from '../data/vocabulary.js';
+import {
+  getRoomVocabulary, saveRoomVocabulary, validateTerm, MAX_TERMS
+} from '../data/room-vocabulary.js';
 import { formatTWD } from '../utils/money.js';
 import { formatDateRange, formatDate, addDays, isValidDateString } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
@@ -41,7 +43,7 @@ const emptyFilters = () =>
   ({ keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' });
 
 export async function renderAdminRooms(panel, context) {
-  const rooms = await listRooms({});
+  const [rooms, vocabulary] = await Promise.all([listRooms({}), getRoomVocabulary()]);
 
   // 房態逐日獨立：選了日期才知道哪些房「當天」被訂走。
   // 沒選日期時 occupied 為 null，房態退回房源本身的營運狀態。
@@ -53,9 +55,9 @@ export async function renderAdminRooms(panel, context) {
 
   const frag = document.createDocumentFragment();
   frag.append(createPageHeader('房源管理', roomsSummary(rooms.length)));
-  frag.append(buildCreateBar(panel, context));
+  frag.append(buildCreateBar(panel, context, vocabulary));
   frag.append(buildFilterForm(panel, context));
-  frag.append(buildTable(filtered, rooms.length, occupied, panel, context));
+  frag.append(buildTable(filtered, rooms.length, occupied, panel, context, vocabulary));
 
   panel.replaceChildren(frag);
 }
@@ -65,7 +67,7 @@ export async function renderAdminRooms(panel, context) {
  * 原本的做法是把整份表單常駐在頁首，光是設施與特色的勾選框就把清單推到摺線以下，
  * 而管理員進這一頁十次有九次是來看清單的。
  */
-function buildCreateBar(panel, context) {
+function buildCreateBar(panel, context, vocabulary) {
   const bar = document.createElement('div');
   bar.className = 'filter-bar__actions';
   bar.style.marginBottom = 'var(--sp-4)';
@@ -74,9 +76,11 @@ function buildCreateBar(panel, context) {
   add.type = 'button';
   add.className = 'btn btn--primary';
   add.textContent = '新增房源';
-  add.addEventListener('click', () => openRoomForm(panel, context));
+  add.addEventListener('click', () => openRoomForm(panel, context, vocabulary));
 
-  bar.append(add);
+  // 詞彙管理放在房源管理底下而非另開一頁：管理員是在填房源表單時
+  // 才會發現「這個設施清單裡沒有」，入口就該在那個當下伸手可及的地方
+  bar.append(add, actionButton('管理設施／特色', () => openVocabularyForm(panel, context)));
   return bar;
 }
 
@@ -86,13 +90,185 @@ function buildCreateBar(panel, context) {
  * 未保存的上傳一律由浮窗的 onClose 清掉，不論使用者是按取消、按 ✕ 還是按 Esc——
  * 只掛在取消鈕上的話，按 Esc 就會在 storage 留下沒人引用的檔案（憲章「上傳」條）。
  */
-function openRoomForm(panel, context, room = null) {
+function openRoomForm(panel, context, vocabulary, room = null) {
   const photosRef = {};
   const dialog = openModal({
     title: room ? `編輯房源：${room.name}` : '新增房源',
-    content: buildForm(panel, context, room, photosRef, () => dialog.close()),
+    content: buildForm(panel, context, room, photosRef, () => dialog.close(), vocabulary),
     onClose: () => photosRef.current?.discardUnsaved()
   });
+}
+
+/**
+ * 設施／房型特色的增刪（FR-010a）。
+ *
+ * 兩份清單同時編輯、一起儲存。分成兩個浮窗的話，管理員新增一個設施再新增一個特色
+ * 就要開關兩次，而這兩件事幾乎總是一起做。
+ */
+function openVocabularyForm(panel, context) {
+  const dialog = openModal({
+    title: '管理設施／特色',
+    content: buildVocabularyForm(panel, context, () => dialog.close())
+  });
+}
+
+function buildVocabularyForm(panel, context, close) {
+  const form = document.createElement('form');
+  form.className = 'card';
+  form.noValidate = true;
+
+  const intro = document.createElement('p');
+  intro.className = 'field__hint';
+  intro.textContent = '這兩份清單同時決定前台搜尋列的篩選選項與房源表單的可勾選項目。'
+    + `每份最多 ${MAX_TERMS} 項。`;
+  form.append(intro);
+
+  const error = inlineError();
+
+  // 目前值先複製一份在本地改，按儲存才寫回——中途按取消不該留下任何痕跡
+  const editors = {
+    amenities: buildTermEditor('設施', 'amenities', error),
+    features: buildTermEditor('房型特色', 'features', error)
+  };
+
+  form.append(editors.amenities.element, editors.features.element, error);
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn--primary';
+  submit.textContent = '儲存';
+  form.append(buttonRow(submit, actionButton('取消', () => close())));
+
+  getRoomVocabulary().then((vocab) => {
+    editors.amenities.setTerms(vocab.amenities);
+    editors.features.setTerms(vocab.features);
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    error.hidden = true;
+    submit.disabled = true;
+    try {
+      // 兩份清單分開寫：system_settings 是一列一個 key，沒有跨列交易可用。
+      // 先寫設施再寫特色，任一失敗都會讓錯誤浮上來，不會靜靜地只成功一半。
+      await withAudit(
+        {
+          action: ACTIONS.SETTING_UPDATE, targetTable: 'system_settings',
+          summary: {
+            amenities: editors.amenities.getTerms().length,
+            features: editors.features.getTerms().length
+          }
+        },
+        async () => {
+          await saveRoomVocabulary('amenities', editors.amenities.getTerms());
+          await saveRoomVocabulary('features', editors.features.getTerms());
+        }
+      );
+      toast('已儲存。前台篩選器與房源表單已套用新的清單。', 'ok');
+      close();
+      reload(panel, context);
+    } catch (err) {
+      showInlineError(error, toUserMessage(err));
+      submit.disabled = false;
+    }
+  });
+
+  return form;
+}
+
+/** 一份清單的編輯器：現有項目可逐一移除，下方一列可新增 */
+function buildTermEditor(legendText, kind, error) {
+  let terms = [];
+
+  const fs = document.createElement('fieldset');
+  fs.style.border = 'none';
+  fs.style.padding = '0';
+  fs.style.margin = '0 0 var(--sp-5)';
+
+  const legend = document.createElement('legend');
+  legend.textContent = legendText;
+  fs.append(legend);
+
+  const list = document.createElement('div');
+  list.className = 'filter-group__options';
+  fs.append(list);
+
+  const addWrap = document.createElement('div');
+  addWrap.style.display = 'flex';
+  addWrap.style.gap = 'var(--sp-2)';
+  addWrap.style.marginTop = 'var(--sp-3)';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = `vocab-${kind}-new`;
+  input.setAttribute('aria-label', `新增${legendText}`);
+  input.placeholder = `新增${legendText}…`;
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'btn';
+  add.textContent = '加入';
+
+  const commit = () => {
+    const value = input.value.trim();
+    const invalid = validateTerm(value, terms);
+    if (invalid) { showInlineError(error, invalid); return; }
+    error.hidden = true;
+    terms = [...terms, value];
+    input.value = '';
+    paint();
+    input.focus();
+  };
+
+  add.addEventListener('click', commit);
+  // Enter 直接加入。不攔的話會觸發表單 submit，變成「打完字按 Enter 就整份存檔」
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+  });
+
+  addWrap.append(input, add);
+  fs.append(addWrap);
+
+  function paint() {
+    list.replaceChildren();
+    if (!terms.length) {
+      const empty = document.createElement('p');
+      empty.className = 'field__hint';
+      empty.textContent = '目前沒有任何項目。清單為空時，前台不會顯示這一組篩選。';
+      list.append(empty);
+      return;
+    }
+    terms.forEach((term, index) => {
+      const chip = document.createElement('span');
+      chip.className = 'check-chip';
+
+      const label = document.createElement('span');
+      label.textContent = term;
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'photo-tile__btn photo-tile__btn--danger';
+      remove.textContent = '✕';
+      remove.setAttribute('aria-label', `移除${term}`);
+      remove.title = `移除${term}`;
+      remove.addEventListener('click', () => {
+        terms = terms.filter((_, i) => i !== index);
+        error.hidden = true;
+        paint();
+      });
+
+      chip.append(label, remove);
+      list.append(chip);
+    });
+  }
+
+  paint();
+
+  return {
+    element: fs,
+    getTerms: () => [...terms],
+    setTerms: (next) => { terms = [...next]; paint(); }
+  };
 }
 
 function roomsSummary(total) {
@@ -233,7 +409,7 @@ const reload = (panel, context) => renderAdminRooms(panel, context);
 // 新增 / 編輯表單
 // ---------------------------------------------------------------------------
 
-function buildForm(panel, context, room, photosRef, close) {
+function buildForm(panel, context, room, photosRef, close, vocabulary) {
   // 標題由浮窗的 __head 提供，表單自己不再放一個 h2，否則畫面上會出現兩行一樣的字
   const form = document.createElement('form');
   form.className = 'card';
@@ -281,10 +457,10 @@ function buildForm(panel, context, room, photosRef, close) {
   form.append(row, photos.element, description.wrap);
 
   const amenities = checkboxGroup({
-    name: 'amenities', legend: '設施', options: AMENITIES, selected: room?.amenities ?? []
+    name: 'amenities', legend: '設施', options: vocabulary.amenities, selected: room?.amenities ?? []
   });
   const features = checkboxGroup({
-    name: 'features', legend: '房型特色', options: ROOM_FEATURES, selected: room?.features ?? []
+    name: 'features', legend: '房型特色', options: vocabulary.features, selected: room?.features ?? []
   });
   form.append(amenities, features);
 
@@ -373,7 +549,7 @@ const ROOM_EXPORT_COLUMNS = [
   { key: 'features', label: '房型特色' }
 ];
 
-function buildTable(rooms, totalCount, occupied, panel, context) {
+function buildTable(rooms, totalCount, occupied, panel, context, vocabulary) {
   const section = document.createElement('section');
 
   const head = document.createElement('div');
@@ -426,7 +602,7 @@ function buildTable(rooms, totalCount, occupied, panel, context) {
       formatTWD(room.nightlyPrice),
       statusTag(roomStatusLabel(status), ROOM_STATUS[status]?.tone ?? 'neutral'),
       room.averageRating === null ? '尚無評分' : String(room.averageRating),
-      buildRowActions(room, panel, context)
+      buildRowActions(room, panel, context, vocabulary)
     ];
   });
 
@@ -441,13 +617,13 @@ function buildTable(rooms, totalCount, occupied, panel, context) {
   return section;
 }
 
-function buildRowActions(room, panel, context) {
+function buildRowActions(room, panel, context, vocabulary) {
   const wrap = document.createElement('div');
   wrap.style.display = 'flex';
   wrap.style.gap = 'var(--sp-1)';
 
   // 表單開在浮窗裡，因此不必再重繪整頁、也不必把畫面捲回頂端
-  wrap.append(actionButton('編輯', () => openRoomForm(panel, context, room)));
+  wrap.append(actionButton('編輯', () => openRoomForm(panel, context, vocabulary, room)));
 
   // 房態快速切換（FR-051）
   const nextStatus = room.status === 'maintenance' ? 'available' : 'maintenance';

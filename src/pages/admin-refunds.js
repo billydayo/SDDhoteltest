@@ -15,7 +15,7 @@ import { listRooms } from '../data/rooms.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
 import { REFUND_STATUS, refundStatusLabel, REFUND_POLICY } from '../services/refunds.js';
 import {
-  createEmptyRow, actionButton, statusTag, buttonRow, selectField
+  createEmptyRow, actionButton, statusTag, buttonRow, selectField, createExportBar
 } from '../components/admin-ui.js';
 import { formatTWD } from '../utils/money.js';
 import { formatDateRange, formatDateTime, daysUntil } from '../utils/dates.js';
@@ -47,6 +47,43 @@ export async function renderAdminRefunds(panel, context) {
     panel.replaceChildren(frag);
     return;
   }
+
+  // 匯出跟著狀態篩選走，與畫面上看到的一致
+  frag.append(createExportBar({
+    label: '匯出退款申請',
+    filename: 'sunny-refunds',
+    sheetName: '退款申請',
+    columns: [
+      { key: 'statusLabel', label: '狀態' },
+      { key: 'orderNo', label: '訂單編號' },
+      { key: 'roomName', label: '房源' },
+      { key: 'stay', label: '住宿日期' },
+      { key: 'totalAmount', label: '訂單金額' },
+      { key: 'amount', label: '申請退款金額' },
+      { key: 'reason', label: '退款原因' },
+      { key: 'adminNote', label: '審核說明' },
+      { key: 'createdAt', label: '申請時間' },
+      { key: 'reviewedAt', label: '審核時間' }
+    ],
+    notify: toast,
+    getRows: () => refunds.map((r) => {
+      const order = orderById.get(r.orderId);
+      const room = order ? roomById.get(order.roomId) : null;
+      return {
+        statusLabel: refundStatusLabel(r.status),
+        orderNo: order?.orderNo ?? r.orderId.slice(0, 8),
+        roomName: room?.name ?? '（房源已下架）',
+        stay: order ? formatDateRange(order.checkIn, order.checkOut) : '',
+        totalAmount: order?.totalAmount ?? '',
+        amount: r.amount,
+        reason: r.reason,
+        adminNote: r.adminNote ?? '',
+        createdAt: formatDateTime(r.createdAt),
+        // 尚未審核時留空，不要輸出一個看起來像時間的預設值
+        reviewedAt: r.reviewedAt ? formatDateTime(r.reviewedAt) : ''
+      };
+    })
+  }));
 
   const list = document.createElement('ul');
   list.className = 'review-list';

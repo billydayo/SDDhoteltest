@@ -12,7 +12,7 @@ import { loadComparison, undercutAlerts, markResolved, buildComplaintEmail }
 import { withAudit, ACTIONS } from '../services/audit.js';
 import { channelPricingNotice } from '../components/simulated-badge.js';
 import {
-  createDataTable, createEmptyRow, actionButton, statusTag, buttonRow
+  createDataTable, createEmptyRow, actionButton, statusTag, buttonRow, createExportBar
 } from '../components/admin-ui.js';
 import { formatTWD, formatPercent } from '../utils/money.js';
 import { formatDateTime } from '../utils/dates.js';
@@ -44,6 +44,35 @@ export async function renderAdminChannel(panel, context) {
     panel.replaceChildren(frag);
     return;
   }
+
+  // 匯出跟著「只看未處理」的切換走，與畫面上看到的一致
+  frag.append(createExportBar({
+    label: showUnresolvedOnly ? '匯出未處理預警' : '匯出比價資料',
+    filename: 'sunny-channel-prices',
+    sheetName: '渠道比價',
+    columns: [
+      { key: 'roomName', label: '房源' },
+      { key: 'channel', label: '平台' },
+      { key: 'websitePrice', label: '官網價' },
+      { key: 'channelPrice', label: '平台售價' },
+      { key: 'gap', label: '價差' },
+      { key: 'gapPercent', label: '價差比' },
+      { key: 'statusLabel', label: '狀態' },
+      { key: 'capturedAt', label: '擷取時間' }
+    ],
+    notify: toast,
+    getRows: () => visible.map((r) => ({
+      roomName: r.roomName,
+      channel: r.channel,
+      websitePrice: r.websitePrice,
+      channelPrice: r.channelPrice,
+      // 沒有價差時輸出空字串而非 0——0 會被讀成「剛好一樣」
+      gap: r.isUndercut ? r.gap : '',
+      gapPercent: r.isUndercut ? formatPercent(r.gapPercent) : '',
+      statusLabel: !r.isUndercut ? '正常' : (r.resolved ? '已處理' : '賤賣預警'),
+      capturedAt: formatDateTime(r.capturedAt)
+    }))
+  }));
 
   frag.append(buildTable(visible, panel, context));
   panel.replaceChildren(frag);

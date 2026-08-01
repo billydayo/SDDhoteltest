@@ -9,11 +9,13 @@
  *    密碼一律由 Supabase Auth 雜湊保管，應用資料表不存在密碼欄位。
  */
 
+import { DEFAULT_AMENITIES, DEFAULT_ROOM_FEATURES } from '../data/vocabulary.js';
+
 /**
  * 提高版本號會讓既有使用者的 localStorage 在下次載入時重建為新的種子資料。
  * 新增房源或示範訂單後務必遞增，否則舊資料不會更新。
  */
-export const SEED_VERSION = 6;
+export const SEED_VERSION = 7;
 
 /**
  * 房源照片。
@@ -421,7 +423,13 @@ export function buildSeedData() {
     riskChecks: [],
     channelPrices: buildChannelPrices(),
     adminLogs: [],
-    settings: { pending_payment_minutes: 60 },
+    // 設施與房型特色可由後台增刪（FR-010a），因此存在 settings 而非寫死在程式裡。
+    // 這裡的起始值與 supabase/schema.sql 的預設列一致。
+    settings: {
+      pending_payment_minutes: 60,
+      room_amenities: [...DEFAULT_AMENITIES],
+      room_features: [...DEFAULT_ROOM_FEATURES]
+    },
     siteContent: {
       id: SITE_CONTENT_ID,
       heroTitle: 'Sunny 訂房平台',

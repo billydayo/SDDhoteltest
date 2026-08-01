@@ -11,7 +11,7 @@ import { createPageHeader, toast, toastError } from '../app.js';
 import { listProfiles, updateProfile, setUserRole } from '../data/profiles.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
 import {
-  createDataTable, createEmptyRow, actionButton, confirmAction, statusTag
+  createDataTable, createEmptyRow, actionButton, confirmAction, statusTag, createExportBar
 } from '../components/admin-ui.js';
 import { formatDateTime } from '../utils/dates.js';
 import { toUserMessage } from '../utils/errors.js';
@@ -28,6 +28,27 @@ export async function renderAdminUsers(panel, context) {
     panel.replaceChildren(frag);
     return;
   }
+
+  // 匯出不含電子郵件與密碼：那些由認證服務保管，本頁本來就不顯示，
+  // 匯出檔若帶出去等於在報表裡外洩一份帳號清單
+  frag.append(createExportBar({
+    label: '匯出用戶',
+    filename: 'sunny-users',
+    sheetName: '用戶',
+    columns: [
+      { key: 'displayName', label: '顯示名稱' },
+      { key: 'phone', label: '聯絡電話' },
+      { key: 'roleLabel', label: '角色' },
+      { key: 'createdAt', label: '建立時間' }
+    ],
+    notify: toast,
+    getRows: () => profiles.map((p) => ({
+      displayName: p.displayName || '（未設定）',
+      phone: p.phone || '',
+      roleLabel: p.role === 'admin' ? '管理員' : '會員',
+      createdAt: formatDateTime(p.createdAt)
+    }))
+  }));
 
   const rows = profiles.map((profile) => [
     buildNameCell(profile, panel, context),

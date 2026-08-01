@@ -661,12 +661,20 @@ export async function getSystemSettings() {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
+/**
+ * 用 upsert 而非 update。
+ *
+ * 設施與房型特色（room_amenities / room_features）是後來才加的 key，
+ * 若堅持 update，既有資料庫在跑過遷移之前第一次儲存就會拿到 NOT_FOUND——
+ * 而那是一個「還沒設定過」的正常狀態，不是錯誤。
+ * 權限仍由 RLS 的 settings_update／settings_insert 把關，不會因此放寬。
+ */
 export async function updateSystemSetting(key, value) {
   const sb = await client();
   const rows = await run(
     sb.from('system_settings')
-      .update({ value, updated_at: new Date().toISOString() })
-      .eq('key', key).select()
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .select()
   );
   if (!rows.length) throw appError('NOT_FOUND');
   return getSystemSettings();

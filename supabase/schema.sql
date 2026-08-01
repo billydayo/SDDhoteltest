@@ -141,8 +141,13 @@ create table if not exists public.system_settings (
   updated_at timestamptz not null default now()
 );
 
+-- room_amenities / room_features：可由後台增刪的詞彙表（FR-010a）。
+-- 值是字串陣列；前台的篩選器與後台的房源表單都由此取得選項。
+-- 這裡只給起始值，之後以應用程式的寫入為準。
 insert into public.system_settings (key, value) values
-  ('pending_payment_minutes', '60'::jsonb)
+  ('pending_payment_minutes', '60'::jsonb),
+  ('room_amenities', '["免費 Wi-Fi","冷氣","獨立衛浴","浴缸","陽台","小冰箱","書桌","衣櫃","客廳區","咖啡機","備品組","加床服務","嬰兒床可租借"]'::jsonb),
+  ('room_features',  '["採光佳","安靜樓層","商務友善","情侶推薦","親子友善","朋友同行","泡澡放鬆","無障礙","可加床"]'::jsonb)
 on conflict (key) do nothing;
 
 comment on table public.system_settings is
@@ -727,6 +732,12 @@ create policy settings_update on public.system_settings
   using (public.is_admin())
   with check (public.is_admin());
 
+-- upsert 需要：尚未設定過的 key（room_amenities / room_features）第一次儲存是 insert
+drop policy if exists settings_insert on public.system_settings;
+create policy settings_insert on public.system_settings
+  for insert to authenticated
+  with check (public.is_admin());
+
 -- ---------------------------------------------------------------------------
 -- Storage：房源品質檢測圖
 --
@@ -788,7 +799,9 @@ grant select, insert, update, delete on
   public.refunds, public.site_content, public.favorites,
   public.room_risk_checks, public.channel_prices
   to authenticated;
-grant select, update on public.system_settings to authenticated;
+-- insert 是給 upsert 用的：room_amenities / room_features 這類後加的 key
+-- 在首次儲存時該列還不存在。寫入權限仍由 settings_insert 政策限定為管理員。
+grant select, insert, update on public.system_settings to authenticated;
 grant select, insert on public.admin_logs to authenticated;   -- 不給 update/delete
 grant usage, select on sequence public.order_no_seq to authenticated;
 grant execute on function public.expire_stale_orders() to anon, authenticated;

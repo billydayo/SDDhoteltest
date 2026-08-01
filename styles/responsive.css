@@ -78,6 +78,8 @@
 /* 320px 保底 */
 @media (max-width: 380px) {
   .site-main { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  /* 主視覺是滿版的，內文要跟著 .site-main 收窄，標題才不會比下方內容多凸出 8px */
+  .hero__inner { padding-left: var(--sp-3); padding-right: var(--sp-3); }
   .filter-bar__row { grid-template-columns: 1fr; }
   .card, .filter-bar { padding: var(--sp-4); }
   .room-card__media { aspect-ratio: 3 / 2; }

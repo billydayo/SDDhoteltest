@@ -15,7 +15,8 @@ import { autoModerationNotice } from '../components/simulated-badge.js';
 import { ruleLabel } from '../services/moderation.js';
 import { REVIEW_STATUS, reviewStatusLabel } from '../services/reviews.js';
 import {
-  createEmptyRow, actionButton, confirmAction, statusTag, buttonRow, selectField
+  createEmptyRow, actionButton, confirmAction, statusTag, buttonRow, selectField,
+  createExportBar
 } from '../components/admin-ui.js';
 import { REVIEW_CATEGORIES } from '../data/vocabulary.js';
 import { formatDateTime } from '../utils/dates.js';
@@ -46,6 +47,37 @@ export async function renderAdminReviews(panel, context) {
     panel.replaceChildren(frag);
     return;
   }
+
+  // 匯出跟著狀態篩選走，與畫面上看到的一致
+  frag.append(createExportBar({
+    label: '匯出評論',
+    filename: 'sunny-reviews',
+    sheetName: '評論',
+    columns: [
+      { key: 'statusLabel', label: '狀態' },
+      { key: 'roomName', label: '房源' },
+      { key: 'rating', label: '評分' },
+      { key: 'categoryLabel', label: '評論類型' },
+      { key: 'comment', label: '內容' },
+      { key: 'autoVerdictLabel', label: '自動初判' },
+      { key: 'autoRulesLabel', label: '觸發規則' },
+      { key: 'adminNote', label: '審核說明' },
+      { key: 'createdAt', label: '送出時間' }
+    ],
+    notify: toast,
+    getRows: () => reviews.map((r) => ({
+      statusLabel: reviewStatusLabel(r.status),
+      roomName: roomById.get(r.roomId)?.name ?? '（房源已下架）',
+      rating: r.rating,
+      categoryLabel: categoryLabel(r.category),
+      comment: r.comment,
+      autoVerdictLabel: r.autoVerdict === 'auto-reject' ? '建議退件'
+        : r.autoVerdict === 'auto-pass' ? '未觸發退件規則' : '無紀錄',
+      autoRulesLabel: (r.autoRules ?? []).map(ruleLabel).join('、'),
+      adminNote: r.adminNote ?? '',
+      createdAt: formatDateTime(r.createdAt)
+    }))
+  }));
 
   const list = document.createElement('ul');
   list.className = 'review-list';

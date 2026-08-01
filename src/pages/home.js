@@ -7,6 +7,8 @@
 import { render, renderLoading, renderError, createEmptyState, createErrorState }
   from '../app.js';
 import { getSiteContent } from '../data/site-content.js';
+import { resolveImageUrl } from '../data/rooms.js';
+import { getRoomVocabulary } from '../data/room-vocabulary.js';
 import { searchRooms, buildNoResultHints } from '../services/search.js';
 import { createRoomCard } from '../components/room-card.js';
 import { createFilterBar, createTypeTabs, createActiveFilters, removalPatch }
@@ -33,13 +35,17 @@ export async function renderHome() {
    * 改成只讓結果區顯示錯誤，搜尋列與目前的條件都留在畫面上，
    * 使用者可以直接改掉那個字元再按一次搜尋。
    */
+  // 設施／特色可由後台增刪，因此繪製前取一次。
+  // room-vocabulary 內有快取，正常情況下不會每次重繪都打一次資料庫。
+  const vocabulary = await getRoomVocabulary();
+
   let result;
   try {
     result = await searchRooms();
   } catch (err) {
     result = { rooms: [], error: null, failure: err, filters: store.getSearchFilters() };
   }
-  render(buildPage(cachedContent, result));
+  render(buildPage(cachedContent, result, vocabulary));
 }
 
 /** 條件變更後重新查詢。patch 為 null 代表已被清空。 */
@@ -48,12 +54,12 @@ async function applyFilters(patch) {
   await renderHome();
 }
 
-function buildPage(content, result) {
+function buildPage(content, result, vocabulary) {
   const frag = document.createDocumentFragment();
   const filters = result.filters;
 
   frag.append(buildHero(content));
-  frag.append(createFilterBar(applyFilters));
+  frag.append(createFilterBar(applyFilters, vocabulary));
 
   const active = createActiveFilters(filters, (key) => {
     applyFilters(removalPatch(key, filters));
@@ -102,11 +108,19 @@ function buildHero(content) {
   const hero = document.createElement('section');
   hero.className = 'hero';
 
-  if (content?.heroImage) {
+  // 後台可以上傳主視覺，存起來的是 storage:<path>，要先轉成真正的網址
+  const heroSrc = content?.heroImage ? resolveImageUrl(content.heroImage) : null;
+
+  if (heroSrc) {
     const img = document.createElement('img');
     img.className = 'hero__image';
-    img.src = content.heroImage;
+    img.src = heroSrc;
     img.alt = `${content.heroTitle ?? 'Sunny 訂房平台'} 主視覺`;
+    // 圖片載不到時退回純色版面，不要留一塊破圖擋在標題後面
+    img.addEventListener('error', () => {
+      img.remove();
+      hero.classList.add('hero--plain');
+    }, { once: true });
     hero.append(img);
   } else {
     hero.classList.add('hero--plain');

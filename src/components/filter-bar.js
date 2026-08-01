@@ -9,15 +9,20 @@
  *         其餘欄位原封不動。
  */
 
-import { AMENITIES, ROOM_FEATURES, ROOM_TYPES } from '../data/vocabulary.js';
+import { ROOM_TYPES } from '../data/vocabulary.js';
 import { SORT_OPTIONS, describeActiveFilters } from '../services/search.js';
 import * as store from '../state/store.js';
 import { earliestCheckIn } from '../utils/dates.js';
 
 /**
  * @param {(patch: object) => void} onChange 條件變更時呼叫，由呼叫端重新查詢
+ * @param {{ amenities: string[], features: string[] }} vocabulary
+ *        設施與房型特色的選項。由呼叫端取得後傳入——它們可由後台增刪，
+ *        因此不能在模組載入時就寫死（FR-010a）。
  */
-export function createFilterBar(onChange) {
+export function createFilterBar(onChange, vocabulary) {
+  const amenityOptions = vocabulary?.amenities ?? [];
+  const featureOptions = vocabulary?.features ?? [];
   const filters = store.getSearchFilters();
 
   const form = document.createElement('form');
@@ -30,8 +35,13 @@ export function createFilterBar(onChange) {
   const main = buildMainRow(filters);
 
   form.append(main.row);
-  form.append(buildCheckGroup('設施條件', 'amenities', AMENITIES, filters.amenities));
-  form.append(buildCheckGroup('房型特色', 'features', ROOM_FEATURES, filters.features));
+  // 清單為空時整組不畫：一個沒有任何選項的 fieldset 看起來像壞掉
+  if (amenityOptions.length) {
+    form.append(buildCheckGroup('設施條件', 'amenities', amenityOptions, filters.amenities));
+  }
+  if (featureOptions.length) {
+    form.append(buildCheckGroup('房型特色', 'features', featureOptions, filters.features));
+  }
   form.append(buildActions(onChange));
 
   form.addEventListener('submit', (e) => {

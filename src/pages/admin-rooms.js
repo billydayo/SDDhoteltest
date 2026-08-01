@@ -39,6 +39,15 @@ const MANUAL_ROOM_STATUSES = ['available', 'maintenance'];
 
 let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' };
 
+/**
+ * 篩選面板是否展開。預設收合。
+ *
+ * 六個欄位攤開來是 338px，把房源清單推到 744px 之外——而管理員進這一頁
+ * 十次有九次是來看清單的。收合後只留一顆按鈕，按下才展開。
+ * 送出後自動收回：那個當下使用者要看的是結果，不是剛才填的條件。
+ */
+let filtersOpen = false;
+
 const emptyFilters = () =>
   ({ keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' });
 
@@ -56,6 +65,12 @@ export async function renderAdminRooms(panel, context) {
   const frag = document.createDocumentFragment();
   frag.append(createPageHeader('房源管理', roomsSummary(rooms.length)));
   frag.append(buildCreateBar(panel, context, vocabulary));
+
+  // 面板收起時，用一行摘要交代目前生效的條件；展開時面板自己就說明了
+  if (!filtersOpen) {
+    const summary = buildFilterSummary(panel, context);
+    if (summary) frag.append(summary);
+  }
   frag.append(buildFilterForm(panel, context));
   frag.append(buildTable(filtered, rooms.length, occupied, panel, context, vocabulary));
 
@@ -78,10 +93,62 @@ function buildCreateBar(panel, context, vocabulary) {
   add.textContent = '新增房源';
   add.addEventListener('click', () => openRoomForm(panel, context, vocabulary));
 
+  // 篩選的展開鈕。條件生效時把數量寫在鈕上——面板收起來的時候，
+  // 這是使用者唯一能察覺「清單被篩過」的地方，否則只會覺得房源莫名變少了。
+  const count = activeFilterCount();
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'btn';
+  toggle.id = 'rm-filter-toggle';
+  toggle.textContent = count ? `篩選（${count}）` : '篩選';
+  toggle.setAttribute('aria-expanded', String(filtersOpen));
+  toggle.setAttribute('aria-controls', 'rm-filter-panel');
+  toggle.addEventListener('click', () => {
+    filtersOpen = !filtersOpen;
+    reload(panel, context);
+  });
+
   // 詞彙管理放在房源管理底下而非另開一頁：管理員是在填房源表單時
   // 才會發現「這個設施清單裡沒有」，入口就該在那個當下伸手可及的地方
-  bar.append(add, actionButton('管理設施／特色', () => openVocabularyForm(panel, context)));
+  bar.append(add, actionButton('管理設施／特色', () => openVocabularyForm(panel, context)), toggle);
   return bar;
+}
+
+/** 目前生效的條件數。用來標在篩選鈕上。 */
+const activeFilterCount = () => Object.values(filters).filter((v) => v !== '').length;
+
+/** 面板收起時的一行摘要。沒有條件時回傳 null。 */
+function buildFilterSummary(panel, context) {
+  const parts = [];
+  if (filters.keyword) parts.push(`關鍵字：${filters.keyword}`);
+  if (filters.type) parts.push(ROOM_TYPES.find((t) => t.value === filters.type)?.label ?? filters.type);
+  if (filters.date) parts.push(`房態日期：${formatDate(filters.date)}`);
+  if (filters.status) parts.push(roomStatusLabel(filters.status));
+  if (filters.minPrice) parts.push(`≥ ${filters.minPrice}`);
+  if (filters.maxPrice) parts.push(`≤ ${filters.maxPrice}`);
+  if (!parts.length) return null;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'active-filters';
+
+  const label = document.createElement('span');
+  label.className = 'active-filters__label';
+  label.textContent = `已套用 ${parts.length} 項條件：`;
+  wrap.append(label);
+
+  parts.forEach((text) => {
+    const chip = document.createElement('span');
+    chip.className = 'filter-chip';
+    chip.textContent = text;
+    wrap.append(chip);
+  });
+
+  wrap.append(actionButton('清除條件', () => {
+    filters = emptyFilters();
+    reload(panel, context);
+  }));
+
+  return wrap;
 }
 
 /**
@@ -312,7 +379,11 @@ const hasFilters = () => Object.values(filters).some((v) => v !== '');
 function buildFilterForm(panel, context) {
   const form = document.createElement('form');
   form.className = 'filter-bar';
+  form.id = 'rm-filter-panel';
   form.noValidate = true;
+  // 收合用 hidden 而非不產生節點：aria-controls 指向的元素必須始終存在，
+  // 否則輔助技術在面板收起時找不到那個 id。
+  form.hidden = !filtersOpen;
 
   const keyword = textField({
     id: 'rm-f-kw', name: 'keyword', label: '關鍵字', value: filters.keyword,
@@ -397,6 +468,9 @@ function buildFilterForm(panel, context) {
       maxPrice: maxPrice.input.value,
       date: date.input.value
     };
+    // 送出後收回面板：這個當下使用者要看的是結果，不是剛才填的條件。
+    // 條件本身由按鈕上的數字與上方那行摘要交代，不會不見。
+    filtersOpen = false;
     reload(panel, context);
   });
 

@@ -148,6 +148,28 @@ export async function refundsForOrder(orderId) {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/**
+ * 最新一次申請遭駁回的訂單 id。
+ *
+ * 訂單列表要標示「已駁回」，但一筆一筆去查會變成 N 次往返。
+ * RLS 已經把非本人的資料濾掉，所以一次取回自己的全部申請、在記憶體裡收斂即可。
+ *
+ * 只看**最新**一次：駁回後可以再次申請（FR-039），
+ * 若看的是「有沒有任何一次被駁回」，那筆訂單就再也擺脫不了駁回標籤了。
+ */
+export async function rejectedOrderIds() {
+  const all = await listRefunds();
+  const latest = new Map();
+  all.forEach((r) => {
+    const seen = latest.get(r.orderId);
+    if (!seen || r.createdAt.localeCompare(seen.createdAt) > 0) latest.set(r.orderId, r);
+  });
+
+  const ids = new Set();
+  latest.forEach((r, orderId) => { if (r.status === 'rejected') ids.add(orderId); });
+  return ids;
+}
+
 export const REFUND_STATUS = Object.freeze({
   pending:  { label: '審核中', tone: 'info' },
   approved: { label: '已核准', tone: 'ok' },

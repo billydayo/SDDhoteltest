@@ -17,7 +17,8 @@ import { ORDER_STATUS, orderStatusLabel, PAYMENT_METHODS } from '../data/vocabul
 import { toUserMessage, isAppError } from '../utils/errors.js';
 import {
   quoteRefund, refundUnavailableReason, validateReason, submitRefundRequest,
-  refundsForOrder, refundQuota, REFUND_POLICY, REFUND_STATUS, refundStatusLabel
+  refundsForOrder, refundQuota, rejectedOrderIds,
+  REFUND_POLICY, REFUND_STATUS, refundStatusLabel
 } from '../services/refunds.js';
 import * as router from '../router.js';
 
@@ -34,13 +35,44 @@ import * as router from '../router.js';
 let statusTab = '';
 
 /**
+ * 只用於顯示的訂單狀態。
+ *
+ * 'refund-rejected' 不是資料庫裡的值——退款被駁回後訂單本身仍是 confirmed
+ * （FR-039）。刻意**不**把它加進 vocabulary 的 ORDER_STATUS：那份定義同時餵給
+ * 後台的訂單狀態下拉選單，加進去等於讓管理員可以把訂單設成一個不存在的狀態。
+ */
+// 標籤寫「退款已駁回」而非「已駁回」：後者單獨出現在卡片右上角時，
+// 會被讀成「訂房被駁回」——但被駁回的是退款申請，訂房本身完全有效。
+// 詳情頁雖然有一段說明，列表上卻只有這個標籤，四個字必須自己講清楚。
+const REFUND_REJECTED = 'refund-rejected';
+const DISPLAY_ONLY_STATUS = Object.freeze({
+  [REFUND_REJECTED]: { label: '退款已駁回', tone: 'danger' }
+});
+
+const displayStatusLabel = (value) =>
+  DISPLAY_ONLY_STATUS[value]?.label ?? orderStatusLabel(value);
+const displayStatusTone = (value) =>
+  DISPLAY_ONLY_STATUS[value]?.tone ?? ORDER_STATUS[value]?.tone ?? 'neutral';
+
+/**
  * 訂單在畫面上的實際狀態。
  *
- * 逾期未付款的訂單在資料上仍是 pending-payment（要等 sweepExpiredOrders 掃過才會
- * 真的變成 cancelled），但標籤已經顯示「已取消（逾期未付款）」。分頁必須跟著
- * 看得到的標籤走，否則使用者會在「待付款」裡看到一筆寫著已取消的訂單。
+ * 兩處與資料庫值不同：
+ *
+ * ・逾期未付款的訂單在資料上仍是 pending-payment（要等 sweepExpiredOrders 掃過
+ *   才會真的變成 cancelled），但標籤顯示「已取消（逾期未付款）」。
+ * ・最新一次退款申請遭駁回的訂單，資料上回到 confirmed（FR-039），但顯示「已駁回」。
+ *
+ * 分頁必須跟著看得到的標籤走，否則使用者會在「已確認」裡看到一筆寫著已駁回的訂單。
+ *
+ * @param {object} order
+ * @param {Set<string>|null} rejected 最新一次申請被駁回的訂單 id
  */
-const displayStatus = (order) => (isPaymentTimeout(order) ? 'cancelled' : order.status);
+function displayStatus(order, rejected) {
+  if (isPaymentTimeout(order)) return 'cancelled';
+  if (order.status === 'confirmed' && rejected?.has(order.id)) return REFUND_REJECTED;
+  return order.status;
+}
 
 /** 取消與退款：已經沒有住宿權益的訂單，列表上以底色與其他筆區隔 */
 const INACTIVE_STATUSES = ['cancelled', 'refunded'];
@@ -64,22 +96,26 @@ export async function renderOrders() {
     }
 
     // 一併取得房名，讓列表不必只顯示 ID
-    const rooms = await Promise.all(orders.map((o) => getRoom(o.roomId).catch(() => null)));
+    const [rooms, rejected] = await Promise.all([
+      Promise.all(orders.map((o) => getRoom(o.roomId).catch(() => null))),
+      // 取不到就當作沒有駁回：標籤退回「已確認」，總比整頁掛掉好
+      rejectedOrderIds().catch(() => null)
+    ]);
     const roomById = new Map(rooms.filter(Boolean).map((r) => [r.id, r]));
 
     const shown = statusTab
-      ? orders.filter((o) => displayStatus(o) === statusTab)
+      ? orders.filter((o) => displayStatus(o, rejected) === statusTab)
       : orders;
 
     const nodes = [
       createPageHeader('我的訂單', listSummary(orders.length, shown.length)),
-      createStatusTabs(orders)
+      createStatusTabs(orders, rejected)
     ];
 
     nodes.push(shown.length
-      ? buildOrderList(shown, roomById)
+      ? buildOrderList(shown, roomById, rejected)
       : createEmptyState({
-          title: `沒有${orderStatusLabel(statusTab)}的訂單`,
+          title: `沒有${displayStatusLabel(statusTab)}的訂單`,
           body: '切換到其他分頁可以查看你的其他訂單。'
         }));
 
@@ -91,7 +127,7 @@ export async function renderOrders() {
 
 function listSummary(total, shown) {
   return statusTab
-    ? `${orderStatusLabel(statusTab)} ${shown} 筆／全部 ${total} 筆，依入住日排序。`
+    ? `${displayStatusLabel(statusTab)} ${shown} 筆／全部 ${total} 筆，依入住日排序。`
     : `共 ${total} 筆，依入住日排序。`;
 }
 
@@ -101,10 +137,10 @@ function listSummary(total, shown) {
  * 每個分頁都帶筆數，且**沒有訂單的狀態不顯示**——一個永遠是空的分頁只是雜訊。
  * 但「全部」永遠在，使用者才有回得去的地方。
  */
-function createStatusTabs(orders) {
+function createStatusTabs(orders, rejected) {
   const counts = new Map();
   orders.forEach((o) => {
-    const s = displayStatus(o);
+    const s = displayStatus(o, rejected);
     counts.set(s, (counts.get(s) ?? 0) + 1);
   });
 
@@ -113,13 +149,20 @@ function createStatusTabs(orders) {
   nav.setAttribute('role', 'group');
   nav.setAttribute('aria-label', '訂單狀態分類');
 
+  // 依定義順序排，而不是依資料出現的先後——分頁的位置必須固定，
+  // 否則新增一筆訂單就會讓整排跳動。
+  // 「已駁回」緊接在「已確認」之後：它本質上就是一筆已確認的訂單。
+  const order = [];
+  Object.keys(ORDER_STATUS).forEach((s) => {
+    order.push(s);
+    if (s === 'confirmed') order.push(REFUND_REJECTED);
+  });
+
   const tabs = [
     { value: '', label: '全部', count: orders.length },
-    // 依 ORDER_STATUS 的順序排，而不是依資料出現的先後——
-    // 分頁的位置必須固定，否則新增一筆訂單就會讓整排跳動
-    ...Object.keys(ORDER_STATUS)
+    ...order
       .filter((s) => counts.has(s))
-      .map((s) => ({ value: s, label: orderStatusLabel(s), count: counts.get(s) }))
+      .map((s) => ({ value: s, label: displayStatusLabel(s), count: counts.get(s) }))
   ];
 
   tabs.forEach(({ value, label, count }) => {
@@ -145,7 +188,7 @@ function createStatusTabs(orders) {
   return nav;
 }
 
-function buildOrderList(orders, roomById) {
+function buildOrderList(orders, roomById, rejected) {
   const ul = document.createElement('ul');
   ul.className = 'room-list';
 
@@ -153,8 +196,9 @@ function buildOrderList(orders, roomById) {
     const li = document.createElement('li');
     li.className = 'card order-card';
 
-    // 已取消與已退款整張卡片加底色，掃過列表時一眼就能跳過它們
-    if (INACTIVE_STATUSES.includes(displayStatus(order))) {
+    // 已取消與已退款整張卡片加底色，掃過列表時一眼就能跳過它們。
+    // 「已駁回」不在此列——那筆訂單仍然有效，住宿權益不受影響。
+    if (INACTIVE_STATUSES.includes(displayStatus(order, rejected))) {
       li.classList.add('order-card--inactive');
     }
 
@@ -172,7 +216,7 @@ function buildOrderList(orders, roomById) {
     link.textContent = roomById.get(order.roomId)?.name ?? '（房源已下架）';
     title.append(link);
 
-    head.append(title, statusTag(order));
+    head.append(title, statusTag(order, rejected));
 
     const meta = document.createElement('p');
     meta.className = 'room-card__meta';
@@ -200,13 +244,17 @@ function buildOrderList(orders, roomById) {
   return ul;
 }
 
-function statusTag(order) {
+/**
+ * @param {object} order
+ * @param {Set<string>|null} [rejected] 最新一次退款申請被駁回的訂單 id
+ */
+function statusTag(order, rejected) {
+  const status = displayStatus(order, rejected);
   const span = document.createElement('span');
-  const tone = ORDER_STATUS[order.status]?.tone ?? 'neutral';
-  span.className = `tag tag--${tone}`;
+  span.className = `tag tag--${displayStatusTone(status)}`;
   span.textContent = isPaymentTimeout(order)
     ? '已取消（逾期未付款）'
-    : orderStatusLabel(order.status);
+    : displayStatusLabel(status);
   return span;
 }
 
@@ -261,8 +309,11 @@ function buildDetail(order, room, refunds, quota, context) {
   const card = document.createElement('section');
   card.className = 'card';
 
+  // 詳情頁已經載了這筆訂單的申請紀錄，直接由它推導，不必再查一次
+  const rejected = refunds[0]?.status === 'rejected' ? new Set([order.id]) : null;
+
   const head = document.createElement('p');
-  head.append(statusTag(order));
+  head.append(statusTag(order, rejected));
   card.append(head);
 
   card.append(buildSummary(order, room));
@@ -301,10 +352,10 @@ function buildRefundHistory(order, refunds) {
   section.append(h2);
 
   /*
-   * FR-039：退款遭駁回後訂單回到「已確認」，會員可再次申請。
+   * FR-039：退款遭駁回後訂單在資料上仍是「已確認」，會員可再次申請。
    *
-   * 但畫面上會同時出現「已確認」（訂單）與「退款已駁回」（申請）兩個標籤，
-   * 使用者很容易誤以為訂單出了問題。這句話把兩者的關係講明白。
+   * 標籤已寫明「退款已駁回」，但那是四個字的空間，講不完「所以我的房間還在嗎」。
+   * 這段話補完整：被駁回的是申請，訂房有效，而且還可以再試一次。
    */
   const latest = refunds[0];
   if (latest?.status === 'rejected' && order.status === 'confirmed') {
@@ -313,8 +364,8 @@ function buildRefundHistory(order, refunds) {
     note.style.display = 'block';
     note.style.padding = 'var(--sp-2) var(--sp-3)';
     note.style.marginBottom = 'var(--sp-3)';
-    note.textContent = '退款申請未通過審核，你的訂單維持「已確認」狀態，'
-      + '住宿權益不受影響。若仍需取消，可再次提出申請。';
+    note.textContent = '被駁回的是這筆退款申請，不是你的訂房。'
+      + '訂房仍然有效，住宿權益不受影響。若仍需取消，可再次提出申請。';
     section.append(note);
   }
 

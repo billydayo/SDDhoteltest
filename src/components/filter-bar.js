@@ -26,46 +26,99 @@ export function createFilterBar(onChange) {
   // 關閉原生驗證，改由 services/search.js 產生繁體中文訊息（FR-069、FR-075）。
   // 否則輸入 0 只會跳出瀏覽器內建的英文提示。
   form.noValidate = true;
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    onChange(readForm(form));
-  });
 
-  form.append(buildMainRow(filters));
+  const main = buildMainRow(filters);
+
+  form.append(main.row);
   form.append(buildCheckGroup('設施條件', 'amenities', AMENITIES, filters.amenities));
   form.append(buildCheckGroup('房型特色', 'features', ROOM_FEATURES, filters.features));
   form.append(buildActions(onChange));
 
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!validateRequired(main.fields)) return;
+    onChange(readForm(form));
+  });
+
   return form;
+}
+
+/**
+ * 按下「搜尋」時的必填檢查。
+ *
+ * 只在送出時檢查，不在頁面載入時檢查——首頁一進來就滿版紅字會嚇到人，
+ * 而且此時使用者根本還沒做任何事。房型頁籤與「清除全部條件」也不走這裡：
+ * 前者依 FR-012 只改房型、不得動到其他條件，後者的用途正是把欄位清空。
+ *
+ * @returns {boolean} 全部通過才回傳 true
+ */
+function validateRequired(fields) {
+  const checks = [
+    { field: fields.checkIn, message: '請選擇入住日。' },
+    { field: fields.checkOut, message: '請選擇退房日。' },
+    { field: fields.guests, message: '請填寫入住人數。' }
+  ];
+
+  let firstInvalid = null;
+
+  checks.forEach(({ field, message }) => {
+    const value = field.input.value.trim();
+    let error = value ? null : message;
+
+    // 人數填了但填成 0 或負數時，「請填寫」是答非所問，要講清楚哪裡不對
+    if (!error && field.input.name === 'guests') {
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 1) error = '入住人數需為大於 0 的整數。';
+    }
+
+    setFieldError(field, error);
+    if (error && !firstInvalid) firstInvalid = field;
+  });
+
+  // 把焦點送到第一個有問題的欄位，使用者才不必自己找紅字在哪
+  firstInvalid?.input.focus();
+  return !firstInvalid;
+}
+
+function setFieldError(field, message) {
+  field.error.textContent = message ?? '';
+  field.error.hidden = !message;
+  if (message) field.input.setAttribute('aria-invalid', 'true');
+  else field.input.removeAttribute('aria-invalid');
 }
 
 function buildMainRow(filters) {
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
 
-  row.append(
-    field('關鍵字', 'keyword', 'text', filters.keyword, { placeholder: '房名或描述' }),
-    field('入住日', 'checkIn', 'date', filters.checkIn, { min: earliestCheckIn() }),
-    field('退房日', 'checkOut', 'date', filters.checkOut, { min: earliestCheckIn() }),
-    field('入住人數', 'guests', 'number', filters.guests, { min: '1', step: '1' }),
+  const fields = {
+    keyword: field('關鍵字', 'keyword', 'text', filters.keyword, { placeholder: '房名或描述' }),
+    checkIn: field('入住日', 'checkIn', 'date', filters.checkIn,
+      { min: earliestCheckIn() }, { required: true }),
+    checkOut: field('退房日', 'checkOut', 'date', filters.checkOut,
+      { min: earliestCheckIn() }, { required: true }),
+    guests: field('入住人數', 'guests', 'number', filters.guests,
+      { min: '1', step: '1' }, { required: true }),
     // step 必須是 1：若設成 100，瀏覽器只接受 1、101、201…，
     // 使用者輸入 2500 會被原生驗證擋下而送不出表單。
-    field('每晚價格上限', 'priceCap', 'number', filters.priceCap, {
+    priceCap: field('每晚價格上限', 'priceCap', 'number', filters.priceCap, {
       min: '1', step: '1', inputmode: 'numeric', placeholder: '例如 3000', class: 'no-spin'
     }),
-    selectField('排序', 'sort', SORT_OPTIONS, filters.sort)
-  );
-  return row;
+    sort: selectField('排序', 'sort', SORT_OPTIONS, filters.sort)
+  };
+
+  Object.values(fields).forEach((f) => row.append(f.wrap));
+  return { row, fields };
 }
 
-function field(label, name, type, value, attrs = {}) {
+function field(label, name, type, value, attrs = {}, { required = false } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'field';
 
   const id = `filter-${name}`;
   const l = document.createElement('label');
   l.htmlFor = id;
-  l.textContent = label;
+  l.textContent = required ? `${label}（必填）` : label;
 
   const input = document.createElement('input');
   input.id = id;
@@ -74,8 +127,25 @@ function field(label, name, type, value, attrs = {}) {
   input.value = value ?? '';
   Object.entries(attrs).forEach(([k, v]) => input.setAttribute(k, v));
 
-  wrap.append(l, input);
-  return wrap;
+  // 錯誤訊息一律建好但預設隱藏。等出錯才插進 DOM 的話，
+  // aria-describedby 指向的節點在那之前並不存在，輔助技術讀不到。
+  const error = document.createElement('p');
+  error.className = 'field__error';
+  error.id = `${id}-error`;
+  error.hidden = true;
+  error.setAttribute('role', 'alert');
+
+  if (required) {
+    input.setAttribute('aria-required', 'true');
+    input.setAttribute('aria-describedby', error.id);
+    // 填好就把紅字收掉，不必等到再按一次搜尋
+    input.addEventListener('input', () => {
+      if (input.value.trim()) setFieldError({ input, error }, null);
+    });
+  }
+
+  wrap.append(l, input, error);
+  return { wrap, input, error };
 }
 
 function selectField(label, name, options, value) {
@@ -99,7 +169,8 @@ function selectField(label, name, options, value) {
   });
 
   wrap.append(l, select);
-  return wrap;
+  // 與 field() 的形狀一致，buildMainRow 才能一律用 f.wrap 取用
+  return { wrap, input: select };
 }
 
 /** 多選群組。以 fieldset + legend 提供正確的語意分組。 */

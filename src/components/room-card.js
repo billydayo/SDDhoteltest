@@ -8,7 +8,7 @@
  */
 
 import { formatTWD, calculateTotal } from '../utils/money.js';
-import { formatRating, primaryImage } from '../data/rooms.js';
+import { formatRating, primaryImage, FALLBACK_IMAGE } from '../data/rooms.js';
 import { typeLabel, roomStatusLabel, ROOM_STATUS } from '../data/vocabulary.js';
 import { nightsBetween } from '../utils/dates.js';
 import { createFavoriteButton } from './favorite-button.js';
@@ -31,10 +31,12 @@ function buildMedia(room) {
   media.className = 'room-card__media';
 
   const img = document.createElement('img');
-  img.src = primaryImage(room) ?? 'assets/rooms/room-fallback.svg';
+  img.src = primaryImage(room) ?? FALLBACK_IMAGE;
   // 憲章原則 V：所有圖片必須有有意義的 alt
   img.alt = `${room.name}的房間照片`;
   img.loading = 'lazy';
+  // 照片多半是外部網址，離線或對方擋圖時要退回本地示意圖，不能留破圖圖示
+  img.addEventListener('error', () => { img.src = FALLBACK_IMAGE; }, { once: true });
   media.append(img);
 
   // 有多張照片時標示張數，讓使用者知道詳情頁還有得看

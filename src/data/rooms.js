@@ -47,12 +47,18 @@ export const toStoragePath = (value) => (isStorageRef(value) ? value.slice(STORA
 /** 把 images 陣列中的任一項轉成可直接放進 <img src> 的字串 */
 export const resolveImageUrl = (value) => repo.resolveRoomPhotoUrl(value);
 
-/** 第一張圖，沒有圖片時回傳 null 由呼叫端決定佔位方式 */
+/**
+ * 沒有照片、或照片載入失敗時的本地示意圖。
+ * 種子資料的照片是外部網址，離線時一定載不到，因此後備必須留在專案內。
+ */
+export const FALLBACK_IMAGE = 'assets/rooms/room-fallback.svg';
+
+/** 第一張圖，沒有圖片時回傳後備示意圖 */
 export function primaryImage(room) {
   const first = room?.images?.[0];
   if (first) {
     const url = resolveImageUrl(first);
     if (url) return url;
   }
-  return 'assets/rooms/room-fallback.svg';
+  return FALLBACK_IMAGE;
 }

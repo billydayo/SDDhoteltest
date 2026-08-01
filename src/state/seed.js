@@ -13,7 +13,20 @@
  * 提高版本號會讓既有使用者的 localStorage 在下次載入時重建為新的種子資料。
  * 新增房源或示範訂單後務必遞增，否則舊資料不會更新。
  */
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 6;
+
+/**
+ * 房源照片。
+ *
+ * 用實拍照片而非先前的 SVG 示意圖：示意圖一眼就看得出是佔位素材，而訂房網站的
+ * 第一印象幾乎全押在照片上，示意圖會讓整個站看起來還沒做完。
+ *
+ * 這裡只記 Unsplash 的 photo id，尺寸與畫質參數集中在同一處 ——
+ * 日後要調整寬度或壓縮率只改這一行，不必逐一修四十幾條網址。
+ * 照片載入失敗時由 assets/rooms/room-fallback.svg 頂替，不會留下破圖。
+ */
+const photos = (...ids) =>
+  ids.map((id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=80`);
 
 const ROOM_IDS = {
   singleA: '11111111-1111-4111-8111-000000000001',
@@ -73,7 +86,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.singleA, name: '暖陽單人房 A', type: 'single',
       maxGuests: 1, nightlyPrice: 1800,
-      images: ['assets/rooms/single-a.svg'],
+      images: photos('1522771739844-6a9f6d5f14af', '1590073844006-33379778ae09',
+                     '1552321554-5fefe8c9ef14'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌'],
       features: ['商務友善', '安靜樓層'],
       description: '面向內庭的安靜單人房，適合商務短住。採光良好，附書桌與閱讀燈。',
@@ -82,7 +96,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.singleB, name: '暖陽單人房 B', type: 'single',
       maxGuests: 1, nightlyPrice: 1800,
-      images: ['assets/rooms/single-b.svg'],
+      images: photos('1522708323590-d24dbb6b0267', '1502672260266-1c1ef2d93688'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌'],
       features: ['商務友善'],
       description: '同層的另一間單人房，格局相同，窗景面向街道。',
@@ -91,7 +105,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.doubleA, name: '日光雙人房 A', type: 'double',
       maxGuests: 2, nightlyPrice: 2600,
-      images: ['assets/rooms/double-a.svg'],
+      images: photos('1618773928121-c32242e63f39', '1560185007-cde436f6a4d0'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '備品組', '陽台'],
       features: ['採光佳', '情侶推薦'],
       description: '一張加大雙人床的標準房型，早晨採光充足，附小陽台，適合情侶或夫妻。',
@@ -100,7 +114,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.doubleB, name: '日光雙人房 B', type: 'double',
       maxGuests: 2, nightlyPrice: 2600,
-      images: ['assets/rooms/double-b.svg'],
+      images: photos('1631049307264-da0ec9d70304', '1611967164521-abae8fba4668'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '備品組'],
       features: ['安靜樓層', '情侶推薦'],
       description: '與 A 房同規格，位於安靜的走廊末端。',
@@ -109,7 +123,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.doubleC, name: '日光雙人房 C', type: 'double',
       maxGuests: 2, nightlyPrice: 2800,
-      images: ['assets/rooms/double-c.svg'],
+      images: photos('1512918728675-ed5a9ecdebfd', '1615529182904-14819c35db37'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '備品組', '浴缸', '陽台'],
       features: ['採光佳', '情侶推薦', '泡澡放鬆'],
       description: '含獨立浴缸與陽台的雙人房，空間略大於標準雙人房。',
@@ -118,7 +132,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.twinA, name: '雙床房 A', type: 'twin',
       maxGuests: 2, nightlyPrice: 2900,
-      images: ['assets/rooms/twin-a.svg'],
+      images: photos('1595576508898-0ad5c879a061', '1541971875076-8f970d573be6'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃'],
       features: ['商務友善', '朋友同行'],
       description: '兩張單人床的房型，適合朋友同行或商務同事。',
@@ -127,7 +141,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.twinB, name: '雙床房 B', type: 'twin',
       maxGuests: 3, nightlyPrice: 3200,
-      images: ['assets/rooms/twin-b.svg'],
+      images: photos('1596436889106-be35e843f974', '1618220179428-22790b461013'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃', '加床服務'],
       features: ['朋友同行', '可加床'],
       description: '可加床的雙床房，最多可住三人。',
@@ -136,7 +150,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.family, name: '家庭四人房', type: 'family',
       maxGuests: 4, nightlyPrice: 4200,
-      images: ['assets/rooms/family-a.svg'],
+      images: photos('1560448204-e02f11c3d0e2', '1540518614846-7eded433c457',
+                     '1600566753086-00f18fb6b3ea'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '客廳區', '嬰兒床可租借', '浴缸'],
       features: ['親子友善', '無障礙', '可加床'],
       description: '兩大床的家庭房，附小客廳區與無障礙動線，適合親子出遊。',
@@ -145,7 +160,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.suiteA, name: '景觀套房', type: 'suite',
       maxGuests: 2, nightlyPrice: 5600,
-      images: ['assets/rooms/suite-a.svg'],
+      images: photos('1602002418082-a4443e081dd1', '1568495248636-6432b97bd949',
+                     '1598928506311-c55ded91a20c'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台'],
       features: ['採光佳', '泡澡放鬆', '情侶推薦'],
       description: '頂層景觀套房，含起居空間與大面窗景，附膠囊咖啡機。',
@@ -154,7 +170,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.suiteB, name: '景觀套房（整理中）', type: 'suite',
       maxGuests: 2, nightlyPrice: 5600,
-      images: ['assets/rooms/suite-b.svg'],
+      images: photos('1566195992011-5f6b21e539aa', '1600210492486-724fe5c67fb0'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台'],
       features: ['採光佳', '泡澡放鬆'],
       description: '與景觀套房同規格。此房目前設為整理中，用於展示房態排除規則。',
@@ -163,7 +179,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.waDouble, name: '和風雙人房', type: 'double',
       maxGuests: 2, nightlyPrice: 3100,
-      images: ['assets/rooms/wa-double.svg'],
+      images: photos('1611892440504-42a792e24d32', '1519710164239-da123dc03ef4'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '備品組', '浴缸'],
       features: ['泡澡放鬆', '情侶推薦', '安靜樓層'],
       description: '榻榻米與檜木浴缸的和式房型，適合想放慢步調的旅客。',
@@ -172,7 +188,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.waTwin, name: '和風雙床房', type: 'twin',
       maxGuests: 2, nightlyPrice: 3300,
-      images: ['assets/rooms/wa-twin.svg'],
+      images: photos('1582719478250-c89cae4dc85b', '1618221195710-dd6b41faaea6'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃', '備品組'],
       features: ['朋友同行', '安靜樓層'],
       description: '和式雙床房，兩張獨立床墊，附小型茶席空間。',
@@ -181,7 +197,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.starView, name: '星空景觀房', type: 'double',
       maxGuests: 2, nightlyPrice: 4100,
-      images: ['assets/rooms/star-view.svg'],
+      images: photos('1596394516093-501ba68a0ba6', '1445019980597-93fa8acb246c'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '陽台', '咖啡機'],
       features: ['採光佳', '情侶推薦'],
       description: '面東的高樓層房型，天氣好時可從陽台看見星空。',
@@ -190,7 +206,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.gardenView, name: '庭園景觀房', type: 'double',
       maxGuests: 2, nightlyPrice: 3600,
-      images: ['assets/rooms/garden-view.svg'],
+      images: photos('1615874959474-d609969a20ed', '1503174971373-b1f69850bded'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '陽台', '備品組'],
       features: ['採光佳', '安靜樓層', '情侶推薦'],
       description: '低樓層房型，陽台直接面向內庭花園，清晨有鳥聲。',
@@ -199,7 +215,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.bizSingle, name: '商務單人房', type: 'single',
       maxGuests: 1, nightlyPrice: 2100,
-      images: ['assets/rooms/biz-single.svg'],
+      images: photos('1591088398332-8a7791972843', '1592229505726-ca121723b8ef'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌', '衣櫃'],
       features: ['商務友善', '安靜樓層'],
       description: '附大型書桌與人體工學椅，長時間工作也不易疲勞。',
@@ -208,7 +224,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.bizDouble, name: '商務雙人房', type: 'double',
       maxGuests: 2, nightlyPrice: 2900,
-      images: ['assets/rooms/biz-double.svg'],
+      images: photos('1631049552057-403cdb8f0658', '1566665797739-1674de7a421a'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '書桌', '小冰箱', '衣櫃'],
       features: ['商務友善'],
       description: '雙人商務房，兩側各有獨立插座與閱讀燈。',
@@ -217,7 +233,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.kidsFamily, name: '親子主題房', type: 'family',
       maxGuests: 4, nightlyPrice: 4800,
-      images: ['assets/rooms/kids-family.svg'],
+      images: photos('1616486338812-3dadae4b4ace', '1594563703937-fdc640497dcd',
+                     '1505693416388-ac5ce068fe85'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '嬰兒床可租借', '加床服務'],
       features: ['親子友善', '可加床', '採光佳'],
       description: '含遊戲區與防撞設計的家庭房，備有兒童備品與床欄。',
@@ -226,7 +243,7 @@ function buildRooms() {
     {
       id: ROOM_IDS.accessible, name: '無障礙友善房', type: 'double',
       maxGuests: 2, nightlyPrice: 3000,
-      images: ['assets/rooms/accessible.svg'],
+      images: photos('1587985064135-0366536eab42', '1600607687920-4e2a09cf159d'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '小冰箱', '衣櫃'],
       features: ['無障礙', '安靜樓層'],
       description: '加寬門框與無門檻淋浴間，走道淨寬足供輪椅迴轉。',
@@ -235,7 +252,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.execSuite, name: '頂樓行政套房', type: 'suite',
       maxGuests: 3, nightlyPrice: 6800,
-      images: ['assets/rooms/exec-suite.svg'],
+      images: photos('1611048267451-e6ed903d4a38', '1578683010236-d716f9a3f461',
+                     '1554009975-d74653b879f1'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台', '加床服務'],
       features: ['採光佳', '商務友善', '可加床', '泡澡放鬆'],
       description: '頂樓行政套房，含獨立起居室與辦公區，可加床。',
@@ -244,7 +262,8 @@ function buildRooms() {
     {
       id: ROOM_IDS.honeymoon, name: '蜜月套房', type: 'suite',
       maxGuests: 2, nightlyPrice: 7500,
-      images: ['assets/rooms/honeymoon.svg'],
+      images: photos('1590490360182-c33d57733427', '1551882547-ff40c63fe5fa',
+                     '1571003123894-1f0594d2b5d9'),
       amenities: ['免費 Wi-Fi', '冷氣', '獨立衛浴', '浴缸', '小冰箱', '客廳區', '咖啡機', '陽台', '備品組'],
       features: ['情侶推薦', '泡澡放鬆', '採光佳'],
       description: '雙人按摩浴缸與景觀陽台，房內備有慶祝布置服務。',
@@ -407,7 +426,7 @@ export function buildSeedData() {
       id: SITE_CONTENT_ID,
       heroTitle: 'Sunny 訂房平台',
       heroSubtitle: '舒適住宿，安心入住',
-      heroImage: 'assets/hero.svg',
+      heroImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80',
       updatedAt: new Date().toISOString()
     }
   };

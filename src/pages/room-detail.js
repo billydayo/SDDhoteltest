@@ -10,7 +10,7 @@
  */
 
 import { render, renderLoading, renderError, createEmptyState, toast } from '../app.js';
-import { getRoom, formatRating, resolveImageUrl } from '../data/rooms.js';
+import { getRoom, formatRating, resolveImageUrl, FALLBACK_IMAGE } from '../data/rooms.js';
 import { listPublicReviews } from '../data/reviews.js';
 import { getLatestRiskCheck } from '../data/risk-checks.js';
 import { formatTWD, calculateTotal } from '../utils/money.js';
@@ -136,12 +136,18 @@ function buildGallery(room) {
   wrap.className = 'detail-gallery';
 
   const images = (room.images ?? []).map(resolveImageUrl).filter(Boolean);
-  const sources = images.length ? images : ['assets/rooms/room-fallback.svg'];
+  const sources = images.length ? images : [FALLBACK_IMAGE];
 
   const main = document.createElement('img');
   main.className = 'detail-gallery__main';
   main.src = sources[0];
   main.alt = `${room.name}的房間照片`;
+  // 外部照片載不到時退回本地示意圖。用 once 之外還要比對 src，
+  // 否則後備圖本身若也失敗會無限重設 src。
+  main.addEventListener('error', () => {
+    if (main.src.endsWith(FALLBACK_IMAGE)) return;
+    main.src = FALLBACK_IMAGE;
+  });
   wrap.append(main);
 
   if (sources.length < 2) return wrap;
@@ -162,6 +168,7 @@ function buildGallery(room) {
     img.src = src;
     img.alt = '';                 // 裝飾性：主圖已有完整說明
     img.loading = 'lazy';
+    img.addEventListener('error', () => { img.src = FALLBACK_IMAGE; }, { once: true });
     btn.append(img);
 
     btn.addEventListener('click', () => {

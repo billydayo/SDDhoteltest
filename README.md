@@ -65,7 +65,7 @@ SDDhoteltest/
 ├── README.md
 ├── index.html
 ├── styles/
-├── assets/                  # 房源與主視覺的 SVG 示意圖
+├── assets/                  # 圖片載入失敗時的 SVG 後備圖（房源照片為 Unsplash 網址）
 ├── src/
 │   ├── config.js            # 憑證設定，預設留空 = 示範模式
 │   ├── lib/supabase.js      # client 建立與模式偵測

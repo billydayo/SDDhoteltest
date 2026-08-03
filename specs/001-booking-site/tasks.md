@@ -54,8 +54,8 @@ US9（房源檢測與詳情頁展示）。
 回應 302 導向 `accounts.google.com`，回呼位址為專案的 `/auth/v1/callback`，
 授權範圍 `email profile`。瀏覽器端行為由 `tests/e2e/google-auth.e2e.mjs` 驗證
 （25 項）。完成授權後的兩件事——登入成功導回原頁、同信箱不產生第二個帳號
-（FR-088／SC-025）——需要真實 Google 帳密，自動化測不到，仍由
-`browser-acceptance.md` 人工把關。
+（FR-088／SC-025）——需要真實 Google 帳密，自動化測不到，已於同日以人工
+驗收通過（見 `browser-acceptance.md`）。
 
 **第 6 關的 19 項補測已完成（2026-08-03）**：房源照片管理（12）、上傳邊界（3）、
 訂單管理的房源篩選（4）。改以 `tests/e2e/photos.e2e.mjs` 驗證，全數通過。

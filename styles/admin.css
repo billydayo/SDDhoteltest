@@ -17,6 +17,19 @@
   position: sticky;
   top: 92px;
   box-shadow: var(--shadow-sm);
+  /*
+   * 導覽有自己的捲軸，與主內容完全分開。
+   *
+   * 沒有這段時，十二個模組在矮視窗（或瀏覽器縮放後）會比可視高度還長。
+   * sticky 元素高過視窗就只會黏住上緣，下半截要把**整頁**捲下去才看得到——
+   * 而「要捲多遠」取決於右邊表格有幾百列。導覽能不能點到，不該由資料量決定。
+   */
+  max-height: calc(100vh - 92px - var(--sp-5));
+  max-height: calc(100dvh - 92px - var(--sp-5));
+  overflow-y: auto;
+  /* 導覽捲到底時不把剩下的滾動交給頁面，否則主內容會跟著跳 */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .admin-nav h2 {
   font-family: var(--font-body);

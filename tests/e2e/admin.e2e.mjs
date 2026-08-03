@@ -1,5 +1,5 @@
 /**
- * 後台：逐日房態、六個模組的報表匯出、設施／特色增刪。
+ * 後台：逐日房態、七個模組的報表匯出、設施／特色增刪。
  *
  * 匯出與詞彙儲存都跑在**資料庫模式**（那是它們真正會出事的地方：
  * RLS、jsonb 語法、SheetJS 動態載入），但詞彙的寫入改在示範模式驗，
@@ -53,7 +53,7 @@ const r = createReporter('後台');
     r.check(`「${probe.name}」在退房日 ${probe.checkOut}`, await statusOn(probe.checkOut), '空房');
   }
 
-  // --- 六個模組的匯出（FR-058）-------------------------------------------
+  // --- 七個模組的匯出（FR-058）-------------------------------------------
   // headless Chrome 會取消實際存檔，因此看 CDP 的 downloadWillBegin 事件。
   let downloads = [];
   const cdp = await page.createCDPSession();
@@ -68,7 +68,9 @@ const r = createReporter('後台');
     ['#/admin/users', '用戶管理'],
     ['#/admin/reviews', '評論審核'],
     ['#/admin/refunds', '退款審核'],
-    ['#/admin/channel', '渠道比價']
+    ['#/admin/channel', '渠道比價'],
+    // 日誌自己也可匯出。它是唯一一個「匯出動作會出現在自己畫面上」的模組
+    ['#/admin/logs', '操作日誌']
   ]) {
     await goto(page, hash, 2600);
     downloads = [];

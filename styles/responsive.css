@@ -11,6 +11,9 @@
   .admin-nav {
     position: static;
     padding: var(--sp-3);
+    /* 橫排折行後本來就不高，再限高只會多出一條沒必要的捲軸 */
+    max-height: none;
+    overflow: visible;
   }
   .admin-nav ul {
     display: flex;

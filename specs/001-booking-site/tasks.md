@@ -48,11 +48,14 @@ US9（房源檢測與詳情頁展示）。
 | Phase 16 服務條款（T112） | ✅ |
 | Phase 17 Polish（T113–T116、T119） | ✅ |
 
-**剩餘 1 項任務**：
+**所有任務已完成。**
 
-- **T009 Google provider** — 選用功能，尚未於 Dashboard 啟用。目前點擊
-  Google 登入會顯示「請於 Authentication → Providers → Google 完成設定」，
-  不影響其他功能。
+**T009 Google provider 已於 2026-08-03 啟用**：`/auth/v1/authorize?provider=google`
+回應 302 導向 `accounts.google.com`，回呼位址為專案的 `/auth/v1/callback`，
+授權範圍 `email profile`。瀏覽器端行為由 `tests/e2e/google-auth.e2e.mjs` 驗證
+（25 項）。完成授權後的兩件事——登入成功導回原頁、同信箱不產生第二個帳號
+（FR-088／SC-025）——需要真實 Google 帳密，自動化測不到，仍由
+`browser-acceptance.md` 人工把關。
 
 **第 6 關的 19 項補測已完成（2026-08-03）**：房源照片管理（12）、上傳邊界（3）、
 訂單管理的房源篩選（4）。改以 `tests/e2e/photos.e2e.mjs` 驗證，全數通過。
@@ -79,7 +82,7 @@ US9（房源檢測與詳情頁展示）。
 | `test:unit` | — | 40 項純函式與判定規則 | ✅ |
 | `test:search` | 資料庫＋示範 | 首頁搜尋與篩選、條件式必填、整理中房態，32 項 | ✅ |
 | `test:orders` | 示範 | 會員端訂單與取消，13 項 | ✅ |
-| `test:admin` | 資料庫＋示範 | 逐日房態、六模組匯出、詞彙增刪，23 項 | ✅ |
+| `test:admin` | 資料庫＋示範 | 逐日房態、七模組匯出、詞彙增刪，15 項 | ✅ |
 | `test:photos` | 示範＋資料庫 | 照片管理、上傳邊界、訂單房源篩選，48 項 | ✅ |
 | `test:messaging` | 示範 | 私訊、評論回覆、訂單取消入口，28 項 | ✅ |
 
@@ -91,16 +94,26 @@ US9（房源檢測與詳情頁展示）。
 |---|---|---|---|
 | 1 | 會員無法取消未付款訂單 | **`migrate-order-cancel.sql` 從未在正式資料庫執行**，守門 trigger 仍是舊版；另外列表上根本沒有取消入口 | 列表加入付款／取消入口（FR-035b）、錯誤訊息改為可行動、**待管理員執行 migration** |
 | 2 | 後台表單需獨立滾輪 | 浮窗本身已會內捲，但背景頁面沒有鎖定，滾輪會捲到底下的列表 | 開窗時鎖住 `html` 捲動，關窗還原 |
-| 3 | 匯出未記錄操作日誌 | 未實作 | 六個模組的匯出統一寫入 `report.export`（FR-058a） |
+| 3 | 匯出未記錄操作日誌 | 未實作 | 各模組的匯出統一寫入 `report.export`（FR-058a） |
 | 4 | 房源日期篩選需要區間 | 原本只有單日 | 改為起／迄兩欄，含頭含尾（FR-051b） |
 | 5 | 寬度應與視窗相符 | `--content-max: 1240px` 寫死 | 改為 `none`，全站滿寬 |
 | 6 | 評論回覆＋私訊 | 未實作 | 新增 FR-103d 與 FR-123~128，**需執行 `migrate-messages.sql`** |
 | 7 | 相簿左右切換 | 已存在且可用 | 依確認結果不修改 |
 | 8 | 上傳非圖片檔沒有錯誤提示 | 提示有產生、文字也對，但後台浮窗是原生 `<dialog>` + `showModal()`，渲染在瀏覽器 **top layer**，`.toast-stack` 的 z-index 再高都會被蓋住 | 提示容器改掛進當下開著的浮窗，關窗前接回 body |
 
-**尚待人工執行**：`supabase/migrate-order-cancel.sql` 與 `supabase/migrate-messages.sql`。
-兩者都需要 SQL Editor 權限，開發工具無法代勞。未執行時畫面會明確說出該跑哪一支，
-而不是丟出看不懂的錯誤。
+**兩支 migration 已於 2026-08-03 由管理員執行完畢**，並以 REST ＋ 真實帳號實測 22 項全過
+（清單見 `migrate-messages.sql` 末端）。其中「會員可取消待付款訂單」——也就是第 1 項
+真正壞掉的那一條——確認已修復，取消後同區間可立即重新預訂。
+
+### 2026-08-03 的第三批修正
+
+驗收時追加回報的三項，都屬於「功能會動但用起來不對」的類型：
+
+| # | 回報 | 實際根因 | 處置 |
+|---|---|---|---|
+| 1 | 首頁搜尋說明與欄位貼太近 | 該行帶著 inline 的**負值上邊距** `calc(var(--sp-2) * -1)`，抵銷掉 `.field__hint` 的 0.25rem 後淨值是 -0.25rem | 改用 `.filter-bar__hint`，上邊距對齊欄位間距（`--sp-4`）；併同加上 `max-width: 68ch`，那是全站滿寬後的連帶問題 |
+| 2 | 縮小視窗時後台左側目錄看不全 | `.admin-nav` 是 `position: sticky` 但沒有限高。sticky 元素高過視窗就只會黏住上緣，下半截要把**整頁**捲到底才看得到——而要捲多遠取決於右邊表格有幾百列 | 導覽加上 `max-height: calc(100dvh - 92px - var(--sp-5))` ＋ `overflow-y: auto` ＋ `overscroll-behavior: contain`，自己捲，與主內容完全脫鉤 |
+| 3 | 操作日誌沒有匯出 | 六個模組有匯出，唯獨日誌沒有 | 加入匯出（FR-058 擴為七個模組），範圍跟著篩選走；匯出動作本身照樣寫入日誌 |
 
 ### 瀏覽器實測進度
 
@@ -193,7 +206,7 @@ US9（房源檢測與詳情頁展示）。
 未完成此階段前，應用程式會以示範模式運作，功能完整。
 
 - [X] T008 Create the Supabase project and disable "Confirm email" under Authentication → Providers → Email
-- [ ] T009 Enable the Google provider in Supabase Auth and register the callback URL in Google Cloud's authorized redirect URIs
+- [X] T009 Enable the Google provider in Supabase Auth and register the callback URL in Google Cloud's authorized redirect URIs
 - [X] T010 Run supabase/schema.sql in the SQL Editor and verify btree_gist, all eleven tables, triggers, functions, and constraints exist
 - [X] T011 [P] Verify RLS is enabled with explicit policies on all eleven tables, and that anon can read only rooms, approved reviews, site_content, room_risk_checks, and system_settings
 - [X] T012 [P] Verify admin_logs rejects UPDATE and DELETE for every role including admin (SC-027)

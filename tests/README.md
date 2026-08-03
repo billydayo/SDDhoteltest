@@ -42,8 +42,9 @@ npm test
 | `npm run test:unit` | 在無頭瀏覽器裡跑第一層，結果收進同一個出口 |
 | `npm run test:search` | 首頁搜尋與篩選（**資料庫模式**） |
 | `npm run test:orders` | 會員端訂單、取消（示範模式） |
-| `npm run test:admin` | 逐日房態、六模組匯出、設施／特色增刪 |
+| `npm run test:admin` | 逐日房態、七模組匯出、設施／特色增刪 |
 | `npm run test:photos` | 房源照片管理、上傳邊界、訂單的房源篩選 |
+| `npm run test:google` | Google 第三方登入的導向、取消與示範模式停用 |
 | `npm run test:messaging` | 私訊、評論回覆、待付款訂單的取消入口 |
 
 ### 哪些跑在哪個模式，為什麼
@@ -65,6 +66,15 @@ local adapter 是在記憶體裡用 JS 過濾，踩不到 PostgREST 的語法問
 因此那三項跑資料庫模式，並自建一間 `__e2e 臨時房源（可刪）`，做完就刪，
 全程不碰正式房源的照片。測試用的圖片由 `e2e/fixtures.mjs` 當場產生
 （單色 PNG，顏色不同才分辨得出排序），輸出在 `.tmp/`，不進版本控制。
+
+`google` 兩種模式都用，但**不會真的連到 Google**。主框架一旦要離開本站就攔下來，
+記錄網址後以 `abort('aborted')` 取消；因此測得到 client_id、回呼位址與授權範圍，
+卻不產生任何真實的授權請求，也不建立帳號。示範模式那半段驗證按鈕停用（FR-089）
+與服務層的第二道防線。
+
+完成授權之後的兩件事——登入成功導回原頁、同信箱不產生第二個帳號
+（FR-088／SC-025）——**自動化測不到**，需要一組真實 Google 帳密，
+留在 `browser-acceptance.md` 由人工把關。
 
 ### 兩個環境上的坑
 

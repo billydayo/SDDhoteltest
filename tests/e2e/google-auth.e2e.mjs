@@ -19,7 +19,7 @@ const r = createReporter('Google 第三方登入');
 // ---------------------------------------------------------------------------
 
 {
-  const { browser, page, problems } = await openPage({ demo: true });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true });
   await goto(page, '#/login', 2000);
 
   const btn = await googleButton(page);
@@ -41,6 +41,8 @@ const r = createReporter('Google 第三方登入');
 
   r.ok('示範模式：Google 登入不發出任何網路請求',
     !problems.length, problems.join(' / '));
+  r.ok('示範模式：主控台零錯誤零警告',
+    !consoleIssues.length, consoleIssues.list().join(' / '));
 
   await browser.close();
 }
@@ -50,7 +52,11 @@ const r = createReporter('Google 第三方登入');
 // ---------------------------------------------------------------------------
 
 {
-  const { browser, page, problems } = await openPage();
+  // 刻意中止離站導覽，Chrome 會就那次取消在主控台留下 net::ERR_ABORTED，
+  // 那是測試自己造成的，不是應用程式的問題。
+  const { browser, page, problems, consoleIssues } = await openPage({
+    allowConsole: [/net::ERR_ABORTED/, /accounts\.google\.com/]
+  });
 
   /*
    * 主框架要離開本站時攔下來：記錄網址、中止導覽。
@@ -126,6 +132,8 @@ const r = createReporter('Google 第三方登入');
     '#/favorites');
 
   r.ok('資料庫模式：過程中沒有頁面錯誤', !problems.length, problems.join(' / '));
+  r.ok('資料庫模式：主控台零錯誤零警告',
+    !consoleIssues.length, consoleIssues.list().join(' / '));
 
   await browser.close();
 }
@@ -135,7 +143,7 @@ const r = createReporter('Google 第三方登入');
 // ---------------------------------------------------------------------------
 
 {
-  const { browser, page, problems } = await openPage();
+  const { browser, page, problems, consoleIssues } = await openPage();
 
   // Supabase 取消授權時導回的形狀
   await page.goto(
@@ -169,6 +177,8 @@ const r = createReporter('Google 第三方登入');
     0);
 
   r.ok('取消流程沒有頁面錯誤', !problems.length, problems.join(' / '));
+  r.ok('取消流程：主控台零錯誤零警告',
+    !consoleIssues.length, consoleIssues.list().join(' / '));
 
   await browser.close();
 }

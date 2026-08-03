@@ -29,7 +29,7 @@ async function send(page, text) {
 // 會員端：客服訊息
 // ===========================================================================
 {
-  const { browser, page, problems } = await openPage({ demo: true, height: 1200 });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true, height: 1200 });
   await login(page, 'guest@sunny.com', 'guest123');
   await goto(page, '#/messages', 2800);
 
@@ -67,7 +67,7 @@ async function send(page, text) {
     }),
     'member');
 
-  r.done(problems);
+  r.done(problems, consoleIssues);
   await browser.close();
 }
 
@@ -75,7 +75,7 @@ async function send(page, text) {
 // 管理員端：會員訊息 + 評論回覆
 // ===========================================================================
 {
-  const { browser, page, problems } = await openPage({ demo: true, height: 1200 });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true, height: 1200 });
   await login(page, 'admin@sunny.com', 'admin123');
 
   // --- 討論串清單 ---------------------------------------------------------
@@ -221,7 +221,7 @@ async function send(page, text) {
   r.check('清空內容即收回回覆',
     await page.evaluate(() => document.querySelectorAll('.review-reply').length), 0);
 
-  r.done(problems);
+  r.done(problems, consoleIssues);
   await browser.close();
 }
 
@@ -229,7 +229,7 @@ async function send(page, text) {
 // 待付款訂單的取消入口（FR-035a）
 // ===========================================================================
 {
-  const { browser, page, problems } = await openPage({ demo: true, height: 1200 });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true, height: 1200 });
   await login(page, 'guest@sunny.com', 'guest123');
   await goto(page, '#/orders', 3000);
 
@@ -257,7 +257,7 @@ async function send(page, text) {
       '取消訂單');
   }
 
-  const summary = r.done(problems);
+  const summary = r.done(problems, consoleIssues);
   await browser.close();
   process.exit(summary.failed ? 1 : 0);
 }

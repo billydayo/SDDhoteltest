@@ -38,7 +38,22 @@ function chromePath() {
  * demo=true 時攔截 src/config.js 回傳空憑證，強制進入示範模式——
  * 這樣測試不會碰到線上資料庫，也就不會在別人的正式資料上留下痕跡。
  */
-export async function openPage({ demo = false, width = 1400, height = 1100 } = {}) {
+/**
+ * 主控台雜訊的白名單。
+ *
+ * 這裡只放「不是本專案造成、也修不掉」的訊息。任何來自 src/ 的錯誤或警告
+ * 都不該加進來——那是要修的東西，不是要藏的東西。
+ */
+const CONSOLE_NOISE = [
+  // 無頭 Chrome 沒有 favicon 的處理器，每頁都會叫一次
+  /favicon\.ico/,
+  // DevTools 在無頭模式下對自己發的提示
+  /DevTools listening on/
+];
+
+export async function openPage({
+  demo = false, width = 1400, height = 1100, allowConsole = []
+} = {}) {
   const browser = await puppeteer.launch({
     executablePath: chromePath(),
     headless: 'new',
@@ -46,6 +61,19 @@ export async function openPage({ demo = false, width = 1400, height = 1100 } = {
   });
   const page = await browser.newPage();
   await page.setViewport({ width, height });
+
+  /*
+   * 把 User-Agent 裡的 HeadlessChrome 改回 Chrome。
+   *
+   * 不是為了「假裝不是自動化」，而是因為房源照片允許填外部網址（FR-050），
+   * 而有些圖床的機器人防護看到 HeadlessChrome 會**直接切斷連線**——不是回 403，
+   * 是連回應都不給。Chrome 把它報成 ERR_HTTP2_PROTOCOL_ERROR，看起來就像
+   * 「這張照片壞了」，實際上真人開同一頁完全正常。
+   *
+   * 實測：13w.com.tw 的 Winho-CDN 對 HeadlessChrome 斷線、對一般 Chrome UA 回
+   * 200。不改的話，主控台檢查會把一張好照片誤報成故障。
+   */
+  await page.setUserAgent((await browser.userAgent()).replace('HeadlessChrome', 'Chrome'));
 
   const problems = [];
   page.on('pageerror', (e) => problems.push(`JS 例外：${e.message}`));
@@ -56,6 +84,38 @@ export async function openPage({ demo = false, width = 1400, height = 1100 } = {
       problems.push(`HTTP ${r.status()} ${r.url().split('/rest/v1/')[1]?.slice(0, 40)} :: ${body}`);
     }
   });
+
+  /*
+   * 主控台的錯誤與警告（SC-014／T118）。
+   *
+   * 與 problems 分開收：pageerror 抓的是「未捕捉的例外」，而 console.error
+   * 多半是被 catch 起來、畫面上看不出異狀、卻代表某處出了事的訊息。
+   * 兩者的意義不同，混在一起會讓既有的 !problems.length 斷言變得說不清楚。
+   *
+   * 同一則訊息可能在一次流程裡重複幾十次（例如每張卡片各噴一次），
+   * 因此以內容為鍵計數，回報時只列一行並附上次數。
+   */
+  const consoleCounts = new Map();
+  page.on('console', (msg) => {
+    const type = msg.type();
+    if (type !== 'error' && type !== 'warning') return;
+    const body = msg.text();
+    const loc = msg.location();
+    const where = loc?.url
+      ? ` @ ${loc.url.replace(BASE, '')}:${(loc.lineNumber ?? 0) + 1}`
+      : '';
+    const key = `console.${type}：${body}${where}`;
+    // 比對包含出處的完整字串——載入失敗的訊息本身不含網址，
+    // 只比對 msg.text() 會讓 /favicon\.ico/ 這類過濾永遠比不中。
+    if ([...CONSOLE_NOISE, ...allowConsole].some((re) => re.test(key))) return;
+    consoleCounts.set(key, (consoleCounts.get(key) ?? 0) + 1);
+  });
+  const consoleIssues = {
+    get length() { return consoleCounts.size; },
+    list() {
+      return [...consoleCounts].map(([k, n]) => (n > 1 ? `${k}  ×${n}` : k));
+    }
+  };
 
   if (demo) {
     await page.setRequestInterception(true);
@@ -86,7 +146,7 @@ export async function openPage({ demo = false, width = 1400, height = 1100 } = {
     };
   });
 
-  return { browser, page, problems };
+  return { browser, page, problems, consoleIssues };
 }
 
 export async function goto(page, hash, settle = 2500) {
@@ -150,10 +210,25 @@ export function createReporter(suiteName) {
       results[condition ? 'passed' : 'failed'] += 1;
       console.log(`${condition ? '✅' : '❌'} ${label}${condition ? '' : `  ${detail}`}`);
     },
-    done(problems = []) {
+    /**
+     * @param problems      openPage 回傳的頁面錯誤（未捕捉例外、REST 4xx）
+     * @param consoleIssues openPage 回傳的主控台錯誤與警告。傳入才會檢查——
+     *                      沒傳的區段不會憑空多一項通過，數字才對得起來。
+     */
+    done(problems = [], consoleIssues = null) {
       if (problems.length) {
         results.failed += problems.length;
         console.log(`❌ 頁面錯誤 ${problems.length} 筆：\n     ${problems.join('\n     ')}`);
+      }
+      if (consoleIssues) {
+        if (consoleIssues.length) {
+          results.failed += consoleIssues.length;
+          console.log(`❌ 主控台錯誤／警告 ${consoleIssues.length} 種（SC-014）：`
+            + `\n     ${consoleIssues.list().join('\n     ')}`);
+        } else {
+          results.passed += 1;
+          console.log('✅ 主控台零錯誤零警告（SC-014）');
+        }
       }
       console.log(`--- 通過 ${results.passed} / 失敗 ${results.failed} ---`);
       return results;

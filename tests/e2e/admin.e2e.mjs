@@ -13,7 +13,7 @@ const r = createReporter('後台');
 
 // =========================================================== 資料庫模式
 {
-  const { browser, page, problems } = await openPage();
+  const { browser, page, problems, consoleIssues } = await openPage();
   await login(page, 'admin@sunny.com', 'admin123');
 
   // --- 逐日房態（FR-015 / FR-051a）---------------------------------------
@@ -94,13 +94,13 @@ const r = createReporter('後台');
   });
   r.ok('用戶頁不顯示電子郵件', !userColumns.some((c) => c.includes('郵件')), userColumns.join('/'));
 
-  r.done(problems);
+  r.done(problems, consoleIssues);
   await browser.close();
 }
 
 // =========================================================== 示範模式
 {
-  const { browser, page, problems } = await openPage({ demo: true });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true });
   await login(page, 'admin@sunny.com', 'admin123');
   await goto(page, '#/admin/rooms', 2400);
 
@@ -152,7 +152,7 @@ const r = createReporter('後台');
   r.ok('前台篩選器出現新項目', await page.evaluate(() =>
     [...document.querySelectorAll('input[name="amenities"]')].some((i) => i.value === '溫泉湯屋')));
 
-  const summary = r.done(problems);
+  const summary = r.done(problems, consoleIssues);
   await browser.close();
   process.exit(summary.failed ? 1 : 0);
 }

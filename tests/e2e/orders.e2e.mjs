@@ -7,7 +7,7 @@
 import { openPage, goto, login, sleep, createReporter } from './harness.mjs';
 
 const r = createReporter('會員端訂單');
-const { browser, page, problems } = await openPage({ demo: true, height: 1400 });
+const { browser, page, problems, consoleIssues } = await openPage({ demo: true, height: 1400 });
 
 await login(page, 'guest@sunny.com', 'guest123');
 await goto(page, '#/orders', 3000);
@@ -114,6 +114,6 @@ function status(id) {
   }, id);
 }
 
-const summary = r.done(problems);
+const summary = r.done(problems, consoleIssues);
 await browser.close();
 process.exit(summary.failed ? 1 : 0);

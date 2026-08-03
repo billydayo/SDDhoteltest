@@ -1,6 +1,6 @@
 # 自動化測試
 
-兩層，各有不同的約束（憲章 2.6.0「關於自動化測試」）。
+三層，各有不同的約束（憲章 2.6.0「關於自動化測試」）。
 
 **自動化測試不取代 [`browser-acceptance.md`](../specs/001-booking-site/checklists/browser-acceptance.md)。**
 版面、對比、照片好不好看這類需要人眼判斷的項目，仍以手動驗收把關。
@@ -46,6 +46,53 @@ npm test
 | `npm run test:photos` | 房源照片管理、上傳邊界、訂單的房源篩選 |
 | `npm run test:google` | Google 第三方登入的導向、取消與示範模式停用 |
 | `npm run test:messaging` | 私訊、評論回覆、待付款訂單的取消入口 |
+| `npm run test:rls` | 第三層：權限邊界（見下） |
+
+### 主控台的錯誤與警告（SC-014 / T118）
+
+harness 除了未捕捉的例外，也收 `console.error` 與 `console.warn`，
+每個區段結束時當成一項斷言檢查。這一項原本靠人眼看 DevTools，
+「兩模式零錯誤零警告」因此從宣稱變成會失敗的測試。
+
+真正修不掉、又不是本專案造成的訊息（無頭 Chrome 的 favicon 404）
+列在 `harness.mjs` 的 `CONSOLE_NOISE`。某一支測試自己刻意製造的雜訊
+用 `openPage({ allowConsole: [...] })` 就地放行，並在該處寫清楚原因——
+`google-auth` 的中止導覽與 `photos` 的孤兒檔探測都屬於這類。
+**來自 `src/` 的錯誤或警告不該進白名單**，那是要修的東西。
+
+---
+
+## 第三層：權限邊界（Node，不開瀏覽器）
+
+```
+npm run test:rls
+```
+
+`rest/boundaries.rest.mjs`，50 項。直接以真實帳號打 PostgREST 與 Auth，
+驗 RLS 政策、守門 trigger 與稽核不可竄改：匿名可讀範圍、未公開評論對匿名
+不可見、會員讀不到他人的訂單／收藏／討論串（指名 ID 也不行）、會員無法
+自行升權、稽核日誌連管理員都改不動也刪不掉、日誌不含密碼或金鑰、
+訊息送出後不可修改不可刪除、評論回覆由伺服器蓋章。
+
+**為什麼不用瀏覽器**：這一層要驗的正是「繞過前端直接打資料庫」。
+Puppeteer 測得到畫面上按不到，測不到有人拿 anon key 自己發請求——
+而那才是 RLS 要擋的攻擊面。原本這些項目寫在
+`supabase/migrate-messages.sql` 末端當人工清單，現在可以重跑。
+
+幾個刻意的設計：
+
+- **PGRST\* 的錯誤不算「被擋下」。** 欄位名打錯會回 400 PGRST204，
+  若把它當成權限擋住，日後一次改欄位名就會讓一整批安全斷言默默變成假通過。
+- **不能只看狀態碼。** 政策的 `USING` 讓某列對該身分不可見時，PostgREST 回的是
+  200／204 加上「影響 0 列」，不是 42501。所以每個寫入嘗試都另外回頭讀一次資料。
+- **改動一律還原。** 評論回覆測完就清空；萬一 RLS 真的有洞讓房價被改成 1，
+  測試會把原價寫回去——找到漏洞是它的職責，順手破壞資料不是。
+- **`SUNNY_RLS_SKIP_APPEND=1`** 會略過「偽造 sender_role 被蓋回 member」那一項。
+  該項必須真的插入成功才驗得到 trigger，而 messages 依設計只增不刪
+  （沒有 delete 政策，任何身分都刪不掉），所以每跑一次就會在示範會員的
+  討論串多留一則標示為 `[自動測試]` 的訊息。
+
+這一層在示範模式下沒有意義（沒有資料庫），`src/config.js` 憑證為空時會直接跳過。
 
 ### 哪些跑在哪個模式，為什麼
 
@@ -76,7 +123,7 @@ local adapter 是在記憶體裡用 JS 過濾，踩不到 PostgREST 的語法問
 （FR-088／SC-025）——**自動化測不到**，需要一組真實 Google 帳密，
 留在 `browser-acceptance.md` 由人工把關。
 
-### 兩個環境上的坑
+### 三個環境上的坑
 
 **無頭 Chrome 的 dialog 事件不穩定。** 實測會出現「對話框沒觸發、`window.confirm`
 直接回 false」，讓測試誤判成功能壞掉。harness 一律把 `window.confirm` 換成樁，
@@ -84,6 +131,14 @@ local adapter 是在記憶體裡用 JS 過濾，踩不到 PostgREST 的語法問
 
 **無頭 Chrome 會取消實際下載。** 匯出測試改看 CDP 的 `downloadWillBegin` 事件，
 不看檔案系統。
+
+**`HeadlessChrome` 這個 User-Agent 會被圖床擋掉。** 房源照片允許填外部網址，
+而有些 CDN 的機器人防護看到 HeadlessChrome 會直接切斷連線——不是回 403，
+是連回應都不給，Chrome 報成 `ERR_HTTP2_PROTOCOL_ERROR`。加上主控台檢查之後，
+這會把一張真人看得到的好照片誤報成故障（實測 13w.com.tw 的 Winho-CDN：
+HeadlessChrome → 斷線，一般 Chrome UA → 200）。因此 harness 把 UA 裡的
+`HeadlessChrome` 換成 `Chrome`。這不是為了規避偵測，是為了讓外部資源的
+載入結果與真人瀏覽一致，否則主控台檢查會一直產生假警報。
 
 `messaging` 跑**示範模式**：它會真的送出訊息、真的公開一則評論回覆、真的取消訂單。
 私訊的權限邊界（會員讀不到他人的討論串、前端無法偽造 sender_role）在資料庫模式

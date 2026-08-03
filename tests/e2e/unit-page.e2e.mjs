@@ -8,7 +8,7 @@
 import { openPage, BASE, sleep, createReporter } from './harness.mjs';
 
 const r = createReporter('單元測試（於瀏覽器內執行）');
-const { browser, page, problems } = await openPage({ demo: true });
+const { browser, page, problems, consoleIssues } = await openPage({ demo: true });
 
 await page.goto(`${BASE}/tests/index.html`, { waitUntil: 'networkidle2' });
 await sleep(2500);
@@ -22,6 +22,6 @@ if (!results) {
     results.failures.join('\n     '));
 }
 
-const summary = r.done(problems);
+const summary = r.done(problems, consoleIssues);
 await browser.close();
 process.exit(summary.failed ? 1 : 0);

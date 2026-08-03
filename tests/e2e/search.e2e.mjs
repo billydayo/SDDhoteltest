@@ -13,7 +13,7 @@ import { openPage, goto, clickByText, setValue, text, count, sleep, createReport
   from './harness.mjs';
 
 const r = createReporter('首頁搜尋與篩選');
-const { browser, page, problems } = await openPage();
+const { browser, page, problems, consoleIssues } = await openPage();
 
 const reset = async () => {
   await goto(page, '#/', 2000);
@@ -179,7 +179,7 @@ await clickByText(page, '清除全部條件');
 await sleep(2200);
 r.ok('清除全部條件不被擋', (await errors()).length === 0 && await rooms() > 0);
 
-r.done(problems);
+r.done(problems, consoleIssues);
 await browser.close();
 
 // =========================================================== 示範模式
@@ -189,7 +189,8 @@ await browser.close();
  * 而這條看的是房態的呈現與排除規則，兩種模式的判定邏輯共用同一份 search.js。
  */
 {
-  const { browser: demoBrowser, page: demo, problems: demoProblems } = await openPage({ demo: true });
+  const { browser: demoBrowser, page: demo, problems: demoProblems,
+    consoleIssues: demoConsole } = await openPage({ demo: true });
   await goto(demo, '#/', 2600);
 
   const underMaintenance = await demo.evaluate(async () => {
@@ -225,7 +226,7 @@ await browser.close();
     visible.length > 0 && underMaintenance.every((n) => !visible.includes(n)),
     `結果 ${visible.length} 間：${visible.join('、')}`);
 
-  const summary = r.done(demoProblems);
+  const summary = r.done(demoProblems, demoConsole);
   await demoBrowser.close();
   process.exit(summary.failed ? 1 : 0);
 }

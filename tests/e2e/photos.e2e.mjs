@@ -145,7 +145,7 @@ const clickModal = (page, label) => page.evaluate((t) => {
 // 示範模式：照片管理 12 項 + 訂單的房源篩選 4 項
 // ===========================================================================
 {
-  const { browser, page, problems } = await openPage({ demo: true });
+  const { browser, page, problems, consoleIssues } = await openPage({ demo: true });
   await login(page, 'admin@sunny.com', 'admin123');
 
   // --- 照片管理區與封面標示 -------------------------------------------------
@@ -362,7 +362,7 @@ const clickModal = (page, label) => page.evaluate((t) => {
       /^全部訂單（\d+）$/.test(await ordersTitle(page)));
   }
 
-  r.done(problems);
+  r.done(problems, consoleIssues);
   await browser.close();
 }
 
@@ -370,7 +370,12 @@ const clickModal = (page, label) => page.evaluate((t) => {
 // 資料庫模式：上傳邊界（FR-050e、FR-050f）
 // ===========================================================================
 {
-  const { browser, page, problems } = await openPage();
+  // 驗證孤兒檔已被清除的辦法，就是去 fetch 它並期待失敗（見下方 orphanGone）。
+  // 那個 400 是測試自己打出來的，不是應用程式的問題。只放行帶快取破壞參數的
+  // 那一種，真正壞掉的房源照片仍然會被抓到。
+  const { browser, page, problems, consoleIssues } = await openPage({
+    allowConsole: [/\/room-photos\/.*\?t=\d+/]
+  });
   await login(page, 'admin@sunny.com', 'admin123');
 
   // 自己建一間臨時房源，全程不碰正式房源的照片
@@ -480,6 +485,6 @@ const clickModal = (page, label) => page.evaluate((t) => {
   r.ok('臨時房源已清除', removed >= 1, `刪除 ${removed} 間`);
   await cleanup.browser.close();
 
-  const summary = r.done(problems);
+  const summary = r.done(problems, consoleIssues);
   process.exit(summary.failed ? 1 : 0);
 }

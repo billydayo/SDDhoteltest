@@ -33,6 +33,16 @@ function translate(error) {
   if (/無法付款|逾期取消/.test(message)) {
     return appError('ORDER_EXPIRED', undefined, { cause: error });
   }
+  /*
+   * 「不允許的訂單狀態變更」是守門 trigger 的統包訊息，兩種情形都會走到它：
+   *   ・已確認的訂單想直接取消——本來就該擋，那是退款審核的事
+   *   ・待付款的訂單想取消，但資料庫還沒跑過 migrate-order-cancel.sql
+   * 前者是正確行為，後者是部署沒跟上。翻成 FORBIDDEN 的「你沒有權限執行此操作」
+   * 兩種都解釋不了，管理員也無從判斷該去修哪裡，因此獨立成一則訊息。
+   */
+  if (/不允許的訂單狀態變更/.test(message)) {
+    return appError('ORDER_NOT_CANCELLABLE', undefined, { cause: error });
+  }
   if (/退款申請已達上限/.test(message)) {
     return appError('REFUND_LIMIT_REACHED', undefined, { cause: error });
   }
@@ -52,6 +62,17 @@ function translate(error) {
   }
   if (code === '23514' && /settings_valid_range/.test(message)) {
     return appError('SETTING_OUT_OF_RANGE', undefined, { cause: error });
+  }
+  /*
+   * 資料表或欄位不存在＝這台資料庫還沒跑過對應的 migration。
+   *
+   * 這不是使用者做錯了什麼，翻成「操作未能完成，請稍後再試」會讓人一直重試，
+   * 而不論重試幾次都一樣。直接說出該做什麼，省下一輪追查。
+   *   PGRST205 / 42P01：找不到資料表
+   *   PGRST204 / 42703：找不到欄位
+   */
+  if (['PGRST205', 'PGRST204', '42P01', '42703'].includes(code)) {
+    return appError('FEATURE_NOT_MIGRATED', undefined, { cause: error });
   }
   if (code === '42501' || error.status === 403) {
     return appError('FORBIDDEN', undefined, { cause: error });
@@ -105,7 +126,16 @@ const toReview = (r) => r && ({
   id: r.id, orderId: r.order_id, roomId: r.room_id, userId: r.user_id,
   rating: r.rating, comment: r.comment, category: r.category, status: r.status,
   autoVerdict: r.auto_verdict, autoRules: r.auto_rules ?? [],
-  adminNote: r.admin_note, createdAt: r.created_at
+  adminNote: r.admin_note, createdAt: r.created_at,
+  adminReply: r.admin_reply ?? null,
+  adminReplyAt: r.admin_reply_at ?? null,
+  adminReplyBy: r.admin_reply_by ?? null
+});
+
+const toMessage = (m) => m && ({
+  id: m.id, threadUserId: m.thread_user_id, senderId: m.sender_id,
+  senderRole: m.sender_role, body: m.body,
+  readAt: m.read_at, createdAt: m.created_at
 });
 
 const toRefund = (r) => r && ({
@@ -460,6 +490,22 @@ export async function submitReview(input) {
       auto_rules: input.autoRules ?? []
     }).select()
   );
+  return toReview(rows[0]);
+}
+
+/**
+ * 業者回覆一則評論（FR-103d）。傳 null 或空字串等於收回回覆。
+ *
+ * 回覆人與時間由 stamp_review_reply trigger 蓋章，這裡刻意不送——
+ * 前端送得出來的東西，前端就改得掉，那兩個欄位是要拿來查責任的。
+ */
+export async function replyToReview(id, body) {
+  const sb = await client();
+  const value = body?.trim() ? body.trim() : null;
+  const rows = await run(
+    sb.from('reviews').update({ admin_reply: value }).eq('id', id).select()
+  );
+  if (!rows.length) throw appError('NOT_FOUND');
   return toReview(rows[0]);
 }
 
@@ -837,6 +883,101 @@ export function onAuthStateChange(handler) {
     unsubscribe = () => data.subscription.unsubscribe();
   });
   return () => unsubscribe();
+}
+
+// ---------------------------------------------------------------------------
+// 私訊（FR-123 ~ FR-127）
+//
+// 討論串以「會員」為單位。管理員不是討論串的一端，而是可以進入任何一串的角色，
+// 因此這裡沒有 recipient 的概念，也沒有「指派給哪位客服」的欄位。
+// ---------------------------------------------------------------------------
+
+/**
+ * 一位會員的完整對話。
+ * 會員只讀得到自己的（RLS messages_select），管理員讀得到任何人的。
+ */
+export async function getMessages(threadUserId) {
+  const sb = await client();
+  const rows = await run(
+    sb.from('messages').select('*')
+      .eq('thread_user_id', threadUserId)
+      .order('created_at', { ascending: true })
+  );
+  return rows.map(toMessage);
+}
+
+/**
+ * 後台的討論串清單：每位會員一列，含最後一則訊息與未讀數。
+ *
+ * 一次把全部訊息撈回來在前端分組，而不是讓資料庫做 group by——
+ * PostgREST 沒有聚合語法，硬做要另開 RPC 或 view，而這個量級（示範專案）
+ * 的訊息總數是幾百則，在前端分組更簡單也更容易改。
+ */
+export async function getMessageThreads() {
+  const sb = await client();
+  const rows = (await run(
+    sb.from('messages').select('*').order('created_at', { ascending: true })
+  )).map(toMessage);
+
+  const byUser = new Map();
+  rows.forEach((m) => {
+    if (!byUser.has(m.threadUserId)) {
+      byUser.set(m.threadUserId, { userId: m.threadUserId, messages: [] });
+    }
+    byUser.get(m.threadUserId).messages.push(m);
+  });
+
+  return [...byUser.values()]
+    .map((t) => ({
+      userId: t.userId,
+      lastMessage: t.messages[t.messages.length - 1],
+      total: t.messages.length,
+      // 後台的「未讀」＝會員說了話但還沒有人讀
+      unread: t.messages.filter((m) => m.senderRole === 'member' && !m.readAt).length
+    }))
+    .sort((a, b) => (a.lastMessage.createdAt < b.lastMessage.createdAt ? 1 : -1));
+}
+
+/**
+ * 送出一則訊息。
+ *
+ * sender_id 與 sender_role 一律由 stamp_message_sender trigger 蓋章，
+ * 這裡送了也會被覆寫——會員若能自稱 admin，就能偽造一則官方回覆給自己看，
+ * 而那是自己的討論串，RLS 擋不住。
+ */
+export async function sendMessage({ threadUserId, body }) {
+  const sb = await client();
+  const { data: auth } = await sb.auth.getUser();
+  if (!auth?.user) throw appError('SESSION_EXPIRED');
+
+  const rows = await run(
+    sb.from('messages').insert({
+      thread_user_id: threadUserId ?? auth.user.id,
+      sender_id: auth.user.id,          // trigger 會再覆寫一次，這裡只是不送 null
+      sender_role: 'member',            // 同上：實際角色由伺服器判定
+      body
+    }).select()
+  );
+  return toMessage(rows[0]);
+}
+
+/**
+ * 把對方送來、自己還沒讀的訊息標記為已讀。
+ *
+ * 只標記「對方送的」：把自己送出的訊息標成已讀沒有意義，
+ * 而且會讓對方的未讀數莫名歸零。
+ */
+export async function markMessagesRead(threadUserId, readerRole) {
+  const sb = await client();
+  const senderRole = readerRole === 'admin' ? 'member' : 'admin';
+  await run(
+    sb.from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('thread_user_id', threadUserId)
+      .eq('sender_role', senderRole)
+      .is('read_at', null)
+      .select()
+  );
 }
 
 // ---------------------------------------------------------------------------

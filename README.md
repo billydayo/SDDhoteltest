@@ -35,11 +35,12 @@
 - 三步驟訂房流程，訂單保留 1 小時，逾期自動釋出
 - 虛擬付款選項（LINE Pay / 信用卡 / 銀行轉帳）
 - 我的訂單與退款申請
-- 評論撰寫（送出後經規則式自動審核 + 管理員複核）
+- 評論撰寫（送出後經規則式自動審核 + 管理員複核），並可看到業者的公開回覆
+- 客服訊息：與客服團隊的一對一私訊，訊息送出後不可竄改
 - 前台安全檢測：照片僅於瀏覽器內分析，不會上傳
 - 服務條款與隱私聲明
 
-**後台（十一個模組）**
+**後台（十二個模組）**
 
 儀表板、房源管理、訂單管理（含營運指標）、用戶管理、評論審核、退款審核、
 報表匯出（Excel / CSV fallback）、內容編輯、管理員操作日誌、
@@ -81,7 +82,7 @@ SDDhoteltest/
 │   │   ├── channel.js       # 渠道比價（模擬資料）
 │   │   ├── audit.js         # 稽核日誌寫入
 │   │   └── export.js        # Excel / CSV 匯出
-│   ├── pages/               # 前台 9 頁 + 後台 11 模組
+│   ├── pages/               # 前台 10 頁 + 後台 12 模組
 │   ├── components/ state/ utils/
 │   └── main.js
 ├── supabase/
@@ -118,6 +119,7 @@ python -m http.server 8000
 1. 建立 Supabase 專案，並於 Authentication → Providers → Email 關閉 "Confirm email"
 2. （選用）於 Authentication → Providers → Google 啟用第三方登入
 3. 於 SQL Editor 依序執行 `supabase/schema.sql` 與 `supabase/seed.sql`
+   - 既有專案升級時，另需依序執行 `supabase/migrate-*.sql`（見下方「資料庫遷移」）
    - 若專案曾裝過舊版 schema（`public` 底下看得到 `users`、或看不到 `profiles`），
      必須先執行 `supabase/reset-legacy.sql`。直接重跑 schema.sql 無效——
      `create table if not exists` 會靜默跳過既有的舊表，留下結構錯誤的資料庫。
@@ -126,6 +128,21 @@ python -m http.server 8000
 6. 以上述任一方式開啟 `index.html`
 
 完整步驟見 [快速上手指南](specs/001-booking-site/quickstart.md)。
+
+## 資料庫遷移
+
+`schema.sql` 只給全新安裝。既有的資料庫要跟上新功能，必須另外執行對應的
+`migrate-*.sql`——`create table if not exists` 對已存在的表是靜默跳過的，
+重跑 schema.sql 補不到後來新增的欄位、政策與 trigger。
+
+| 檔案 | 內容 | 沒執行的症狀 |
+|---|---|---|
+| `migrate-room-status.sql` | 移除 `rooms.status` 的 `booked` | 房態可被設成永久賣不出去的值 |
+| `migrate-room-vocabulary.sql` | 設施／特色改存 `system_settings` | 後台無法增刪設施與特色 |
+| `migrate-order-cancel.sql` | 會員可取消待付款訂單（FR-035a） | 按下取消回「不允許的訂單狀態變更」 |
+| `migrate-messages.sql` | 評論回覆與私訊（FR-103d、FR-123~128） | 客服訊息頁顯示「資料表尚未建立」 |
+
+未執行時，畫面會直接說出該跑哪一支，而不是丟一個看不懂的錯誤。
 
 ## 測試帳號
 

@@ -21,6 +21,62 @@
 
 -- btree_gist 讓 uuid 的 `=` 能與 daterange 的 `&&` 併用於排除約束。
 -- 若 SQL Editor 回報找不到 operator class，先執行：set search_path = public, extensions;
+
+create or replace function public.stamp_message_sender()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.sender_id := auth.uid();
+  new.sender_role := case when public.is_admin() then 'admin' else 'member' end;
+
+  -- 會員只能在自己的討論串裡發言；管理員可以在任何一串回覆
+  if new.sender_role = 'member' and new.thread_user_id <> auth.uid() then
+    raise exception '只能在自己的討論串中發言' using errcode = '42501';
+  end if;
+
+  new.read_at := null;                 -- 新訊息一律未讀，由對方讀取時才標記
+  new.created_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_stamp_message_sender on public.messages;
+create trigger trg_stamp_message_sender
+  before insert on public.messages
+  for each row execute function public.stamp_message_sender();
+
+/*
+ * 訊息內容不可竄改，只有已讀時間可以更新。
+ *
+ * 與操作日誌同精神：一則已送出的訊息若能事後改字，整份對話就失去佐證能力。
+ */
+
+create or replace function public.guard_message_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.body is distinct from old.body
+     or new.sender_id is distinct from old.sender_id
+     or new.sender_role is distinct from old.sender_role
+     or new.thread_user_id is distinct from old.thread_user_id
+     or new.created_at is distinct from old.created_at then
+    raise exception '訊息送出後不可修改' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_message_update on public.messages;
+create trigger trg_guard_message_update
+  before update on public.messages
+  for each row execute function public.guard_message_update();
+
 create extension if not exists btree_gist;
 
 -- ---------------------------------------------------------------------------
@@ -316,6 +372,11 @@ create table if not exists public.reviews (
   auto_verdict text check (auto_verdict in ('auto-pass', 'auto-reject')),
   auto_rules jsonb not null default '[]'::jsonb,   -- 觸發的規則代碼，供管理員複核
   admin_note text,
+  -- 業者回覆（FR-103d）。掛在評論上而非某位管理員名下：回覆代表的是店家，
+  -- 換人接手不必轉交。回覆人與時間由 stamp_review_reply trigger 蓋章。
+  admin_reply text check (admin_reply is null or char_length(admin_reply) between 1 and 1000),
+  admin_reply_at timestamptz,
+  admin_reply_by uuid references public.profiles(id),
   created_at timestamptz not null default now()
 );
 
@@ -344,6 +405,34 @@ drop trigger if exists reviews_refresh_rating on public.reviews;
 create trigger reviews_refresh_rating
   after insert or update or delete on public.reviews
   for each row execute function public.refresh_room_rating();
+
+create or replace function public.stamp_review_reply()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if new.admin_reply is distinct from old.admin_reply then
+    if not public.is_admin() then
+      raise exception '僅管理員可回覆評論' using errcode = '42501';
+    end if;
+    if new.admin_reply is null then
+      new.admin_reply_at := null;
+      new.admin_reply_by := null;
+    else
+      new.admin_reply_at := now();
+      new.admin_reply_by := auth.uid();
+    end if;
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists trg_stamp_review_reply on public.reviews;
+create trigger trg_stamp_review_reply
+  before update on public.reviews
+  for each row execute function public.stamp_review_reply();
 
 -- ---------------------------------------------------------------------------
 -- refunds
@@ -513,6 +602,7 @@ create index if not exists idx_channel_prices_unresolved on public.channel_price
   where resolved = false;
 create index if not exists idx_admin_logs_time on public.admin_logs(created_at desc);
 create index if not exists idx_admin_logs_actor on public.admin_logs(actor_id);
+create index if not exists messages_thread_idx on public.messages(thread_user_id, created_at desc);
 -- 設施與房型特色的 AND 篩選（jsonb 包含運算子 @>）
 create index if not exists idx_rooms_amenities on public.rooms using gin (amenities);
 create index if not exists idx_rooms_features on public.rooms using gin (features);
@@ -535,6 +625,7 @@ alter table public.room_risk_checks enable row level security;
 alter table public.channel_prices   enable row level security;
 alter table public.admin_logs       enable row level security;
 alter table public.system_settings  enable row level security;
+alter table public.messages         enable row level security;
 
 -- profiles ------------------------------------------------------------------
 drop policy if exists profiles_select on public.profiles;
@@ -726,6 +817,28 @@ create policy admin_logs_insert on public.admin_logs
 -- 刻意不提供 UPDATE / DELETE 政策。RLS 預設拒絕，因此任何角色（含管理員）
 -- 都無法竄改既有稽核紀錄。這不是遺漏——見憲章「稽核日誌」條。
 -- 額外以 REVOKE 收回表層權限，讓意圖更明確。
+-- messages -----------------------------------------------------------------
+-- 會員只看得到自己的討論串；管理員看得到全部（FR-127）
+drop policy if exists messages_select on public.messages;
+create policy messages_select on public.messages
+  for select to authenticated
+  using (thread_user_id = auth.uid() or public.is_admin());
+
+-- 寫入的正確性由 stamp_message_sender 保證，這裡只管「能不能碰這一串」
+drop policy if exists messages_insert on public.messages;
+create policy messages_insert on public.messages
+  for insert to authenticated
+  with check (thread_user_id = auth.uid() or public.is_admin());
+
+-- 標記已讀。改到內容的嘗試會被 guard_message_update 擋下
+drop policy if exists messages_mark_read on public.messages;
+create policy messages_mark_read on public.messages
+  for update to authenticated
+  using (thread_user_id = auth.uid() or public.is_admin())
+  with check (thread_user_id = auth.uid() or public.is_admin());
+
+-- 刻意不建立 delete 政策：訊息與操作日誌一樣只增不刪
+
 revoke update, delete on public.admin_logs from authenticated;
 
 -- system_settings -----------------------------------------------------------
@@ -811,6 +924,9 @@ grant select, insert, update, delete on
 -- 在首次儲存時該列還不存在。寫入權限仍由 settings_insert 政策限定為管理員。
 grant select, insert, update on public.system_settings to authenticated;
 grant select, insert on public.admin_logs to authenticated;   -- 不給 update/delete
+-- 訊息只增不刪；update 僅用於標記已讀，改內容會被 guard_message_update 擋下
+grant select, insert, update on public.messages to authenticated;
+revoke delete on public.messages from authenticated, anon;
 grant usage, select on sequence public.order_no_seq to authenticated;
 grant execute on function public.expire_stale_orders() to anon, authenticated;
 grant execute on function public.pending_payment_minutes() to anon, authenticated;

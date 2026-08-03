@@ -37,7 +37,7 @@ const MANUAL_ROOM_STATUSES = ['available', 'maintenance'];
 // 編輯中的房源改為參數傳遞，不再是模組層的狀態——
 // 表單只存在於浮窗的生命週期內，用模組變數保存反而要處理它何時該被清掉。
 
-let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' };
+let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', dateFrom: '', dateTo: '' };
 
 /**
  * 篩選面板是否展開。預設收合。
@@ -49,15 +49,44 @@ let filters = { keyword: '', type: '', status: '', minPrice: '', maxPrice: '', d
 let filtersOpen = false;
 
 const emptyFilters = () =>
-  ({ keyword: '', type: '', status: '', minPrice: '', maxPrice: '', date: '' });
+  ({ keyword: '', type: '', status: '', minPrice: '', maxPrice: '', dateFrom: '', dateTo: '' });
+
+/**
+ * 房態要查的日期區間，沒填日期時回 null。
+ *
+ * 回傳的 to 是半開區間的退房日（迄日 + 1 天），可直接餵給 getOccupiedRoomIds。
+ * 只填一端時另一端補成同一天，等同單日查詢。
+ */
+function occupancyRange() {
+  const from = filters.dateFrom || filters.dateTo;
+  const to = filters.dateTo || filters.dateFrom;
+  if (!from) return null;
+  return { from, to: addDays(to, 1) };
+}
+
+/** 給畫面看的區間描述：單日時只寫一個日期，不寫成「9/1 ~ 9/1」 */
+function rangeLabel() {
+  const range = occupancyRange();
+  if (!range) return null;
+  const from = filters.dateFrom || filters.dateTo;
+  const to = filters.dateTo || filters.dateFrom;
+  return from === to ? formatDate(from) : `${formatDate(from)} ~ ${formatDate(to)}`;
+}
 
 export async function renderAdminRooms(panel, context) {
   const [rooms, vocabulary] = await Promise.all([listRooms({}), getRoomVocabulary()]);
 
-  // 房態逐日獨立：選了日期才知道哪些房「當天」被訂走。
-  // 沒選日期時 occupied 為 null，房態退回房源本身的營運狀態。
-  const occupied = filters.date
-    ? await getOccupiedRoomIds(filters.date, addDays(filters.date, 1)).catch(() => null)
+  /*
+   * 房態逐日獨立：選了日期才知道哪些房「那段期間」被訂走。
+   * 沒選日期時 occupied 為 null，房態退回房源本身的營運狀態。
+   *
+   * 區間是「含頭含尾」的：使用者選 9/1–9/3 指的是這三天。查詢用的是半開區間
+   * ［入住, 退房），因此迄日要加一天，9/3 當晚才會被算進去。
+   * 只填一端時視為單日，行為與先前的單日篩選一致。
+   */
+  const range = occupancyRange();
+  const occupied = range
+    ? await getOccupiedRoomIds(range.from, range.to).catch(() => null)
     : null;
 
   const filtered = applyFilters(rooms, occupied);
@@ -122,7 +151,7 @@ function buildFilterSummary(panel, context) {
   const parts = [];
   if (filters.keyword) parts.push(`關鍵字：${filters.keyword}`);
   if (filters.type) parts.push(ROOM_TYPES.find((t) => t.value === filters.type)?.label ?? filters.type);
-  if (filters.date) parts.push(`房態日期：${formatDate(filters.date)}`);
+  if (rangeLabel()) parts.push(`房態日期：${rangeLabel()}`);
   if (filters.status) parts.push(roomStatusLabel(filters.status));
   if (filters.minPrice) parts.push(`≥ ${filters.minPrice}`);
   if (filters.maxPrice) parts.push(`≤ ${filters.maxPrice}`);
@@ -339,9 +368,11 @@ function buildTermEditor(legendText, kind, error) {
 }
 
 function roomsSummary(total) {
-  return filters.date
-    ? `共 ${total} 間房源。房態為 ${formatDate(filters.date)} 當天的狀態。`
-    : `共 ${total} 間房源。選擇日期可查看該日的實際房態。`;
+  const label = rangeLabel();
+  if (!label) return `共 ${total} 間房源。選擇日期區間可查看該期間的實際房態。`;
+  return filters.dateFrom && filters.dateTo && filters.dateFrom !== filters.dateTo
+    ? `共 ${total} 間房源。房態為 ${label} 期間內是否有訂單。`
+    : `共 ${total} 間房源。房態為 ${label} 當天的狀態。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -394,16 +425,21 @@ function buildFilterForm(panel, context) {
     options: [{ value: '', label: '全部房型' },
       ...ROOM_TYPES.map((t) => ({ value: t.value, label: t.label }))]
   });
-  // 日期在房態之前：先決定看哪一天，房態才有意義
-  const date = textField({
-    id: 'rm-f-date', name: 'date', label: '日期', type: 'date', value: filters.date,
+  // 日期在房態之前：先決定看哪一段期間，房態才有意義
+  const dateFrom = textField({
+    id: 'rm-f-date-from', name: 'dateFrom', label: '日期起', type: 'date', value: filters.dateFrom,
+    attrs: { 'aria-describedby': 'rm-f-date-hint' }
+  });
+  const dateTo = textField({
+    id: 'rm-f-date-to', name: 'dateTo', label: '日期迄', type: 'date', value: filters.dateTo,
     attrs: { 'aria-describedby': 'rm-f-date-hint' }
   });
   const dateHint = document.createElement('p');
   dateHint.id = 'rm-f-date-hint';
   dateHint.className = 'field__hint';
-  dateHint.textContent = '房態逐日獨立：8/1 已預訂不代表 8/2 也已預訂。';
-  date.wrap.append(dateHint);
+  dateHint.textContent = '房態逐日獨立：8/1 已預訂不代表 8/2 也已預訂。'
+    + '填區間時，期間內任一天有訂單就算已預訂；只填一端則視為當天。';
+  dateTo.wrap.append(dateHint);
 
   const status = selectField({
     id: 'rm-f-status', name: 'status', label: '房態', value: filters.status,
@@ -421,7 +457,8 @@ function buildFilterForm(panel, context) {
 
   const row = document.createElement('div');
   row.className = 'filter-bar__row';
-  row.append(keyword.wrap, type.wrap, date.wrap, status.wrap, minPrice.wrap, maxPrice.wrap);
+  row.append(keyword.wrap, type.wrap, dateFrom.wrap, dateTo.wrap,
+    status.wrap, minPrice.wrap, maxPrice.wrap);
   form.append(row);
 
   const submit = document.createElement('button');
@@ -449,14 +486,23 @@ function buildFilterForm(panel, context) {
 
     // 日期打錯就直說。若放行，推導出的房態會全部退回營運狀態，
     // 畫面看起來正常但答案是錯的——那比報錯難查得多。
-    if (date.input.value && !isValidDateString(date.input.value)) {
+    const badDate = [dateFrom.input.value, dateTo.input.value]
+      .find((v) => v && !isValidDateString(v));
+    if (badDate) {
       toast('日期格式不正確，請重新選擇。', 'error');
       return;
     }
 
+    // 區間寫反時直接說明，而不是回傳空清單讓人以為那段期間沒有房源
+    if (dateFrom.input.value && dateTo.input.value
+        && dateFrom.input.value > dateTo.input.value) {
+      toast('日期的起始不可晚於結束。', 'error');
+      return;
+    }
+
     // 篩「已預訂」卻沒指定日期是問不出答案的：已預訂本來就綁日期
-    if (status.input.value === 'booked' && !date.input.value) {
-      toast('請先選擇日期，才能查詢當天的已預訂房源。', 'error');
+    if (status.input.value === 'booked' && !dateFrom.input.value && !dateTo.input.value) {
+      toast('請先選擇日期，才能查詢該期間的已預訂房源。', 'error');
       return;
     }
 
@@ -466,7 +512,8 @@ function buildFilterForm(panel, context) {
       status: status.input.value,
       minPrice: minPrice.input.value,
       maxPrice: maxPrice.input.value,
-      date: date.input.value
+      dateFrom: dateFrom.input.value,
+      dateTo: dateTo.input.value
     };
     // 送出後收回面板：這個當下使用者要看的是結果，不是剛才填的條件。
     // 條件本身由按鈕上的數字與上方那行摘要交代，不會不見。
@@ -644,6 +691,7 @@ function buildTable(rooms, totalCount, occupied, panel, context, vocabulary) {
   head.append(h2, createExportButton({
     label: hasFilters() ? '匯出目前結果' : '匯出房源',
     filename: 'sunny-rooms',
+    auditTable: 'rooms',
     sheetName: '房源',
     columns: ROOM_EXPORT_COLUMNS,
     notify: toast,
@@ -683,7 +731,7 @@ function buildTable(rooms, totalCount, occupied, panel, context, vocabulary) {
   section.append(createDataTable(
     [
       '房名', '房型', '人數', '價格',
-      filters.date ? `房態（${formatDate(filters.date)}）` : '房態',
+      rangeLabel() ? `房態（${rangeLabel()}）` : '房態',
       '評分', '操作'
     ],
     rows

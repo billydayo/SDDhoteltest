@@ -24,6 +24,7 @@ import { renderAccount } from './pages/account.js';
 import { renderBooking } from './pages/booking.js';
 import { renderOrders, renderOrderDetail } from './pages/orders.js';
 import { renderFavorites } from './pages/favorites.js';
+import { renderMessages } from './pages/messages.js';
 import { renderRiskCheck } from './pages/risk-check.js';
 import { renderTerms } from './pages/terms.js';
 import { renderAdmin } from './pages/admin.js';
@@ -120,7 +121,8 @@ function startExpirySweep() {
 const ADMIN_ROUTES = [
   '#/admin', '#/admin/rooms', '#/admin/orders', '#/admin/users',
   '#/admin/reviews', '#/admin/refunds', '#/admin/content',
-  '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings'
+  '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings',
+  '#/admin/messages'
 ];
 
 function registerRoutes() {
@@ -136,6 +138,7 @@ function registerRoutes() {
   router.register('#/orders/:id', renderOrderDetail);
 
   router.register('#/favorites', renderFavorites);
+  router.register('#/messages', renderMessages);
   router.register('#/risk-check', renderRiskCheck);
   router.register('#/terms', renderTerms);
 

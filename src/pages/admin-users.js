@@ -34,6 +34,7 @@ export async function renderAdminUsers(panel, context) {
   frag.append(createExportBar({
     label: '匯出用戶',
     filename: 'sunny-users',
+    auditTable: 'profiles',
     sheetName: '用戶',
     columns: [
       { key: 'displayName', label: '顯示名稱' },

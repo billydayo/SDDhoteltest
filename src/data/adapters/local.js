@@ -449,6 +449,28 @@ export async function moderateReview(id, decision, note = null) {
   return clone(updated);
 }
 
+/**
+ * 業者回覆一則評論（FR-103d）。傳空字串等於收回回覆。
+ * 資料庫模式由 stamp_review_reply trigger 蓋上回覆人與時間，這裡以相同規則補上。
+ */
+export async function replyToReview(id, body) {
+  const admin = requireAdmin();
+  const value = body?.trim() ? body.trim() : null;
+  let updated = null;
+  store.mutate('reviews', (reviews) => reviews.map((r) => {
+    if (r.id !== id) return r;
+    updated = {
+      ...r,
+      adminReply: value,
+      adminReplyAt: value ? nowIso() : null,
+      adminReplyBy: value ? admin.id : null
+    };
+    return updated;
+  }));
+  if (!updated) throw appError('NOT_FOUND');
+  return clone(updated);
+}
+
 export async function deleteReview(id) {
   requireAdmin();
   const review = store.read('reviews').find((r) => r.id === id);
@@ -773,6 +795,86 @@ export function onAuthStateChange(handler) {
   return () => {
     sessionListeners = sessionListeners.filter((fn) => fn !== handler);
   };
+}
+
+// ---------------------------------------------------------------------------
+// 私訊（FR-123 ~ FR-127）
+//
+// 規則與資料庫模式一致：討論串屬於會員，會員只碰得到自己的，
+// 管理員碰得到全部。差別只在這裡是 JS 的判斷，那裡是 RLS。
+// ---------------------------------------------------------------------------
+
+/** 只有本人或管理員可以進入某位會員的討論串 */
+function assertThreadAccess(threadUserId) {
+  const user = requireUser();
+  if (user.role !== 'admin' && user.id !== threadUserId) throw appError('FORBIDDEN');
+  return user;
+}
+
+export async function getMessages(threadUserId) {
+  assertThreadAccess(threadUserId);
+  return clone(
+    store.read('messages')
+      .filter((m) => m.threadUserId === threadUserId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+  );
+}
+
+export async function getMessageThreads() {
+  requireAdmin();
+  const byUser = new Map();
+  store.read('messages')
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+    .forEach((m) => {
+      if (!byUser.has(m.threadUserId)) byUser.set(m.threadUserId, []);
+      byUser.get(m.threadUserId).push(m);
+    });
+
+  return [...byUser.entries()]
+    .map(([userId, messages]) => ({
+      userId,
+      lastMessage: clone(messages[messages.length - 1]),
+      total: messages.length,
+      unread: messages.filter((m) => m.senderRole === 'member' && !m.readAt).length
+    }))
+    .sort((a, b) => (a.lastMessage.createdAt < b.lastMessage.createdAt ? 1 : -1));
+}
+
+export async function sendMessage({ threadUserId, body }) {
+  const user = requireUser();
+  const thread = threadUserId ?? user.id;
+  if (user.role !== 'admin' && thread !== user.id) {
+    throw appError('FORBIDDEN', '只能在自己的討論串中發言。');
+  }
+
+  const text = body?.trim() ?? '';
+  if (!text) throw appError('UNKNOWN', '請輸入訊息內容。');
+  if (text.length > 2000) throw appError('UNKNOWN', '訊息長度上限為 2000 字。');
+
+  const message = {
+    id: uuid(),
+    threadUserId: thread,
+    senderId: user.id,
+    // 與 stamp_message_sender trigger 一樣由伺服器端判定，不採信呼叫端
+    senderRole: user.role === 'admin' ? 'admin' : 'member',
+    body: text,
+    readAt: null,
+    createdAt: nowIso()
+  };
+  store.mutate('messages', (all) => [...all, message]);
+  return clone(message);
+}
+
+export async function markMessagesRead(threadUserId, readerRole) {
+  assertThreadAccess(threadUserId);
+  const senderRole = readerRole === 'admin' ? 'member' : 'admin';
+  const at = nowIso();
+  store.mutate('messages', (all) => all.map((m) => (
+    m.threadUserId === threadUserId && m.senderRole === senderRole && !m.readAt
+      ? { ...m, readAt: at }
+      : m
+  )));
+  return true;
 }
 
 // ---------------------------------------------------------------------------

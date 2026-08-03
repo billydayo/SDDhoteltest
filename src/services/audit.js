@@ -28,7 +28,10 @@ export const ACTIONS = Object.freeze({
   CONTENT_UPDATE:  'content.update',
   CHANNEL_RESOLVE: 'channel.resolve',
   RISK_CHECK_SAVE: 'risk.save',
-  SETTING_UPDATE:  'setting.update'
+  SETTING_UPDATE:  'setting.update',
+  REPORT_EXPORT:   'report.export',
+  REVIEW_REPLY:    'review.reply',
+  MESSAGE_SEND:    'message.send'
 });
 
 export const ACTION_LABELS = Object.freeze({
@@ -48,7 +51,10 @@ export const ACTION_LABELS = Object.freeze({
   'content.update': '更新網站內容',
   'channel.resolve': '標記渠道預警為已處理',
   'risk.save': '儲存房源檢測結果',
-  'setting.update': '變更系統參數'
+  'setting.update': '變更系統參數',
+  'report.export': '匯出報表',
+  'review.reply': '回覆評論',
+  'message.send': '回覆會員訊息'
 });
 
 export const actionLabel = (action) => ACTION_LABELS[action] ?? action;

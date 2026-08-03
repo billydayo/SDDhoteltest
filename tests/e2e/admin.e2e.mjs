@@ -37,7 +37,8 @@ const r = createReporter('後台');
       await goto(page, '#/admin/rooms', 2200);
       await page.evaluate(() => document.querySelector('#rm-filter-toggle')?.click());
       await sleep(1500);
-      await setValue(page, '#rm-f-date', date);
+      await setValue(page, '#rm-f-date-from', date);
+      await setValue(page, '#rm-f-date-to', date);
       await page.click('#rm-filter-panel button[type="submit"]');
       await sleep(2200);
       return page.evaluate((name) => {

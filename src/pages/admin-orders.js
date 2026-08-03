@@ -212,6 +212,7 @@ function buildTable(orders, totalCount, roomById, panel, context) {
   head.append(h2, createExportButton({
     label: hasFilters() ? '匯出目前結果' : '匯出訂單',
     filename: 'sunny-orders',
+    auditTable: 'orders',
     sheetName: '訂單',
     columns: ORDER_EXPORT_COLUMNS,
     notify: toast,

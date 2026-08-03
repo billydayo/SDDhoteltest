@@ -15,7 +15,7 @@ import { DEFAULT_AMENITIES, DEFAULT_ROOM_FEATURES } from '../data/vocabulary.js'
  * 提高版本號會讓既有使用者的 localStorage 在下次載入時重建為新的種子資料。
  * 新增房源或示範訂單後務必遞增，否則舊資料不會更新。
  */
-export const SEED_VERSION = 7;
+export const SEED_VERSION = 8;
 
 /**
  * 房源照片。
@@ -403,6 +403,32 @@ function buildRefunds() {
 }
 
 /** 建立一份全新的種子資料集合 */
+/**
+ * 示範用的私訊。一段已經有來有往的對話，後台一進去就看得到討論串長什麼樣，
+ * 不必先自己發一則。討論串屬於示範會員，管理員任一位都看得到（FR-127）。
+ */
+function buildMessages() {
+  const member = '22222222-2222-4222-8222-000000000001';
+  const admin = '22222222-2222-4222-8222-000000000002';
+  return [
+    {
+      id: '55555555-5555-4555-8555-000000000001',
+      threadUserId: member, senderId: member, senderRole: 'member',
+      body: '請問星光雙人房可以提早入住嗎？我大概中午就會到。',
+      readAt: '2026-07-28T02:10:00.000Z',
+      createdAt: '2026-07-28T01:40:00.000Z'
+    },
+    {
+      id: '55555555-5555-4555-8555-000000000002',
+      threadUserId: member, senderId: admin, senderRole: 'admin',
+      body: '您好，標準入住時間為 15:00。若當天房間已整理完畢，我們會盡量安排提早入住，'
+        + '抵達前再與櫃檯確認即可。',
+      readAt: null,
+      createdAt: '2026-07-28T02:12:00.000Z'
+    }
+  ];
+}
+
 export function buildSeedData() {
   const rooms = buildRooms();
   const reviews = buildReviews();
@@ -423,6 +449,7 @@ export function buildSeedData() {
     riskChecks: [],
     channelPrices: buildChannelPrices(),
     adminLogs: [],
+    messages: buildMessages(),
     // 設施與房型特色可由後台增刪（FR-010a），因此存在 settings 而非寫死在程式裡。
     // 這裡的起始值與 supabase/schema.sql 的預設列一致。
     settings: {

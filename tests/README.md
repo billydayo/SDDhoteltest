@@ -44,6 +44,7 @@ npm test
 | `npm run test:orders` | 會員端訂單、取消（示範模式） |
 | `npm run test:admin` | 逐日房態、六模組匯出、設施／特色增刪 |
 | `npm run test:photos` | 房源照片管理、上傳邊界、訂單的房源篩選 |
+| `npm run test:messaging` | 私訊、評論回覆、待付款訂單的取消入口 |
 
 ### 哪些跑在哪個模式，為什麼
 
@@ -73,6 +74,12 @@ local adapter 是在記憶體裡用 JS 過濾，踩不到 PostgREST 的語法問
 
 **無頭 Chrome 會取消實際下載。** 匯出測試改看 CDP 的 `downloadWillBegin` 事件，
 不看檔案系統。
+
+`messaging` 跑**示範模式**：它會真的送出訊息、真的公開一則評論回覆、真的取消訂單。
+私訊的權限邊界（會員讀不到他人的討論串、前端無法偽造 sender_role）在資料庫模式
+是由 RLS 與 `stamp_message_sender` trigger 執行的，那一層由
+`supabase/migrate-messages.sql` 末端的驗證清單以 SQL 驗——瀏覽器測不到
+「繞過前端直接寫入」的情形。
 
 ---
 

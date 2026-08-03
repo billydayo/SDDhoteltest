@@ -907,3 +907,95 @@ dialog::backdrop { background: rgba(27, 42, 36, 0.45); backdrop-filter: blur(3px
 
 details > summary { color: var(--c-text-muted); font-size: var(--f-small); }
 details[open] > summary { margin-bottom: var(--sp-2); }
+
+/* ---------------------------------------------------------------------------
+   業者回覆（FR-103d）
+
+   縮排 + 換底色 + 左側粗線：讀者掃過評論列表時，要在看到第一個字之前
+   就知道「這一段不是客人說的」。只靠一行「業者回覆」標籤是不夠的。
+   --------------------------------------------------------------------------- */
+
+.review-reply {
+  margin: var(--sp-3) 0 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface-alt);
+  border-inline-start: 3px solid var(--c-forest);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.review-reply__meta {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--f-tiny);
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+.review-reply__body { margin: 0; white-space: pre-wrap; }
+
+/* 回覆表單裡引用的原始評論 */
+.review-quote {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface-alt);
+  border-inline-start: 3px solid var(--c-border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--c-text-muted);
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------------
+   私訊（FR-123 ~ FR-127）
+   --------------------------------------------------------------------------- */
+
+.msg-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/*
+ * 對話區自己捲動，不讓整頁跟著長。
+ * 高度用 min()：訊息少時貼合內容，多時停在一個螢幕內，輸入框永遠看得到。
+ */
+.msg-thread__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  max-height: min(58vh, 620px);
+  overflow-y: auto;
+  padding: var(--sp-4);
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-lg);
+}
+
+.msg-bubble {
+  max-width: min(72ch, 82%);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-soft);
+  border-radius: var(--radius-lg);
+  align-self: flex-start;
+}
+/* 自己說的話靠右並換色，一眼分得出誰在說話 */
+.msg-bubble--mine {
+  align-self: flex-end;
+  background: var(--c-forest);
+  color: var(--c-text-invert);
+  border-color: transparent;
+}
+.msg-bubble__meta {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--f-tiny);
+  color: var(--c-text-muted);
+}
+.msg-bubble--mine .msg-bubble__meta { color: rgb(255 255 255 / 0.78); }
+.msg-bubble__body { margin: 0; white-space: pre-wrap; }
+.msg-bubble__unread {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  font-size: var(--f-tiny);
+  opacity: 0.75;
+}
+
+.msg-thread__form { display: flex; flex-direction: column; gap: var(--sp-2); }
+.msg-thread__form textarea { width: 100%; resize: vertical; }
+.msg-thread__form button { align-self: flex-start; }

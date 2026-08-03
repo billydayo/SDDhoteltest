@@ -17,6 +17,7 @@ const MEMBER_LINKS = [
   { href: '#/', label: '首頁' },
   { href: '#/favorites', label: '我的收藏' },
   { href: '#/orders', label: '我的訂單' },
+  { href: '#/messages', label: '客服訊息' },
   { href: '#/risk-check', label: '安全檢測' }
 ];
 

@@ -160,7 +160,15 @@ export async function getOrderStats() {
 export const getReviews = (filters) => adapter.getReviews(filters);
 export const submitReview = (input) => adapter.submitReview(input);
 export const moderateReview = (id, decision, note) => adapter.moderateReview(id, decision, note);
+export const replyToReview = (id, body) => adapter.replyToReview(id, body);
 export const deleteReview = (id) => adapter.deleteReview(id);
+
+// 私訊（FR-123 ~ FR-127）
+export const getMessages = (threadUserId) => adapter.getMessages(threadUserId);
+export const getMessageThreads = () => adapter.getMessageThreads();
+export const sendMessage = (input) => adapter.sendMessage(input);
+export const markMessagesRead = (threadUserId, readerRole) =>
+  adapter.markMessagesRead(threadUserId, readerRole);
 
 export const getRefunds = (filters) => adapter.getRefunds(filters);
 export const requestRefund = (input) => adapter.requestRefund(input);

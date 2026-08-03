@@ -140,18 +140,49 @@ export function createPageHeader(title, description) {
 // 提示訊息
 // ---------------------------------------------------------------------------
 
+/**
+ * 提示訊息的容器要掛在哪裡。
+ *
+ * 後台浮窗是原生 `<dialog>` + `showModal()`，它渲染在瀏覽器的 **top layer**——
+ * 那一層在所有 z-index 之上，`.toast-stack` 設到 z-index: 9999 也一樣會被蓋住。
+ * 驗收時「上傳非圖片檔看不到錯誤提示」就是這樣來的：toast 有產生、文字也對，
+ * 只是整個被浮窗擋在後面。
+ *
+ * 解法是把容器掛進當下開著的浮窗裡——同在 top layer，就不會被它蓋住。
+ * 沒有浮窗時回到 body。容器是 position: fixed，掛在哪都定位在視窗上，
+ * 位置不會因此跑掉。
+ */
+function toastHost() {
+  const dialogs = [...document.querySelectorAll('dialog[open]')];
+  return dialogs[dialogs.length - 1] ?? document.body;
+}
+
 export function toast(message, tone = 'info') {
   if (!toastStack) {
     toastStack = document.createElement('div');
     toastStack.className = 'toast-stack';
     toastStack.setAttribute('aria-live', 'polite');
-    document.body.append(toastStack);
   }
+
+  // 每次都重新確認該掛在哪：浮窗可能在上一則提示之後才開啟或關閉
+  const host = toastHost();
+  if (toastStack.parentElement !== host) host.append(toastStack);
+
   const item = document.createElement('div');
   item.className = `toast${tone === 'error' ? ' toast--error' : tone === 'ok' ? ' toast--ok' : ''}`;
   item.textContent = message;
   toastStack.append(item);
   window.setTimeout(() => item.remove(), 5000);
+}
+
+/**
+ * 浮窗關閉前呼叫，把提示容器接回 body。
+ *
+ * 「房源已更新」這類提示是在關窗**之前**發出的，若容器還掛在浮窗裡，
+ * `dialog.remove()` 會把它一起帶走，使用者根本來不及看到。
+ */
+export function releaseToastsFrom(node) {
+  if (toastStack && node.contains(toastStack)) document.body.append(toastStack);
 }
 
 /**

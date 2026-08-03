@@ -237,12 +237,41 @@ function buildOrderList(orders, roomById, rejected) {
 
     if (order.status === 'pending-payment' && remainingMs(order) > 0) {
       li.append(createPaymentCountdown(order, renderOrders));
+      li.append(buildListActions(order));
     }
 
     ul.append(li);
   });
 
   return ul;
+}
+
+/**
+ * 待付款訂單在列表上的動作列。
+ *
+ * 付款與取消原本只存在於訂單詳情頁，列表這裡只有房名是連結——驗收時因此被
+ * 判定為「取消功能缺失」：使用者在列表看到倒數計時，卻沒有任何一顆按鈕，
+ * 也不會想到要先點房名進到另一頁。時效性的操作必須擺在看得到時效的地方。
+ *
+ * 取消本身仍走詳情頁的二次確認流程，這裡只是入口，不重複實作一份。
+ */
+function buildListActions(order) {
+  const row = document.createElement('div');
+  row.className = 'filter-bar__actions';
+  row.style.marginTop = 'var(--sp-3)';
+
+  const pay = document.createElement('a');
+  pay.className = 'btn btn--primary';
+  pay.href = `#/orders/${order.id}`;
+  pay.textContent = '前往付款';
+
+  const cancel = document.createElement('a');
+  cancel.className = 'btn';
+  cancel.href = `#/orders/${order.id}?action=cancel`;
+  cancel.textContent = '取消訂單';
+
+  row.append(pay, cancel);
+  return row;
 }
 
 /**
@@ -286,6 +315,15 @@ export async function renderOrderDetail(context) {
       refundQuota().catch(() => null)
     ]);
     render(buildDetail(order, room, refunds, quota, context));
+
+    // 從列表的「取消訂單」進來時，把焦點送到取消鈕上。
+    // 訂單詳情有付款、退款、評論好幾區，不指路的話使用者還得自己找一次。
+    if (context.query?.action === 'cancel') {
+      const cancel = [...document.querySelectorAll('#main button')]
+        .find((b) => b.textContent.trim() === '取消訂單');
+      cancel?.scrollIntoView({ block: 'center' });
+      cancel?.focus();
+    }
   } catch (err) {
     renderError(err, { retry: () => renderOrderDetail(context) });
   }

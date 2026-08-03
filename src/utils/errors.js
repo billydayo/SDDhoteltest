@@ -26,6 +26,10 @@ export const MESSAGES = Object.freeze({
   ROOM_UNAVAILABLE:      '此房源於所選日期已無空房。',
   ORDER_EXPIRED:         '此訂單已因逾期未付款而取消，請重新訂房。',
   ORDER_NOT_CANCELLABLE: '只有尚未付款的訂單可以直接取消。已付款的訂單請改用申請退款。',
+  // 資料庫還沒跑過對應的 migration。訊息寫給管理員看——會遇到這則的，
+  // 是剛部署完新版程式卻忘了執行 SQL 的人，不是一般會員。
+  FEATURE_NOT_MIGRATED:  '此功能所需的資料表尚未建立。請於 Supabase SQL Editor '
+                         + '執行 supabase/ 目錄下對應的 migrate-*.sql 後再試。',
   REFUND_ALREADY_PENDING:'此訂單已有審核中的退款申請。',
   REFUND_NOT_ALLOWED:    '此訂單目前不可申請退款。',
   REFUND_LIMIT_REACHED:  '你的退款申請已達上限 5 筆，無法再提出新的申請。',

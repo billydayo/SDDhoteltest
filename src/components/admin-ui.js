@@ -5,6 +5,8 @@
  * 把這些收在同一處，樣式與鍵盤行為才不會各寫各的。
  */
 
+import { releaseToastsFrom } from '../app.js';
+
 /**
  * 資料表。寬內容在自己的容器內捲動，不讓整頁橫向捲動（憲章原則 V）。
  *
@@ -232,11 +234,21 @@ export function openModal({ title, content, onClose }) {
 
   dialog.append(head, body);
   dialog.addEventListener('close', async () => {
+    releaseToastsFrom(dialog);
+    document.documentElement.classList.remove('has-modal');
     dialog.remove();
     await onClose?.();
   });
 
   document.getElementById('modal-root')?.append(dialog);
+  /*
+   * 鎖住背景頁面的捲動。
+   *
+   * `<dialog>` 會把背景設為 inert（點不到、tab 不到），但**不會**擋掉滾輪——
+   * 在浮窗外側滾動時整個列表會跟著跑，關掉浮窗後才發現位置已經不是原來那裡。
+   * 表單自己的捲動由 .modal__body 的 overflow-y 負責，兩者互不干擾。
+   */
+  document.documentElement.classList.add('has-modal');
   dialog.showModal();
   return dialog;
 }
@@ -300,7 +312,10 @@ export function createExportBar(config) {
   return bar;
 }
 
-export function createExportButton({ label = '匯出報表', filename, sheetName, columns, getRows, notify }) {
+export function createExportButton({
+  label = '匯出報表', filename, sheetName, columns, getRows, notify,
+  auditTable = filename, auditContext
+}) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn';
@@ -312,10 +327,40 @@ export function createExportButton({ label = '匯出報表', filename, sheetName
     try {
       // 動態載入：SheetJS 接近 1 MB，沒按匯出的人不該付這個成本
       const { exportRows } = await import('../services/export.js');
-      const result = await exportRows({
-        filename, sheetName, columns, rows: getRows()
-      });
+      const rows = getRows();
+      const result = await exportRows({ filename, sheetName, columns, rows });
       notify(result.message, result.format === 'none' ? 'error' : 'ok');
+
+      /*
+       * 匯出寫入操作日誌。
+       *
+       * 匯出是把資料帶離系統的動作，事後要查「是誰在什麼時候把哪一份名單帶走了」，
+       * 靠的就是這一筆。零筆時不記——沒有檔案產生，也就沒有資料離開。
+       *
+       * 只記模組、筆數、格式與是否套了篩選，不記任何一列的內容：
+       * 日誌本身是公開給所有管理員看的，把訂購人姓名抄進去等於多開一個外洩點
+       * （FR-118）。
+       *
+       * 失敗時只提醒、不讓整個操作失敗——檔案在這行之前就已經下載完成，
+       * 這裡再拋錯也收不回來，只會讓使用者以為匯出沒成功。
+       */
+      if (result.format !== 'none') {
+        try {
+          const { logAction, ACTIONS } = await import('../services/audit.js');
+          await logAction({
+            action: ACTIONS.REPORT_EXPORT,
+            targetTable: auditTable,
+            summary: {
+              模組: sheetName,
+              筆數: rows.length,
+              格式: result.format,
+              ...(auditContext?.() ?? {})
+            }
+          });
+        } catch {
+          notify('檔案已匯出，但這次操作沒能寫入日誌。', 'error');
+        }
+      }
     } catch {
       notify('匯出未能完成，請稍後再試。', 'error');
     } finally {

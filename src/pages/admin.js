@@ -26,6 +26,7 @@ import { renderAdminRisk } from './admin-risk.js';
 import { renderAdminChannel } from './admin-channel.js';
 import { renderAdminLogs } from './admin-logs.js';
 import { renderAdminSettings } from './admin-settings.js';
+import { renderAdminMessages } from './admin-messages.js';
 
 const MODULES = {
   '#/admin':          renderDashboard,
@@ -38,7 +39,8 @@ const MODULES = {
   '#/admin/risk':     renderAdminRisk,
   '#/admin/channel':  renderAdminChannel,
   '#/admin/logs':     renderAdminLogs,
-  '#/admin/settings': renderAdminSettings
+  '#/admin/settings': renderAdminSettings,
+  '#/admin/messages': renderAdminMessages
 };
 
 export async function renderAdmin(context) {

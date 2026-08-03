@@ -1,5 +1,5 @@
 /**
- * 後台版面骨架與十一個模組的導覽（T032）。
+ * 後台版面骨架與十二個模組的導覽（T032；2026-08-03 新增「會員訊息」）。
  *
  * 企劃書稱「九大模組」但實際列出十一項，本專案以十一項為準
  * （見 spec.md「後台模組數量」）。
@@ -20,6 +20,7 @@ export const ADMIN_MODULES = Object.freeze([
   { route: '#/admin/orders',    label: '訂單管理',      story: 'US6' },
   { route: '#/admin/users',     label: '用戶管理',      story: 'US6' },
   { route: '#/admin/reviews',   label: '評論審核',      story: 'US7' },
+  { route: '#/admin/messages',  label: '會員訊息',      story: 'US13' },
   { route: '#/admin/refunds',   label: '退款審核',      story: 'US7' },
   { route: '#/admin/content',   label: '內容編輯',      story: 'US8' },
   { route: '#/admin/risk',      label: '房源品質檢測',  story: 'US9' },

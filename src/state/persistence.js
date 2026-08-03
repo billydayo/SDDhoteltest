@@ -11,7 +11,7 @@ import { buildSeedData, SEED_VERSION } from './seed.js';
 
 const COLLECTIONS = [
   'users', 'rooms', 'orders', 'reviews', 'refunds', 'favorites',
-  'riskChecks', 'channelPrices', 'adminLogs', 'settings', 'siteContent'
+  'riskChecks', 'channelPrices', 'adminLogs', 'settings', 'siteContent', 'messages'
 ];
 
 const VERSION_KEY = 'seedVersion';

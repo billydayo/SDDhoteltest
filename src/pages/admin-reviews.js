@@ -8,7 +8,7 @@
  */
 
 import { createPageHeader, toast, toastError } from '../app.js';
-import { listReviews, moderateReview, deleteReview } from '../data/reviews.js';
+import { listReviews, moderateReview, deleteReview, replyToReview } from '../data/reviews.js';
 import { listRooms } from '../data/rooms.js';
 import { withAudit, ACTIONS } from '../services/audit.js';
 import { autoModerationNotice } from '../components/simulated-badge.js';
@@ -16,7 +16,7 @@ import { ruleLabel } from '../services/moderation.js';
 import { REVIEW_STATUS, reviewStatusLabel } from '../services/reviews.js';
 import {
   createEmptyRow, actionButton, confirmAction, statusTag, buttonRow, selectField,
-  createExportBar
+  createExportBar, openModal, textareaField, inlineError, showInlineError
 } from '../components/admin-ui.js';
 import { REVIEW_CATEGORIES } from '../data/vocabulary.js';
 import { formatDateTime } from '../utils/dates.js';
@@ -52,6 +52,7 @@ export async function renderAdminReviews(panel, context) {
   frag.append(createExportBar({
     label: '匯出評論',
     filename: 'sunny-reviews',
+    auditTable: 'reviews',
     sheetName: '評論',
     columns: [
       { key: 'statusLabel', label: '狀態' },
@@ -146,8 +147,90 @@ function buildReviewItem(review, roomById, panel, context) {
     li.append(note);
   }
 
+  // 已有的業者回覆。審核說明是給作者看的內部說明，回覆是公開的，兩者不能混在一起
+  if (review.adminReply) {
+    const reply = document.createElement('div');
+    reply.className = 'review-reply';
+
+    const who = document.createElement('p');
+    who.className = 'review-reply__meta';
+    who.textContent = review.adminReplyAt
+      ? `業者回覆・${formatDateTime(review.adminReplyAt)}`
+      : '業者回覆';
+
+    const text = document.createElement('p');
+    text.className = 'review-reply__body';
+    text.textContent = review.adminReply;
+
+    reply.append(who, text);
+    li.append(reply);
+  }
+
   li.append(buildActions(review, panel, context));
   return li;
+}
+
+/**
+ * 回覆評論（FR-103d）。
+ *
+ * 只有已公開的評論能回覆——待審核與已駁回的評論前台看不到，
+ * 回了也沒有人讀得到，反而讓管理員以為已經對外說明過了。
+ */
+function openReplyForm(review, panel, context) {
+  const form = document.createElement('form');
+  form.className = 'card';
+  form.noValidate = true;
+
+  const intro = document.createElement('p');
+  intro.className = 'field__hint';
+  intro.textContent = '回覆會公開顯示在這則評論下方，所有訪客都看得到。'
+    + '清空內容並儲存即可收回回覆。';
+
+  const original = document.createElement('blockquote');
+  original.className = 'review-quote';
+  original.textContent = review.comment;
+
+  const field = textareaField({
+    id: 'rev-reply', name: 'reply', label: '回覆內容',
+    value: review.adminReply ?? '', rows: 5,
+    hint: '上限 1000 字。請避免寫出訂單編號、電話等可辨識個人的資訊。'
+  });
+  field.input.maxLength = 1000;
+
+  const error = inlineError();
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn--primary';
+  submit.textContent = '儲存回覆';
+
+  const dialog = openModal({ title: '回覆評論', content: form });
+  form.append(intro, original, field.wrap, error,
+    buttonRow(submit, actionButton('取消', () => dialog.close())));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = field.input.value.trim();
+    submit.disabled = true;
+
+    try {
+      await withAudit(
+        {
+          action: ACTIONS.REVIEW_REPLY, targetTable: 'reviews', targetId: review.id,
+          // 只記長度不記內容：日誌所有管理員都看得到，回覆本身在前台已經公開，
+          // 抄一份進日誌只是多一個要維護的副本
+          summary: { roomId: review.roomId, 動作: body ? '回覆' : '收回回覆', 字數: body.length }
+        },
+        () => replyToReview(review.id, body)
+      );
+      toast(body ? '回覆已公開。' : '回覆已收回。', 'ok');
+      dialog.close();
+      reload(panel, context);
+    } catch (err) {
+      showInlineError(error, toUserMessage(err));
+      submit.disabled = false;
+    }
+  });
 }
 
 /** 自動審核初判與觸發的規則（可解釋，供管理員判斷） */
@@ -206,6 +289,15 @@ function buildActions(review, panel, context) {
   const buttons = [];
   if (review.status !== 'approved') buttons.push(approve);
   if (review.status !== 'rejected') buttons.push(reject);
+
+  // 回覆只對已公開的評論開放：其餘狀態前台看不到，回了也沒人讀得到
+  if (review.status === 'approved') {
+    buttons.push(actionButton(
+      review.adminReply ? '編輯回覆' : '回覆評論',
+      () => openReplyForm(review, panel, context)
+    ));
+  }
+
   buttons.push(remove);
 
   return buttonRow(...buttons);

@@ -52,6 +52,7 @@ export async function renderAdminRefunds(panel, context) {
   frag.append(createExportBar({
     label: '匯出退款申請',
     filename: 'sunny-refunds',
+    auditTable: 'refunds',
     sheetName: '退款申請',
     columns: [
       { key: 'statusLabel', label: '狀態' },

@@ -433,10 +433,39 @@ function buildReviewList(reviews, category) {
     body.textContent = review.comment;
 
     li.append(head, body);
+
+    // 業者回覆（FR-103d）。縮排並換底色，讀者一眼就分得出這是店家說的，
+    // 不是另一位客人的評論。
+    const reply = buildAdminReply(review);
+    if (reply) li.append(reply);
+
     ul.append(li);
   });
 
   return ul;
+}
+
+/** 業者對某則評論的公開回覆。沒有回覆時回傳 null。 */
+function buildAdminReply(review) {
+  if (!review.adminReply) return null;
+
+  const box = document.createElement('div');
+  box.className = 'review-reply';
+
+  const meta = document.createElement('p');
+  meta.className = 'review-reply__meta';
+  // 回覆代表店家而非某位員工，因此不顯示回覆人姓名——那既是內部資訊，
+  // 對讀者也沒有意義。時間有意義：看得出多久回覆一次。
+  meta.textContent = review.adminReplyAt
+    ? `業者回覆・${formatDateTime(review.adminReplyAt)}`
+    : '業者回覆';
+
+  const body = document.createElement('p');
+  body.className = 'review-reply__body';
+  body.textContent = review.adminReply;
+
+  box.append(meta, body);
+  return box;
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +513,10 @@ function buildMyReviewStatus(myReviews) {
       note.textContent = '評論已送出，待管理員審核後公開。';
       li.append(note);
     }
+
+    // 自己的評論也要看得到業者回覆——那正是最想看到回覆的人
+    const reply = buildAdminReply(review);
+    if (reply) li.append(reply);
 
     if (review.adminNote) {
       const note = document.createElement('p');

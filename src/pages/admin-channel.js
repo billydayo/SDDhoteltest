@@ -49,6 +49,7 @@ export async function renderAdminChannel(panel, context) {
   frag.append(createExportBar({
     label: showUnresolvedOnly ? '匯出未處理預警' : '匯出比價資料',
     filename: 'sunny-channel-prices',
+    auditTable: 'channel_prices',
     sheetName: '渠道比價',
     columns: [
       { key: 'roomName', label: '房源' },

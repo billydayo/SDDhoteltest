@@ -1,5 +1,71 @@
 <!--
 Sync Impact Report
+- Version change: 3.0.0 → 3.1.0
+- Bump rationale: MINOR。解決 v3.0.0 遺留的兩個 TODO，並新增 ORM 與遷移機制的
+  規定。原憲章未指定資料存取方式（僅要求「MUST 使用非同步驅動」），亦未指定
+  套件管理器與遷移工具；本次將三者定為強制，屬新增規範性內容而非釐清措辭，
+  故為 MINOR 而非 PATCH。不使任何既有合規做法失效。
+- Resolved TODOs:
+  - TODO(FRONTEND_PACKAGE_MANAGER) → 已解決：**npm**。理由：`tests/package-lock.json`
+    已是 npm lockfile，改用 pnpm 會在同一 repo 產生兩種套件管理器。
+  - TODO(MIGRATION_TOOL) → 已解決：**Alembic**。
+- Modified sections:
+  - 前端約束 → 套件管理定為 npm，`package-lock.json` MUST 進版控；
+    新增禁止 import 未宣告的間接相依。
+  - 後端約束 → 新增「ORM 與資料存取」條：MUST 使用 SQLAlchemy 2.0 宣告式 ORM
+    搭配 asyncpg；明訂 PostgreSQL 特有結構無法由模型表達，MUST 由遷移腳本
+    以原生 SQL 維護。
+  - 資料庫約束 → 遷移機制定為 Alembic；新增 autogenerate 的強制人工審閱規定
+    （RLS 政策、trigger、函式與 EXCLUDE USING gist 皆偵測不到，盲目套用可能
+    產生刪除敘述）；新增「事實來源」條禁止平行維護全量 schema SQL。
+  - Governance → v3.0.0 遷移計畫表：`schema.sql` 由「原樣保留」細化為「內容折進
+    Alembic 初始 revision」；新增 `migrations.sql` 一列。
+- 依據：使用者於 2026-08-03 指定 npm 與 SQLAlchemy ORM。Alembic 為 SQLAlchemy 的
+  既定搭配，依前次討論所述理由採用——採用的是其版本追蹤能力，而非 autogenerate。
+
+Sync Impact Report（前一版）
+- Version change: 2.6.0 → 3.0.0
+- Bump rationale: MAJOR。技術堆疊全面更換，既有的合規做法大規模轉為不合規。
+  三項決策同時生效：(1) 後端改為自行撰寫並部署的 Python FastAPI，以 uv 管理套件；
+  (2) 前端改為 React + Tailwind，引入建置步驟；(3) 移除示範模式。
+  原則 II 被完全取代而非放寬，原則 III 的雙軌 adapter 被移除，故為 MAJOR。
+- Modified principles:
+  - II. 零建置的原生前端 → **II. 前後端分離的分層架構**（完全取代）。
+    移除框架禁令、打包工具禁令、`npm install` 禁令、自建後端禁令、
+    「直接開啟 index.html」不可協商條款。改為明確要求 React + Tailwind + Vite
+    前端與 FastAPI + uv 後端，兩者以 HTTP JSON API 為唯一介面。
+  - III. 雙軌資料層 → **III. 資料存取的單一路徑**（完全取代）。
+    移除雙 adapter、`isSupabaseConfigured` 切換、「每項驗收需在兩種模式下通過」。
+    改為：瀏覽器 MUST NOT 直接連線資料庫，所有存取 MUST 經 FastAPI。
+  - IV. 訂房邏輯正確性 → 判定責任由「前端檢查 + 資料庫約束」改為
+    「後端權威判定 + 資料庫約束」；前端檢查降級為純 UX 提示。
+    半開區間規則、日曆日規則、整數金額規則全部原文保留。
+  - V. 無障礙與響應式基本線 → 條文不變，但落實方式改綁 Tailwind：
+    語意化標籤要求改為對 JSX 生效，禁止以 `div + onClick` 取代 `button`。
+  - VI. 誠實標示模擬範圍 → 實質改寫。Supabase Auth 消失後，密碼雜湊改為本專案
+    自身的責任，新增 argon2id/bcrypt、JWT 秘鑰、禁止明文與禁止入日誌等規定。
+    移除全部示範模式條款。**前台使用者上傳照片不得離開瀏覽器**一條保留且強化。
+- Added sections:
+  - 品質標準與技術約束 → 新增「後端約束（FastAPI + uv）」
+  - 品質標準與技術約束 → 新增「前端約束（React + Tailwind + Vite）」
+  - Governance → 新增「v3.0.0 遷移計畫」（依修訂程序第 3 條要求）
+- Removed sections:
+  - 品質標準與技術約束 → 移除整節「Supabase 約束」，由「資料庫約束」取代。
+    RLS 不再是安全邊界，anon key／service_role key 相關條文全部失效。
+  - 「入口與結構：單一入口 index.html」條
+  - 「可重現性：不依賴任何本機環境設定」條（已與需要執行環境的架構矛盾）
+- Deferred TODOs:
+  - TODO(FRONTEND_PACKAGE_MANAGER)：npm／pnpm 未指定，須於 plan.md 定案。
+  - TODO(MIGRATION_TOOL)：schema 遷移工具（Alembic 或延續手寫 idempotent SQL）
+    未指定，須於 plan.md 定案。
+- Corrected: 前一版（2.6.0）只更新了 Sync Impact Report，底部 Version 行仍停在
+  2.5.0。本次一併修正，以 2.6.0 為變更基準。
+- 依據：使用者於 2026-08-03 指示「後端改使用 python FastAPI UV 管理套件」，
+  並於同日確認前端改用 React + Tailwind、移除示範模式、FastAPI 獨佔資料庫存取。
+- ⚠️ 本次修訂使既有的 16,398 行原生 JS/CSS/HTML 前端與 `src/` 下全部資料層
+  程式碼轉為不合規。已依「合規審查」條記錄於 Governance 的遷移計畫，非靜默留存。
+
+Sync Impact Report（前一版）
 - Version change: 2.5.0 → 2.6.0
 - Bump rationale: MINOR。解除自動化測試的禁令。原條文以「零建置」為由排除了
   所有測試框架，屬於過度延伸——原則 II 約束的是應用程式如何送到瀏覽器，
@@ -15,83 +81,31 @@ Sync Impact Report
 Sync Impact Report（前一版）
 - Version change: 2.4.0 → 2.5.0
 - Bump rationale: MINOR。放寬示範模式的網路請求限制、改變卡片形狀語彙、
-  改採參考站的原始配色。三者皆為放寬或風格調整，不使既有的資料層、
-  安全或訂房規則失效。
+  改採參考站的原始配色。
 - Modified principles:
   - II. 零建置的原生前端 → 移除「示範模式 MUST NOT 發出任何網路請求」。
-    改為區分兩件事：**資料**仍 MUST NOT 離開瀏覽器（這是示範模式的本質），
-    但靜態資源（webfont、CDN 函式庫）MAY 於需要時載入。
 - Modified sections:
-  - 品質標準與技術約束 →「視覺基調」條：橫向房源卡片改為**直向拱形卡片**；
-    解除 webfont 禁令，允許 Playfair Display 作為拉丁字標題字型。
-  - 合規審查 → 新增「已知不合規項目」清單，記錄兩處低於 WCAG AA 的配色。
-- 依據：使用者於 2026-07-31 指示「憲章取消零網路請求、改成直向拱形卡片、
-  顏色依照參考站」。
-- ⚠️ 本次修訂使原則 V 的對比度要求出現兩處已知違反，已依「合規審查」條
-  明確記錄而非靜默留存。修復方式僅需調整兩個色值，見該節。
+  - 品質標準與技術約束 →「視覺基調」條：改為直向拱形卡片；允許
+    Playfair Display 作為拉丁字標題字型。
+  - 合規審查 → 新增「已知不合規項目」清單。
+- 依據：使用者於 2026-07-31 指示。
 
 Sync Impact Report（前一版）
 - Version change: 2.3.0 → 2.4.0
 - Bump rationale: MINOR。視覺基調由「圓體大標」改為「襯線大標」，並明確化
-  配色與對比度的要求。此為擴充既有指引與調整風格宣告，不使既有的資料層、
-  安全或訂房規則失效，故非 MAJOR。
-- Modified sections:
-  - 品質標準與技術約束 →「視覺基調」條改寫：明訂暖象牙／深林綠／黃銅三色、
-    襯線大標、標題字重 400、禁止 webfont；新增「對比度稽核」條要求所有承載
-    文字的顏色都必須在 base.css 標註對比度。
+  配色與對比度的要求。
 - 依據：使用者於 2026-07-31 指定參考 sunny-booking-prototype2 的視覺設計。
-  企劃書「視覺設計」欄原寫「圓體大標」，此次以使用者的明確指示為準；
-  「米色系配色」與「橫向房源列表」兩項維持不變。
-- Modified principles: 無
-- Added principles: 無
-- Removed sections: 無
 
 Sync Impact Report（前一版）
 - Version change: 2.2.0 → 2.3.0
 - Bump rationale: MINOR。依《Sunny 訂房平台產品企劃書》修訂版納入新模組。
-  主要為放寬原則 VI 的照片禁令（區分兩種照片來源）並新增「模擬外部整合」條款。
-  既有合規做法（照片全程留在瀏覽器）依然合規，故為 MINOR。
-- Modified principles:
-  - VI. 誠實標示模擬範圍 → 照片規定改為區分來源：前台使用者自行上傳的「安全檢測」
-    照片 MUST NOT 離開瀏覽器（不變）；管理員對自家房源所做的品質檢測，其結果與
-    圖片 MAY 存入雲端並公開於房源詳情頁。新增「模擬外部整合」規定：渠道比價與
-    AI 審核皆為模擬／規則式實作，MUST 明確標示，MUST NOT 宣稱為真實服務。
-  - II. 零建置的原生前端 → 明確禁止爬蟲、排程作業與 Edge Function；外部平台價格
-    MUST 以種子資料模擬。
-  - IV. 訂房邏輯正確性 → 新增「待付款訂單同樣佔用房況，且逾期後 MUST 釋出」規則。
-- Modified sections:
-  - 品質標準與技術約束 → Supabase 約束新增稽核日誌與系統參數的處理規定
-- Added principles: 無
-- Removed sections: 無
-- 上游文件：《Sunny 訂房平台產品企劃書》v1.0（2026-07，含 supabase／渠道控價／
-  操作日誌／系統參數修訂）
+  放寬原則 VI 的照片禁令並新增「模擬外部整合」條款。
+- 上游文件：《Sunny 訂房平台產品企劃書》v1.0（2026-07）
 
 Sync Impact Report（前一版）
 - Version change: 2.1.0 → 2.2.0
-- Bump rationale: MINOR。採用 Supabase 作為預設資料層與認證機制。原則 II 的
-  「MUST NOT 需要後端伺服器或資料庫」被放寬為「MUST NOT 依賴後端才能運行」——
-  未設定憑證時仍須以 localStorage 完整運作，因此既有的純本機實作依然合規，
-  屬放寬而非重新定義，故為 MINOR 而非 MAJOR。
-- Modified principles:
-  - II. 零建置的原生前端 → 放寬後端禁令：允許 Supabase（託管 Postgres + Auth）
-    作為遠端資料層，但 MUST 以 ESM CDN 引入、MUST NOT 引入建置步驟，且
-    MUST 保留無憑證時的完整 localStorage 示範模式。新增 `@supabase/supabase-js`
-    為預先核可的第三方函式庫例外。
-  - III. 資料集中且可抽換 → 由「日後可換成後端」升級為「現在就有兩套 adapter」：
-    資料存取函式 MUST 為非同步，MUST 透過 repository facade 依憑證有無切換
-    Supabase 與 localStorage，且兩者 MUST 通過同一套驗收案例。
-  - VI. 誠實標示模擬範圍 → 區分兩種模式：Supabase 模式的登入為真實認證
-    （密碼由 Supabase Auth 雜湊保管），示範模式的登入仍為模擬。付款與退款
-    在任何模式下 MUST 維持模擬。新增「示範帳號密碼 MUST 為展示用途專屬」規定。
-- Modified sections:
-  - 品質標準與技術約束 → 新增 Supabase 約束（RLS 強制啟用、僅可使用 anon key、
-    service_role key 禁止出現於前端或版控、憑證設定檔規範、離線與連線失敗行為）
-- Added principles: 無
-- Removed sections: 無
-- Resolved TODOs:
-  - TODO(PROJECT_NAME) → 已解決：Sunny 訂房平台
-- Deferred TODOs: 無
-- 上游文件：《Sunny 訂房平台產品企劃書》v1.0（2026-07）；2026-07-31 資料層決策：改用 Supabase
+- Bump rationale: MINOR。採用 Supabase 作為預設資料層與認證機制。
+- Resolved TODOs: TODO(PROJECT_NAME) → 已解決：Sunny 訂房平台
 -->
 
 # Sunny 訂房平台 Constitution
@@ -111,270 +125,305 @@ Sync Impact Report（前一版）
 **理由**：本專案以 Spec Kit 流程驅動，規格是所有下游產物（tasks、實作、驗收）的唯一
 事實來源。允許實作反向定義規格會使流程失效。
 
-### II. 零建置的原生前端（Vanilla-First, No Build Step）
+### II. 前後端分離的分層架構（Layered, API-First）
 
-本專案 MUST 只使用 HTML、CSS 與原生 JavaScript。
+本專案由兩個各自獨立建置與部署的層構成，兩層之間 MUST 只以 HTTP JSON API 溝通。
 
-- MUST NOT 引入前端框架（React、Vue、Angular 等）或打包工具（Webpack、Vite、
-  Parcel 等）。
-- MUST NOT 需要 `npm install`、編譯或任何前置建置步驟。專案 MUST 能以「直接開啟
-  `index.html`」或任何靜態檔案伺服器的方式執行。
-- MUST NOT 需要**自行撰寫或部署**的後端伺服器。本專案的遠端資料層 MUST 為
-  **Supabase**（託管 Postgres + Auth + Storage），MUST 由瀏覽器直接呼叫，
-  MUST NOT 在其上再架設一層自製 API 伺服器或 Node 服務。
-- MUST NOT 依賴後端才能運行。未設定 Supabase 憑證時，應用程式 MUST 自動進入
-  示範模式：資料存放於瀏覽器 `localStorage`、功能完整、且 **MUST NOT 連線至
-  Supabase 或任何資料服務**。「直接開啟 `index.html` 就能用」是不可協商的特性。
-- 示範模式 MAY 載入靜態資源（webfont、CDN 函式庫）。這與上一條的差別是刻意的：
-  受管制的是**資料**離不離開瀏覽器，不是有沒有網路封包。靜態資源載入失敗時
-  MUST 優雅退回（字型退回系統字、SheetJS 退回 CSV），MUST NOT 導致功能中斷。
-- MUST NOT 引入 Supabase Edge Functions、Database Webhooks、排程作業（cron）
-  或任何形式的爬蟲。需要伺服器端執行的功能 MUST 改以模擬資料呈現，或不做。
-  唯一例外是資料庫內部的 trigger 與 function——它們屬於 schema 的一部分，
-  隨 `supabase/schema.sql` 進版控，不構成獨立部署的服務。
-- 第三方函式庫 MUST 以 `<script>` / `<link>` 或 ESM CDN（`import` 自
-  `https://esm.sh/…`）直接引入。預先核可的例外僅有 **SheetJS (xlsx)**（用途限於
-  報表匯出）與 **`@supabase/supabase-js` v2**（用途限於資料層與認證）。
-  `@supabase/supabase-js` MUST 以動態 `import()` 延後載入，且 MUST 僅在憑證存在時
-  載入，以確保示範模式零網路請求。引入任何其他函式庫 MUST 在 `plan.md` 說明
-  為何自行實作不划算。預設立場是不引入。
-- JavaScript MUST 以 ES modules 組織，或有明確定義的檔案載入順序；
-  MUST NOT 依賴隱含的全域變數污染。
+- **前端** MUST 為 React 單頁應用，樣式 MUST 以 Tailwind CSS 撰寫，建置工具 MUST 為
+  Vite。前端 MUST NOT 包含任何資料庫憑證、後端秘鑰或伺服器端邏輯。
+- **後端** MUST 為 Python 的 FastAPI 應用。Python 套件管理 MUST 使用 **uv**；
+  MUST NOT 使用 pip、Poetry、Conda 或 requirements.txt 作為主要相依宣告。
+- 兩層之間的介面 MUST 為 HTTP + JSON，且 MUST 完整描述於 FastAPI 自動產生的
+  OpenAPI 文件中。前端 MUST NOT 依賴任何未出現於 OpenAPI 的隱含行為。
+- 前端 MUST NOT 直接連線資料庫、物件儲存或任何第三方資料服務。所有此類存取
+  MUST 經由後端。此為安全邊界，MUST NOT 因開發便利而暫時繞過。
+- 後端 MUST NOT 產生 HTML 畫面。伺服器端渲染、Jinja 樣板與 HTMX 皆不在本專案範圍內；
+  後端只回傳 JSON。
+- 兩層 MUST 能各自獨立啟動與測試。前端 MUST 能在後端未啟動時完成建置
+  （執行期會因 API 不可用而顯示錯誤，這是預期行為，見原則 III）。
 - MUST 選擇能滿足當前已知需求的最簡方案。禁止為「未來可能需要」而預先建置（YAGNI）。
+  引入任何新的執行期相依 MUST 在 `plan.md` 說明為何自行實作不划算。預設立場是不引入。
 
-**理由**：零建置是本專案刻意選擇的約束，它讓任何人不裝任何工具就能開啟、閱讀與修改，
-也是企劃書所定位的「便於教學展示與快速原型驗證」的前提。引入框架或打包步驟會一次性
-摧毀這個特性，因此列為不可協商。Supabase 之所以能被納入，正是因為它不需要建置步驟、
-不需要自行部署伺服器，且可以在憑證缺席時完全退場。
+**理由**：本專案原先以「零建置」為核心約束，換取「打開 `index.html` 就能用」。
+在需要真實認證、伺服器端授權與可控的資料存取之後，該約束的成本已高於收益——
+安全邊界無法只靠瀏覽器內的程式碼建立。改為分層架構是刻意的取捨：放棄零安裝的展示
+便利，換取一條真正可稽核的存取路徑。既然建置步驟已無可避免，前端亦一併改用
+React + Tailwind，以免同時承擔建置成本卻不取得其好處。
 
-### III. 雙軌資料層（Dual-Adapter Data Layer）
+### III. 資料存取的單一路徑（Single Path to Data）
 
-本專案有兩套資料後端：**Supabase**（有憑證時）與 **`localStorage`**（示範模式）。
-兩者 MUST 藏在同一層資料存取介面之後，呼叫端 MUST NOT 知道目前用的是哪一套。
+資料庫 MUST 只有一個存取者：FastAPI 後端。這條路徑沒有替代方案，也沒有降級模式。
 
-- 所有資料集合（`users`/`profiles`、`rooms`、`orders`、`reviews`、`refunds`、
-  `siteContent`）MUST 集中管理，MUST NOT 散落於 HTML 或各功能的 JS 中。
-- 畫面 MUST 透過一層資料存取函式（例如 `getRooms()`、`createOrder()`）取用資料，
-  MUST NOT 直接呼叫 Supabase client，MUST NOT 直接讀寫 `localStorage`，
-  MUST NOT 把資料寫死在 DOM 裡。
-- 所有資料存取函式 MUST 為非同步（回傳 Promise）。即使示範模式可同步完成，
-  介面 MUST 維持非同步，MUST NOT 讓呼叫端因模式不同而有兩種寫法。
-- 兩個 adapter（`supabase` 與 `local`）MUST 實作**完全相同**的函式簽章，並由單一
-  repository facade 依 `isSupabaseConfigured` 於啟動時擇一綁定。切換 MUST NOT
-  需要修改任何頁面或元件程式碼。
-- 每個資料實體 MUST 有明確的欄位定義與型別註記（可用註解或 JSDoc）。前端一律使用
-  camelCase，資料庫一律使用 snake_case，兩者間的轉換 MUST 只發生在 Supabase
-  adapter 內部。
-- 系統 MUST 提供將資料還原為初始種子資料的入口（示範模式重建 `localStorage`；
-  Supabase 模式對應可重複執行的 seed SQL）。
-- 初次載入且 `localStorage` 為空時，示範模式 MUST 自動寫入種子資料，
-  MUST NOT 呈現空站。
-- 每一項驗收案例 MUST 在兩種模式下都通過。任一模式獨有的行為差異 MUST 在
-  `plan.md` 明確列出並向使用者標示。
+- 所有資料集合（`profiles`、`rooms`、`orders`、`reviews`、`refunds`、`favorites`、
+  `site_content`、`room_risk_checks`、`channel_prices`、`admin_logs`、`messages`、
+  `system_settings`）MUST 只由後端讀寫。
+- 後端 MUST 將資料存取集中於明確的資料層（repository 或 service 模組），
+  MUST NOT 讓 SQL 或 ORM 查詢散落於路由處理函式中。
+- 前端 MUST 透過單一 API client 模組呼叫後端，MUST NOT 於元件內直接使用 `fetch`
+  拼接網址。API 端點路徑 MUST NOT 散落於各元件。
+- 每個資料實體 MUST 有 Pydantic 模型定義其進出 API 的形狀。前端 TypeScript 型別
+  MUST 與之對應。資料庫一律使用 snake_case；API 的 JSON 欄位命名 MUST 全站一致，
+  且該慣例 MUST 於 `plan.md` 明訂一次，MUST NOT 逐端點各自決定。
+- 系統 MUST 提供可重複執行的種子資料腳本，能將資料庫還原為初始展示狀態。
+- API 不可用（後端未啟動、網路失敗、逾時）時，前端 MUST 顯示可理解的錯誤並保留
+  使用者已填內容，MUST NOT 靜默失敗，MUST NOT 退回任何本機假資料假裝成功。
+  **MUST NOT 存在 localStorage 示範模式**——它已於 v3.0.0 移除，重新引入等同於
+  重建一條無人維護的第二實作。
+- `localStorage` MAY 僅用於保存 UI 偏好與認證 token，MUST NOT 用於保存業務資料。
 
-**理由**：企劃書已將「串接後端資料庫」列為明確待辦，本專案現在把它實現為 Supabase。
-但示範模式是本專案的展示價值所在，不能因此消失。把兩套後端收斂到同一組非同步介面，
-是唯一能同時保住「真實資料庫」與「打開就能跑」的方式；若讓 Supabase 呼叫散落各處，
-示範模式會在三次改動內腐爛。
+**理由**：舊版的雙軌 adapter 是為了在沒有後端時仍能展示。有了後端之後，維持兩套
+實作意味著每一條業務規則都要寫兩次、驗收兩次，而第二套永遠不會被真正使用。
+移除它是為了讓「資料庫裡的狀態」成為唯一的事實，而不是兩個可能不一致的來源。
 
 ### IV. 訂房邏輯正確性（Booking Correctness）
 
 訂房的日期與房況計算 MUST 遵守下列規則。這些是本專案最容易出錯且錯了最嚴重的地方。
 
 - 入住日與退房日 MUST 以「日曆日」處理，格式 `YYYY-MM-DD` 字串；MUST NOT 使用含
-  時間的 timestamp 做比較，MUST NOT 使用會受瀏覽器時區影響的 `Date` 轉換。
-  時區固定視為 Asia/Taipei。
+  時間的 timestamp 做比較，MUST NOT 使用會受用戶端時區影響的日期轉換。
+  時區固定視為 Asia/Taipei，且 MUST 於後端明確指定，MUST NOT 依賴伺服器的本機時區設定。
 - 夜數 = 退房日 − 入住日。退房當日 MUST NOT 計為一晚。
 - 入住日 MUST 至少為明日（訂房需提前一天）；今日與過去的日期 MUST 被拒絕。
 - 退房日 MUST 晚於入住日至少一晚；相同或倒置的日期 MUST 被拒絕並顯示明確錯誤。
 - 房況重疊判定 MUST 使用半開區間規則：既有訂單 `[a, b)` 與新訂單 `[c, d)` 重疊
   若且唯若 `a < d` 且 `c < b`。同一房源同一晚 MUST NOT 出現兩筆有效訂單。
-- 「同一房源同一晚不得有兩筆有效訂單」在 Supabase 模式 MUST 由資料庫層以排除約束
-  （`EXCLUDE USING gist`，半開區間 `[check_in, check_out)`）強制執行，
-  MUST NOT 只依賴前端檢查。前端的重疊檢查是 UX，資料庫的約束才是保證。
+- 「同一房源同一晚不得有兩筆有效訂單」MUST 由資料庫層以排除約束
+  （`EXCLUDE USING gist`，半開區間 `[check_in, check_out)`）強制執行。
+  **後端的檢查是授權與訊息品質，資料庫的約束才是保證。** 後端 MUST 攔截該約束
+  觸發時拋出的錯誤並轉為可理解的訊息，MUST NOT 讓它變成 500。
+- 前端的日期與房況檢查 MUST 被視為純 UX 提示。所有判定 MUST 於後端重新執行；
+  後端 MUST NOT 信任任何來自用戶端的可用性結論、價格或總金額。
 - 房態為「整理中」的房源 MUST 同樣被排除於可訂清單之外，與「已預訂」等同處理。
 - 待付款訂單 MUST 同樣佔用該房源該區間，與已確認訂單等同處理；保留時間到期後
   MUST 自動視為已取消並立即釋出該區間。過期判定 MUST 於每次查詢房況與建立訂單
-  之前執行，MUST NOT 依賴外部排程，也 MUST NOT 讓過期訂單持續佔用房況。
+  之前執行，MUST NOT 讓過期訂單持續佔用房況。
 - 金額 MUST 以整數（新臺幣元）運算，MUST NOT 以浮點數累加。顯示時才格式化。
-- 訂單成立時的總金額 MUST 保存於訂單上；房源價格日後變動 MUST NOT 改變既有訂單金額。
-- 每一項規則 MUST 有對應的手動驗收案例（含邊界：跨月、跨年、僅一晚、明日入住、
-  退房日等於他人入住日）。
+  後端 MUST NOT 使用 `float` 承載金額。
+- 訂單成立時的總金額 MUST 由後端依當下房價計算並保存於訂單上；房源價格日後變動
+  MUST NOT 改變既有訂單金額。
+- 每一項規則 MUST 有對應的自動化測試與手動驗收案例（含邊界：跨月、跨年、僅一晚、
+  明日入住、退房日等於他人入住日）。
 
-**理由**：即使資料存在瀏覽器，日期算錯一天、或讓同一晚被訂兩次，都會讓整個平台的核心
-行為失去可信度。半開區間規則寫明於此，是為了避免每次實作各自發明一套。
+**理由**：日期算錯一天、或讓同一晚被訂兩次，會讓整個平台的核心行為失去可信度。
+半開區間規則寫明於此，是為了避免每次實作各自發明一套。移到後端之後這些規則更重要
+而非更不重要——用戶端送來的任何數字都可能是偽造的。
 
 ### V. 無障礙與響應式基本線（Accessible & Responsive by Default）
 
 - MUST 使用語意化標籤（`header`、`nav`、`main`、`section`、`button` 等）；
-  MUST NOT 用 `div` + click 取代 `button` 或 `a`。
+  MUST NOT 用 `div` + `onClick` 取代 `button` 或 `a`。此條對 JSX 完全適用——
+  React 讓寫出不可聚焦的假按鈕變得更容易，因此更需要明文禁止。
 - 所有圖片 MUST 有 `alt`；純裝飾圖 MUST 使用 `alt=""`。
 - 所有表單控制項 MUST 有關聯的 `<label>`。
 - 所有互動元素 MUST 可用鍵盤操作，且 MUST 有可見的 focus 樣式。
+  Tailwind 的 focus 樣式 MUST NOT 被 `outline-none` 全域移除而不提供替代。
 - 文字與背景對比 MUST 達 WCAG AA（一般文字 4.5:1，大字 3:1）。米色系配色
   MUST NOT 成為對比不足的藉口。
-- 版面 MUST 在 320px 寬度下正常顯示且不產生橫向捲動。橫向房源列表 MUST 在窄螢幕上
+- 版面 MUST 在 320px 寬度下正常顯示且不產生橫向捲動。房源列表 MUST 在窄螢幕上
   改為可捲動或改為直向堆疊，MUST NOT 造成整頁橫向捲動。
 - 介面文字 MUST 使用繁體中文（台灣用語）。日期顯示格式 MUST 全站一致。
 
-**理由**：這些是基本線而非加分項，且全部都能在無建置環境下靠原生 HTML 做到。企劃書
-已將「行動裝置 RWD 優化」列為待辦，本原則將其提前為交付條件而非後補項目。
+**理由**：這些是基本線而非加分項。企劃書已將「行動裝置 RWD 優化」列為待辦，
+本原則將其提前為交付條件而非後補項目。
 
 ### VI. 誠實標示模擬範圍（No False Security, No False Payment）
 
-本平台的付款與退款在**任何模式下**皆為展示用模擬；登入則依模式而異。何者為真、
-何者為假，MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
+本平台的付款與退款為展示用模擬；認證與授權則為真實實作。何者為真、何者為假，
+MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 
-- **登入（Supabase 模式）**：使用 Supabase Auth，密碼由 Supabase 雜湊保管，
-  前端 MUST NOT 自行儲存、傳遞或比對密碼明文，資料表 MUST NOT 存在任何密碼欄位。
-  此為真實認證，MAY 如此描述。即便如此，登入畫面 MUST 仍提醒「本站為展示用專案，
-  請勿使用你在其他網站的真實密碼」。
-- **登入（示範模式）**：為模擬登入，僅比對 `localStorage` 中的種子帳號，
-  MUST 明確標示為模擬，密碼 MUST NOT 被宣稱為加密儲存。
+- **認證**：由 FastAPI 自行實作。密碼 MUST 以 **argon2id 或 bcrypt** 雜湊儲存；
+  MUST NOT 明文儲存，MUST NOT 使用可逆加密，MUST NOT 使用未加鹽的雜湊
+  （MD5／SHA-1／裸 SHA-256 一律禁止）。密碼明文 MUST NOT 出現於日誌、
+  錯誤訊息、稽核紀錄或 API 回應中，一次都不行。
+- **Token 與秘鑰**：JWT 或 session 秘鑰 MUST 由環境變數提供，MUST NOT 有硬編碼的
+  預設值 fallback——「沒設就用預設值」等同於公開秘鑰。Token MUST 有有效期限。
+- **授權**：所有需要權限的端點 MUST 於後端驗證身分與角色。前端的路由檢查
+  MUST NOT 被描述為安全機制；它只改變畫面呈現。**後端檢查是唯一的存取邊界**，
+  MUST NOT 有任何僅靠前端隱藏來保護的端點。
+- **展示性質的提醒**：登入畫面 MUST 提醒「本站為展示用專案，請勿使用你在其他
+  網站的真實密碼」。
 - **示範帳號**：`guest@sunny.com` / `guest123`、`admin@sunny.com` / `admin123`
-  MUST 公開標示於登入畫面。這組密碼 MUST 為本專案展示專用，
+  MUST 公開標示於登入畫面，且其密碼在資料庫中 MUST 同樣經過雜湊，MUST NOT 因為
+  是示範帳號而走特例路徑。這組密碼 MUST 為本專案展示專用，
   MUST NOT 與任何人的真實密碼相同。
-- **權限（Supabase 模式）**：後台權限 MUST 同時由前端路由檢查與資料庫 RLS 政策
-  執行。前端檢查 MUST NOT 被描述為安全機制；RLS 才是實際的存取邊界。
-- **權限（示範模式）**：僅有前端檢查，MUST NOT 被描述為安全機制；它只改變畫面呈現。
 - **付款**：MAY 實作模擬的付款流程與付款方式選項（LINE Pay、信用卡、銀行轉帳）。
   但 MUST NOT 串接任何真實金流服務；MUST NOT 要求或儲存真實信用卡號、有效期限、
   CVV 或銀行帳號。付款畫面 MUST 明顯標示「虛擬支付，不會產生任何實際交易」。
-  此規定 MUST NOT 因改用 Supabase 而放寬。
+  此規定 MUST NOT 因改用真實後端而放寬——反而因為現在真的有伺服器會收到這些欄位，
+  它變得更重要。
 - **退款**：退款審核 MUST NOT 產生任何實際金錢移轉，僅變更訂單與退款申請的狀態。
 - **個資**：MUST NOT 要求或儲存真實身分證字號、真實金融資訊。示範資料中的姓名與
-  聯絡方式 MUST 為虛構。改用 Supabase 後資料離開了使用者本機，此條的重要性提高
-  而非降低。
+  聯絡方式 MUST 為虛構。
 - **照片（前台使用者）**：使用者於「安全檢測」自行上傳的照片 MUST 僅於瀏覽器內以
-  Canvas 處理，MUST NOT 被傳送至任何外部服務，MUST NOT 被寫入 Supabase Storage
-  或任何資料表，MUST NOT 於分析後殘留。此條不可放寬——那是使用者的私人照片。
+  Canvas 處理，MUST NOT 被送往後端，MUST NOT 被寫入任何儲存空間或資料表，
+  MUST NOT 於分析後殘留。**此條不可放寬，且不因後端存在而改變**——那是使用者的
+  私人照片，而現在有了一個真的能收下它們的伺服器，這條禁令的意義才真正成立。
 - **照片（管理員房源檢測）**：管理員對**自家房源**執行的品質檢測，其分析結果與
-  受檢圖片 MAY 存入 Supabase Storage 並公開於房源詳情頁。此類圖片 MUST 為飯店
-  自有的房間照片，MUST NOT 包含可辨識的人物，且上傳前 MUST 明確告知管理員該圖
-  將公開顯示。兩種來源的程式路徑 MUST 分離，MUST NOT 共用同一個上傳函式。
+  受檢圖片 MAY 經後端上傳並公開於房源詳情頁。此類圖片 MUST 為飯店自有的房間照片，
+  MUST NOT 包含可辨識的人物，且上傳前 MUST 明確告知管理員該圖將公開顯示。
+  兩種來源的程式路徑 MUST 分離，MUST NOT 共用同一個上傳函式。
 - **模擬的外部整合**：本專案不連接任何第三方商業平台。以下模組 MUST 以種子資料
   模擬，並 MUST 於畫面上明確標示其為模擬，MUST NOT 宣稱為真實服務：
   - **渠道比價與控價**：外部平台（Agoda／Booking 等）的價格 MUST 來自種子資料。
     MUST NOT 實作爬蟲、MUST NOT 呼叫任何 OTA 的 API。爬取第三方平台可能違反其
-    服務條款，這不是本專案要承擔的風險。
-  - **AI 評論審核**：MUST 以瀏覽器內的規則式引擎實作，MUST 於介面與後台標示為
-    「自動審核（規則式）」而非「AI 審核」。MUST NOT 呼叫任何 LLM 服務，
-    MUST NOT 在前端放置任何 AI 服務金鑰。規則式審核的結果 MUST 可被管理員複核
-    與覆寫，MUST NOT 成為不可申訴的最終判定。
+    服務條款，這不是本專案要承擔的風險。**後端的存在 MUST NOT 被當成「現在可以
+    寫爬蟲了」的理由**——限制的理由是法律與倫理，不是技術可行性。
+  - **AI 評論審核**：MUST 以規則式引擎實作（現可置於後端），MUST 於介面與後台標示為
+    「自動審核（規則式）」而非「AI 審核」。MUST NOT 呼叫任何 LLM 服務。
+    規則式審核的結果 MUST 可被管理員複核與覆寫，MUST NOT 成為不可申訴的最終判定。
 - 所有模擬性質的模組 MUST 在檔案開頭以註解標示其為模擬，並說明真實系統應如何處理。
 
-**理由**：改用 Supabase 後，登入從假的變成真的、權限從畫面控制變成資料庫政策，
-但付款依然是假的。三者混在同一個介面裡而不加區分，比全部都假還危險——使用者會
-以「登入是真的」推論「付款也是真的」。因此本原則改為逐項標明真偽，而不再一概稱為模擬。
+**理由**：改為自建後端後，認證與授權從「畫面控制」變成真正的安全機制，但付款依然是假的。
+兩者混在同一個介面裡而不加區分，比全部都假還危險——使用者會以「登入是真的」推論
+「付款也是真的」。此外，密碼保管的責任從託管服務回到本專案身上，因此雜湊規則從
+「不得存在密碼欄位」改為明確的演算法要求，而非留白。
 
 ## 品質標準與技術約束
 
-- **瀏覽器支援**：最新版的 Chrome、Edge、Firefox、Safari。MUST NOT 為舊版 IE 妥協。
 - **主控台**：正常操作流程下，瀏覽器 console MUST 零錯誤、零警告。
-- **HTML 有效性**：頁面 MUST 通過 W3C validator（或等效檢查）且無錯誤。
-- **樣式**：MUST NOT 使用 inline `style` 屬性與 inline `onclick`，除非規格明確要求。
-  事件 MUST 以 `addEventListener` 綁定。
+- **後端日誌**：正常操作流程下 MUST NOT 出現未處理的例外堆疊。
 - **視覺基調**：暖象牙底色搭配深林綠主墨色與黃銅強調色、**襯線大標**、
   **直向拱形房源卡片**。標題字重 MUST 保持 400——精品調性靠字形與尺寸經營，
   加粗反而顯得廉價。拱形 MUST 以 `border-radius` 的雙值語法實作
   （水平半徑遠大於垂直半徑），否則會變成單純的圓角而非拱。
-  基調 MUST 全站一致；配色值與字級 MUST 集中於 `styles/base.css` 的 CSS
-  自訂屬性，MUST NOT 於各頁重複硬編碼。
+- **設計 token**：配色值、字級與圓角 MUST 集中定義於 Tailwind 設定的 theme 中，
+  並以具名 token 使用（例如 `bg-brand`）。MUST NOT 在 JSX 中散佈任意值語法
+  （`bg-[#96793F]`、`text-[13px]`）；一旦色值散落，全站換色就不再是改一個地方。
 - **字型**：MAY 引入拉丁字 webfont（目前為 Playfair Display）。
   CJK webfont MUST NOT 引入——字型檔動輒數 MB。字型載入失敗時 MUST 優雅退回
   系統襯線體，版面 MUST NOT 因此崩壞（`font-display: swap`）。
-- **對比度稽核**：新增或調整任何承載文字的顏色時，MUST 於 `base.css` 的註解
-  標註其與背景的對比度。米色與黃銅這類低飽和配色特別容易在不知不覺中掉到
+- **對比度稽核**：新增或調整任何承載文字的顏色時，MUST 於 Tailwind theme 設定的
+  註解標註其與背景的對比度。米色與黃銅這類低飽和配色特別容易在不知不覺中掉到
   4.5:1 以下。已知不合規項目見「合規審查」節。
-- **命名**：CSS class 使用 kebab-case，JavaScript 變數與函式使用 camelCase，
-  常數使用 UPPER_SNAKE_CASE，`localStorage` 鍵名使用企劃書所定義的名稱。
-- **編碼**：所有檔案 MUST 為 UTF-8，HTML MUST 宣告 `<meta charset="utf-8">`。
+- **命名**：React 元件使用 PascalCase，函式與變數使用 camelCase，
+  常數使用 UPPER_SNAKE_CASE；Python 遵循 PEP 8（模組與函式 snake_case，
+  類別 PascalCase）；資料庫識別名一律 snake_case。
+- **編碼**：所有檔案 MUST 為 UTF-8。
 - **錯誤處理**：MUST NOT 靜默吞掉錯誤。失敗的操作 MUST 對使用者顯示可理解的訊息，
-  MUST NOT 只留一片空白畫面。
-- **入口與結構**：專案 MUST 有單一入口 `index.html`，直接開啟即可操作全站。內部的
-  檔案切分方式（單檔或多檔、目錄配置）於 `plan.md` 定案；一旦定案，變更 MUST 走
-  修訂程序。
-- **影像處理**：照片分析 MUST 完全在瀏覽器內以 Canvas 完成。上傳的照片 MUST NOT 被
-  送出瀏覽器，MUST NOT 被寫入 `localStorage` 的長期資料集合（避免容量耗盡）。
-- **報表匯出**：匯出功能 MUST 在 SheetJS 無法載入或處於離線狀態時自動退回 CSV，
-  MUST NOT 因此中斷或無回應，且 MUST 告知使用者已改用 CSV。
-- **儲存容量**：寫入 `localStorage` 失敗（容量已滿）MUST 被攔截並向使用者說明，
-  MUST NOT 導致資料靜默遺失。
+  MUST NOT 只留一片空白畫面。後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑
+  回傳給用戶端。
+- **影像處理**：前台使用者的照片分析 MUST 完全在瀏覽器內以 Canvas 完成（見原則 VI）。
+- **報表匯出**：匯出功能 MUST 在函式庫無法載入時自動退回 CSV，MUST NOT 因此中斷
+  或無回應，且 MUST 告知使用者已改用 CSV。
 - **資源**：圖片 SHOULD 經過壓縮；MUST NOT 提交單檔超過 1 MB 的圖片。
-- **可重現性**：專案 MUST 不依賴任何本機環境設定。在另一台電腦上取得檔案後
-  MUST 能立即開啟執行（未帶憑證時以示範模式執行）。
+- **啟動說明**：README MUST 記載前後端各自的啟動指令與必要環境變數。
+  新進者 MUST 能只依 README 完成本機啟動，MUST NOT 需要口頭補充。
 
-### Supabase 約束
+### 前端約束（React + Tailwind + Vite）
 
-- **RLS**：所有 `public` schema 下的資料表 MUST 啟用 Row Level Security，且
-  MUST 具備明確的政策。「先開放再收斂」是禁止的——沒有政策的資料表視為未完成。
-- **金鑰**：前端 MUST 僅使用 **anon（publishable）key**。`service_role` key
-  MUST NOT 出現於任何前端程式碼、設定檔或版本控制中，一次都不行。若曾誤植，
-  MUST 立即於 Supabase Dashboard 輪替該金鑰。
-- **金鑰的性質**：anon key 是設計上可公開的識別碼，其安全性由 RLS 提供而非由保密
-  提供。因此它 MAY 存在於前端設定檔中；但這 MUST NOT 被當成「RLS 可以晚點再做」
-  的理由。
-- **憑證設定**：憑證 MUST 由單一設定檔（`src/config.js`，於 `index.html` 前置載入
-  並設定 `window.__SUNNY_CONFIG__`）提供。因為沒有建置步驟，前端 MUST NOT 嘗試
-  讀取 `.env`、`process.env` 或 `import.meta.env`——這些在直接開啟的瀏覽器中一律
-  不存在，寫了等同於死碼。設定檔 MUST 隨專案提供且預設為空字串（即示範模式），
-  MUST NOT 因缺檔而產生 404 或主控台錯誤。
-- **Schema 變更**：資料庫結構 MUST 完整記錄於版控中的 `supabase/schema.sql`，
-  且 MUST 可重複執行（idempotent）。MUST NOT 只在 Dashboard 手動改動而不回寫。
-- **連線失敗**：Supabase 已設定但呼叫失敗（離線、逾時、RLS 拒絕）時，系統 MUST
-  向使用者顯示可理解的訊息並保留其已填內容，MUST NOT 靜默失敗，
-  MUST NOT 自動改用 `localStorage` 假裝成功——那會造成使用者以為資料已存下。
-- **模式標示**：目前處於示範模式時，介面 MUST 有持續可見的標示，讓使用者知道
-  資料只存在本機瀏覽器。
+- **瀏覽器支援**：最新版的 Chrome、Edge、Firefox、Safari。MUST NOT 為舊版 IE 妥協。
+- **套件管理**：MUST 使用 **npm**，且 `package-lock.json` MUST 進版控。
+  pnpm、Yarn 或 Bun 的 lockfile MUST NOT 出現於版控中——本 repo 的 `tests/`
+  已使用 npm，混入第二種工具會產生兩份互不知情的鎖定紀錄。
+  所有相依 MUST 宣告於 `package.json`；MUST NOT import 未宣告的間接相依。
+  npm 的扁平化 `node_modules` 會讓這件事靜默成功，直到那個間接相依某天消失為止，
+  因此需明文禁止。
+- **型別**：MUST 使用 TypeScript。`any` MUST 在 `plan.md` 或行內註解說明理由。
+- **元件**：MUST 使用函式元件與 hooks。MUST NOT 引入 class 元件。
+- **樣式**：樣式 MUST 以 Tailwind utility class 撰寫。手寫 CSS MUST 侷限於
+  Tailwind 無法表達的情形（如複雜的 keyframes），且 MUST 集中於單一全域樣式檔。
+  MUST NOT 引入 CSS-in-JS 或 CSS Modules——三套樣式方案並存會讓「改哪裡」
+  變成每次都要重新調查的問題。
+- **UI 函式庫**：預設不引入。引入任何元件庫 MUST 在 `plan.md` 說明理由。
+- **狀態管理**：MUST 先使用 React 內建機制（`useState`、`useReducer`、Context）。
+  引入外部狀態管理函式庫 MUST 在 `plan.md` 舉出內建機制無法解決的具體問題。
+- **秘鑰**：MUST NOT 有任何秘鑰進入前端。`VITE_` 前綴的環境變數會被寫入建置產物，
+  因此 MUST 僅用於公開資訊（如 API base URL）。
+
+### 後端約束（FastAPI + uv）
+
+- **Python 版本**：MUST 固定於 `pyproject.toml` 的 `requires-python`，
+  且 MUST 為 3.12 或更新版本。
+- **套件管理**：MUST 使用 **uv**。相依 MUST 宣告於 `pyproject.toml`；
+  `uv.lock` MUST 進版控。MUST NOT 以 `pip install` 直接安裝至環境而不回寫宣告。
+  MUST NOT 同時維護 `requirements.txt` 作為第二份事實來源
+  （MAY 由 `uv export` 產生供部署用，但 MUST 標示為衍生產物）。
+- **執行**：所有開發與測試指令 MUST 透過 `uv run` 執行，以確保使用鎖定的環境。
+- **型別與驗證**：所有 API 的請求與回應 MUST 有 Pydantic 模型。
+  MUST NOT 回傳未經模型定義的裸 `dict`。函式簽章 MUST 有型別註記。
+- **設定**：所有設定 MUST 由環境變數讀取（SHOULD 以 `pydantic-settings` 集中管理），
+  MUST NOT 硬編碼於程式中。缺少必要環境變數時，應用 MUST 於啟動時明確失敗，
+  MUST NOT 以預設值靜默啟動。`.env` MUST NOT 進版控；`.env.example` MUST 進版控
+  且 MUST 列出所有必要變數。
+- **CORS**：允許來源 MUST 明確列出。MUST NOT 使用 `allow_origins=["*"]`
+  搭配 `allow_credentials=True`。
+- **ORM 與資料存取**：MUST 使用 **SQLAlchemy 2.0 的宣告式 ORM**，資料庫驅動
+  MUST 為 **asyncpg**。模型 MUST 採用 2.0 風格的 `Mapped[...]` 型別註記，
+  MUST NOT 使用 1.x 的舊式 `Query` API。
+  PostgreSQL 特有的結構（`EXCLUDE USING gist` 房況約束、RLS 政策、trigger、函式）
+  無法由 ORM 模型完整表達，MUST 由遷移腳本以原生 SQL 維護，
+  MUST NOT 因為模型裡看不見就當作它們不存在——原則 IV 的房況保證正是其中之一。
+- **非同步**：路由 MUST NOT 在 `async def` 中執行阻塞式 I/O。
+  所有資料庫存取 MUST 走非同步 session，MUST NOT 在同一應用中混用同步 engine。
+- **輸入驗證**：所有外部輸入 MUST 經 Pydantic 驗證。查詢 MUST 透過 ORM 或參數化
+  語句，MUST NOT 以字串拼接組成 SQL。
+- **檔案上傳**：上傳 MUST 經後端，且 MUST 檢查檔案大小與 MIME 類型。
+  前端 MUST NOT 持有可直接寫入儲存空間的憑證。上傳後若因使用者取消而未被任何
+  資料列引用，該檔案 MUST 被清除；反之，移除既有檔案 MUST 於變更真正保存後才
+  實際刪檔——否則使用者按下取消，檔案卻已消失。
+- **程式碼品質**：MUST 使用 ruff 進行 lint 與格式化，且 MUST 於審查前無錯誤。
+
+### 資料庫約束
+
+- **資料庫**：PostgreSQL。托管方式（Supabase 託管、其他雲端或自架）不在本憲章
+  規範範圍，但 MUST 於 `plan.md` 記載，且 MUST 支援 `EXCLUDE USING gist` 約束
+  （見原則 IV）。
+- **存取者**：資料庫憑證 MUST 只存在於後端環境。MUST NOT 出現於前端程式碼、
+  建置產物或版本控制中，一次都不行。若曾誤植，MUST 立即輪替該憑證。
+- **Schema 變更**：MUST 使用 **Alembic** 管理。每次結構變更 MUST 為一支有版本編號
+  的遷移腳本，且資料庫 MUST 自行記錄其所在版本。MUST NOT 只在管理介面手動改動
+  而不回寫；MUST NOT 再以「請依序貼上執行這幾支 SQL」作為升級方式——
+  「我該跑哪幾支」MUST 是工具的責任，不是人的記憶。
+- **Alembic autogenerate**：MAY 用於產生初稿，但輸出 MUST 逐行人工審閱後才可提交，
+  MUST NOT 直接套用。autogenerate **偵測不到** RLS 政策、trigger、函式與
+  `EXCLUDE USING gist` 約束；更危險的是，它可能因無法辨識而產生**刪除**這些物件的
+  敘述。提交任何遷移前 MUST 確認腳本不含任何非預期的 drop。
+- **事實來源**：Alembic 的遷移歷程為資料庫結構的唯一事實來源，SQLAlchemy 模型
+  MUST 與之一致。MUST NOT 另外維護一份手寫的全量 schema SQL 作為平行副本——
+  兩份事實來源必然分歧，而本專案已經歷過一次（見 Governance 遷移計畫）。
+  MAY 由工具產生唯讀快照供閱讀，但 MUST 標示為衍生產物。
+- **RLS**：Row Level Security 不再是本專案的授權機制——授權邊界在 FastAPI（原則 VI）。
+  既有的 RLS 政策 MAY 保留為縱深防禦，但 MUST NOT 被當作唯一的存取控制，
+  也 MUST NOT 讓「RLS 會擋」成為後端省略權限檢查的理由。
 - **稽核日誌**：管理員的後台變更操作 MUST 被記錄。日誌 MUST 為僅可新增
   （append-only）：任何角色皆 MUST NOT 能更新或刪除既有紀錄，包含管理員本人。
-  日誌 MUST NOT 記錄密碼、金鑰或任何真實個資。
+  日誌 MUST NOT 記錄密碼、秘鑰或任何真實個資。
 - **系統參數**：可調整的營運參數（如未付款訂單保留時間）MUST 集中存於單一設定
   來源並由管理員維護，MUST NOT 硬編碼散落於程式碼中。參數 MUST 有合理範圍檢查，
   且變更 MUST 進入稽核日誌。
-- **Storage**：若使用 Supabase Storage，其 bucket MUST 有明確的存取政策：
-  僅管理員可寫入，公開讀取僅限已明示會公開的內容。MUST NOT 建立可任意寫入的
-  public bucket。目前有兩個：`room-risk`（房源品質檢測圖）與
-  `room-photos`（房源展示照片），兩者皆為公開讀取、僅管理員可寫入。
-- **上傳**：任何檔案上傳 MUST 先在瀏覽器內壓縮再送出，MUST NOT 上傳原始檔。
-  上傳後若因使用者取消而未被任何資料列引用，該檔案 MUST 被清除；
-  反之，移除既有檔案 MUST 於變更真正保存後才實際刪檔——否則使用者按下取消，
-  檔案卻已消失。
+- **物件儲存**：公開讀取僅限已明示會公開的內容；寫入 MUST 只能經由後端。
+  MUST NOT 建立可任意寫入的公開 bucket。
 
-**關於自動化測試**（2026-08-01 修訂，見版本 2.6.0）：
+### 自動化測試
 
-本專案 MAY 建立自動化測試，分兩層，各有不同的約束：
+分層架構移除了先前對測試工具的所有顧慮。既然前後端都已有建置與執行環境，
+測試依賴不再構成額外成本。
 
-- **單元測試** MUST 能在無建置步驟的情況下於瀏覽器直接執行（開啟 `tests/index.html`
-  即可），MUST NOT 引入任何執行期依賴。這一層測資料層、驗證規則與純函式。
-- **端對端測試** MAY 使用 Node 與無頭瀏覽器（目前為 `puppeteer-core`，
-  驅動系統既有的 Chrome）。此類依賴 MUST 僅存在於 `tests/` 之下，
-  MUST NOT 被應用程式的任何模組 import，且 MUST NOT 成為部署或執行的前置條件——
-  刪掉整個 `tests/` 目錄，應用仍須完整可用。
-
-**原則 II 的零建置約束針對的是「應用程式如何被送到瀏覽器」，不是開發工具。**
-測試工具不參與 index.html 的載入路徑，因此不構成建置步驟。此界定是必要的：
-先前的條文把兩者混為一談，導致唯一可行的測試方式是人工逐項點選，
-而本專案已累積數十條需要在兩種模式下反覆驗證的規則，人工重跑的成本高到
-實務上不會有人做，等於沒有回歸測試。
-
-自動化測試 MUST NOT 取代 `checklists/browser-acceptance.md`：版面、對比、
-照片是否好看這類需要人眼判斷的項目，仍以手動驗收把關。
+- **後端單元測試** MUST 使用 pytest，並以 `uv run` 執行。原則 IV 的**每一條**
+  日期與房況規則 MUST 有對應測試，含所列邊界案例。這是本憲章唯一明訂「必須有測試」
+  的區域，因為它是最容易錯且最難靠肉眼發現的部分。
+- **API 契約測試** MUST 涵蓋所有需要授權的端點，驗證未認證與越權存取皆被拒絕。
+  僅測試 happy path 的授權測試 MUST NOT 被視為已覆蓋。
+- **前端測試** MAY 使用 Vitest 與 React Testing Library。
+- **端對端測試** MAY 使用無頭瀏覽器。
+- 自動化測試 MUST NOT 取代 `checklists/` 下的手動驗收清單：版面、對比、
+  照片是否好看這類需要人眼判斷的項目，仍以手動驗收把關。
 
 ## 開發流程
 
 1. **規格** — 以 `/speckit-specify` 建立或更新 `spec.md`；不明確處以 `/speckit-clarify`
    澄清。
 2. **計畫** — 以 `/speckit-plan` 產出 `plan.md`。計畫 MUST 明確聲明其如何符合本憲章；
-   任何偏離 MUST 在計畫中列出理由。
+   任何偏離 MUST 在計畫中列出理由。本憲章遺留的 TODO 項目 MUST 於此階段定案。
 3. **任務** — 以 `/speckit-tasks` 產出依相依順序排列的 `tasks.md`。
 4. **驗收清單** — 每項功能 MUST 有手動驗收清單（可用 `/speckit-checklist` 產生），
    且 MUST 在實作前就寫好。清單 MUST 涵蓋 happy path 與錯誤／邊界情境。
 5. **一致性檢查** — 實作前 SHOULD 執行 `/speckit-analyze` 檢查規格／計畫／任務的一致性。
 6. **實作** — 以 `/speckit-implement` 執行。
-7. **驗收** — 功能 MUST 在瀏覽器中實際操作、逐項通過驗收清單後才算完成。
-   MUST NOT 僅憑程式碼看起來正確就標記為完成。
-8. **審查** — 變更 MUST 經過審查，確認：驗收清單已通過、console 無錯誤、憲章合規。
+7. **驗收** — 功能 MUST 在瀏覽器中實際操作、逐項通過驗收清單，且自動化測試
+   MUST 全數通過後才算完成。MUST NOT 僅憑程式碼看起來正確就標記為完成。
+8. **審查** — 變更 MUST 經過審查，確認：驗收清單已通過、測試通過、console 無錯誤、
+   憲章合規。
 
 任何階段發現前一階段的產物有誤時，MUST 回到該階段修正，MUST NOT 在下游用臨時手段補救。
 
@@ -402,22 +451,44 @@ Sync Impact Report（前一版）
 - 已知的不合規項目 MUST 被明確記錄並排入修復，MUST NOT 靜默留存。
 - 執行期的開發指引以各功能目錄下的 `plan.md` 為準；本憲章僅規範不可協商的邊界。
 
-**已知不合規項目**（2026-07-31 起）：
+**v3.0.0 遷移計畫**（依修訂程序第 3 條）：
+
+本次修訂使既有實作大規模不合規。以下為已知範圍與過渡安排：
+
+| 項目 | 現況 | 依新憲章的狀態 |
+|---|---|---|
+| `src/`（原生 JS，約 16,400 行含 CSS/HTML） | 原生 ES modules + 雙 adapter | 不合規，MUST 以 React + TypeScript 重寫 |
+| `styles/`（5 個 CSS 檔） | 手寫 CSS 自訂屬性 | 不合規，色值與字級 MUST 移入 Tailwind theme |
+| `src/config.js` / `window.__SUNNY_CONFIG__` | 前端持有 Supabase 憑證 | 不合規，MUST 移除，憑證改入後端環境變數 |
+| localStorage adapter | 示範模式的資料層 | 不合規，MUST 移除（原則 III） |
+| `supabase/schema.sql`（12 張表、38 條 RLS、11 個函式、1 條 gist 排除約束） | 已於全新專案實跑驗證通過 | **內容 MUST 完整保留**，但 MUST 折進 Alembic 的初始 revision（以原生 SQL 承載），MUST NOT 續存為平行維護的檔案 |
+| `supabase/migrations.sql`（356 行） | 供舊資料庫補上後續變更 | 其內容已完整包含於 `schema.sql`（見該檔標頭）。初始 revision 建立後即無用途，MUST 移除 |
+| `supabase/seed*.sql` | 種子資料 | 合規，MUST 保留 |
+| RLS 政策 | 授權機制 | 降級為縱深防禦，MAY 保留但 MUST NOT 為唯一邊界 |
+| `tests/`（unit.js、e2e、rest） | 瀏覽器內測試 + puppeteer | 過渡期 MAY 保留供比對；後端測試 MUST 以 pytest 重建 |
+
+過渡期規則：
+- 舊實作 MAY 於版控中保留至新實作通過全部驗收清單為止，作為行為比對的參考來源。
+- 保留期間 MUST NOT 有任何新功能加入舊實作。
+- 新舊兩套 MUST NOT 同時部署。
+- 新實作通過驗收後，舊前端程式碼 MUST 被移除，MUST NOT 以「之後可能用得到」為由留存。
+
+**已知不合規項目**（2026-07-31 起，v3.0.0 沿用）：
 
 依使用者指示採用參考站的原始配色後，有一處**實際**低於原則 V 要求的 4.5:1：
 
 | 位置 | 組合 | 實測對比 | 狀態 |
 |---|---|---|---|
-| 白字於 `--c-brand` `#96793F` 上 | `.btn--primary` 按鈕文字 | **4.1:1** | ⚠️ 實際使用中，未達 AA |
-| `--c-text-faint` `#7C8883` 於 `--c-bg` 上 | — | 3.4:1 | 已定義但**目前無任何規則使用**，無實際影響 |
+| 白字於品牌色 `#96793F` 上 | 主要按鈕文字 | **4.1:1** | ⚠️ 實際使用中，未達 AA |
+| 淡色文字 `#7C8883` 於底色上 | — | 3.4:1 | 已定義但目前無任何規則使用，無實際影響 |
 
 按鈕文字是唯一真正的違反。這是刻意保留的風格決定，非疏漏。
-**修復方式為改動一行**：`styles/base.css` 的 `--c-brand` 改為 `#7A6132`
-（即參考站的 `--brass-deep`，白字對比 5.9:1）。視覺差異極小，
-不影響任何其他設計決定。
+**修復方式為改動一個 token**：品牌色改為 `#7A6132`（即參考站的 `--brass-deep`，
+白字對比 5.9:1）。視覺差異極小，不影響任何其他設計決定。
 
-`--c-text-faint` 若日後要投入使用，MUST 先改為 `#63706B`（4.8:1）。
+淡色文字若日後要投入使用，MUST 先改為 `#63706B`（4.8:1）。
 
-在修復之前，`.btn--primary` MUST NOT 被描述為符合 WCAG AA。
+在修復之前，主要按鈕 MUST NOT 被描述為符合 WCAG AA。
+移植至 Tailwind theme 時 MUST 一併處理此項，MUST NOT 把已知的不合規色值原樣搬過去。
 
-**Version**: 2.5.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-07-31
+**Version**: 3.1.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-03

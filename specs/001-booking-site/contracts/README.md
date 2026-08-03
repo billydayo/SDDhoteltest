@@ -1,153 +1,237 @@
 # Interface Contracts
 
-**Revision 2026-07-31**: 本功能原先沒有任何外部介面。改用 Supabase 之後，
-瀏覽器與託管 Postgres 之間存在真實的服務邊界，因此本文件改為記錄該邊界的契約。
+**Date**: 2026-08-03 | **Plan**: [../plan.md](../plan.md) | **憲章**: v3.1.1
+
+> **Revision 2026-08-03**: 邊界由「瀏覽器 ↔ Supabase PostgREST/Auth」改為
+> 「React SPA ↔ FastAPI」。前一版契約（Supabase Auth、PostgREST、Storage、RLS）
+> 已全部作廢。
 
 ## 邊界總覽
 
 ```text
-瀏覽器 (index.html)
-  └── src/data/repository.js          ← 唯一的資料存取入口
-        ├── adapters/local.js         → localStorage（示範模式，無網路）
-        └── adapters/supabase.js      → Supabase PostgREST / Auth（HTTPS）
+React SPA
+  └── src/api/client.ts              ← 唯一的網路出口
+        └── HTTP + JSON              ← 本文件所描述的邊界
+              └── FastAPI
+                    └── repositories/  ← 唯一的資料庫出口
+                          └── PostgreSQL
 ```
 
-只有 `adapters/supabase.js` 會跨越網路邊界。其他任何檔案 MUST NOT 直接呼叫
-Supabase client。
+**兩條規則**：
+- 前端 MUST NOT 於元件內直接 `fetch`；所有請求經 `api/client.ts`
+- 前端 MUST NOT 連線資料庫或任何資料服務——它連 PostgreSQL 的位址都不知道
 
-## 外部服務契約
+## 契約的權威來源
 
-### 1. Supabase Auth
+**本文件不是契約本身。** 契約是 FastAPI 依 Pydantic 模型自動產生的 **OpenAPI 文件**
+（`/openapi.json`，互動式介面於 `/docs`）。本文件記錄的是那份契約必須遵守的**約定**。
 
-| 操作 | 呼叫 | 輸入 | 成功回傳 | 失敗情境 |
-|---|---|---|---|---|
-| 註冊 | `auth.signUp` | email, password, `options.data.display_name` | session + user | email 已存在、密碼少於 6 字元 |
-| 登入 | `auth.signInWithPassword` | email, password | session + user | 帳密錯誤（訊息不得透露 email 是否存在） |
-| Google 登入 | `auth.signInWithOAuth` | `{ provider: 'google' }` | 導向 Google 授權頁 | 使用者取消、provider 未啟用 |
-| 登出 | `auth.signOut` | — | — | — |
-| 取得工作階段 | `auth.getSession` | — | session 或 null | — |
-| 監聽狀態 | `auth.onAuthStateChange` | handler | 取消訂閱函式 | — |
+前端 MUST NOT 依賴任何未出現於 OpenAPI 的隱含行為（憲章原則 II）。
 
-**設定前提**：
-1. Authentication → Providers → Email 需**關閉** “Confirm email”，使註冊後帳號
-   立即可用（本專案不寄送任何郵件）。
-2. Authentication → Providers → Google 需啟用並填入 OAuth Client ID / Secret，
-   同時把 Supabase 的 callback URL 加入 Google Cloud 的 Authorized redirect URIs。
+---
 
-**帳號合併**：Supabase Auth 以電子郵件識別同一使用者，因此密碼帳號與相同信箱的
-Google 帳號會進入同一個 `auth.users`，`profiles` 僅有一筆（FR-088）。
+## 通用約定
 
-**示範模式**：Google 按鈕 MUST 呈現為停用並說明原因。MUST NOT 假造第三方授權畫面
-——那會誤導使用者（憲章原則 VI）。
+### 認證
 
-**Session 儲存**：由 supabase-js 以 `persistSession: true` 存於 `localStorage`，
-達成「關閉瀏覽器後仍保持登入」（FR-003）。
-
-### 2. PostgREST 資料表存取
-
-透過 `supabase.from('<table>')`。所有回應都受 RLS 過濾——**權限不足的結果是空集合或
-錯誤，不是完整資料**。
-
-| 資料表 | 讀 | 寫 |
-|---|---|---|
-| `profiles` | 本人 / 管理員全部 | 本人（不含 `role`）、管理員全部 |
-| `rooms` | 所有人（含未登入） | 僅管理員 |
-| `orders` | 本人 / 管理員全部 | 本人新增；會員限轉 `refund-pending`；管理員全部 |
-| `reviews` | `approved` 公開；本人看自己全部；管理員全部 | 本人新增（限 `pending`）；審核僅管理員 |
-| `refunds` | 本人 / 管理員全部 | 本人新增（限 `pending`）；審核僅管理員 |
-| `site_content` | 所有人 | 僅管理員 |
-| `favorites` | 僅本人 | 僅本人新增／刪除（無 UPDATE 政策） |
-| `room_risk_checks` | 所有人（含未登入） | 僅管理員 |
-| `channel_prices` | 僅管理員 | 僅管理員 |
-| `admin_logs` | 僅管理員 | 僅管理員**新增**；UPDATE / DELETE 無政策且已 REVOKE |
-| `system_settings` | 所有人（前端需知道保留分鐘數） | 僅管理員 |
-
-完整欄位與政策定義見 [data-model.md](../data-model.md) 與
-[`supabase/schema.sql`](../../supabase/schema.sql)。
-
-### 3. 資料庫函式（RPC）
-
-| 函式 | 呼叫時機 | 說明 |
-|---|---|---|
-| `expire_stale_orders()` | 查詢房況前、建立訂單前、讀取訂單列表前，以及應用程式開啟期間每分鐘一次 | 將逾期的待付款訂單改為 `cancelled` 並釋出房況，回傳受影響筆數 |
-| `pending_payment_minutes()` | `orders.expires_at` 的預設值 | 讀取目前的保留分鐘數 |
-
-`expire_stale_orders()` 由 repository 層負責呼叫，MUST NOT 交由個別頁面自行決定。
-漏呼叫的後果是過期訂單持續擋房，且使用者會看到「已無空房」但實際上房是空的。
-
-定期掃描（FR-099a）由 `main.js` 的 `startExpirySweep()` 執行，
-僅在分頁可見時運作，且只有實際取消了訂單才更新畫面。
-這**不是**伺服器端排程——它是應用程式自己發的查詢，關掉分頁即停止，
-因此不違反憲章原則 II 的「禁止排程作業」。
-
-### 資料庫端的 trigger
-
-| Trigger | 作用 |
+| 項目 | 約定 |
 |---|---|
-| `handle_new_user` | 註冊時自動建立 `profiles` 資料列 |
-| `prevent_role_escalation` | 非管理員不得變更 `role`（`auth.uid()` 為 null 的特權情境放行，供 bootstrap） |
-| `guard_order_transition` | 會員的訂單狀態轉換守門；禁止竄改金額、日期與到期時間 |
-| `refresh_room_rating` | 評論異動時重算 `rooms.average_rating` |
-| `enforce_refund_limit` | 單一會員退款上限 5 筆（只計 pending 與 approved） |
+| 形式 | JWT Bearer token |
+| 標頭 | `Authorization: Bearer <token>` |
+| 存放 | 前端 `localStorage`（憲章原則 III 允許 token，禁止業務資料） |
+| 附加 | 由 `api/client.ts` 統一附加，MUST NOT 由各元件自行處理 |
+| 過期 | API 回 401 → client 統一攔截 → 導向登入頁並保留原目的地（FR-009d） |
 
-### 4. Supabase Storage
+### 授權
 
-| Bucket | 讀取 | 寫入 | 內容 |
-|---|---|---|---|
-| `room-risk` | 公開 | 僅管理員 | 管理員對自家房源的品質檢測圖，公開顯示於房源詳情頁 |
-| `room-photos` | 公開 | 僅管理員 | 房源展示照片，顯示於房源列表與詳情頁 |
+**每個路由 MUST 明確宣告其授權要求。** 預設不是「公開」而是「需登入」——
+新增路由時忘記標註 MUST 導致拒絕而非放行。
 
-兩個 bucket 分開，是因為生命週期不同：檢測圖每次重測就整批替換，展示照片則由
-管理員逐張增刪。混在同一個 bucket 會讓清理邏輯互相干擾。
-
-前台「安全檢測」的照片 **MUST NOT** 進入任何 bucket。該路徑在程式碼中
-完全沒有上傳函式可用（`pages/risk-check.js` 不 import `services/risk-upload.js`，
-也不 import `components/image-manager.js`）。
-
-**照片參照格式**：`rooms.images` 中由上傳產生的項目為 `storage:<path>`，
-而非公開網址——見 [data-model.md](../data-model.md) 的說明。
-
-### 5. 錯誤轉譯契約
-
-`adapters/supabase.js` MUST 把資料庫層錯誤轉為業務錯誤，MUST NOT 讓原始訊息外洩：
-
-| 資料庫訊號 | 轉譯為 | 使用者可見訊息 |
+| 層級 | 相依 | 適用 |
 |---|---|---|
-| `23P01` exclusion violation（`orders_no_overlap`） | `ROOM_UNAVAILABLE` | 此房源於所選日期已無空房 |
-| `23505` unique violation（`refunds` pending 索引） | `REFUND_ALREADY_PENDING` | 此訂單已有審核中的退款申請 |
-| `P0001` 且訊息含「退款申請已達上限」（`enforce_refund_limit`） | `REFUND_LIMIT_REACHED` | 你的退款申請已達上限 5 筆，無法再提出新的申請 |
-| `23505` unique violation（`reviews.order_id`） | `REVIEW_ALREADY_EXISTS` | 此訂單已撰寫過評論 |
-| `42501` 且訊息含「無法付款」（`guard_order_transition`） | `ORDER_EXPIRED` | 此訂單已因逾期未付款而取消，請重新訂房 |
-| `42501` 且訊息含「僅管理員可變更角色」 | `ROLE_FORBIDDEN` | 你沒有權限變更角色 |
-| `42501` / RLS 拒絕、空結果 | `FORBIDDEN` | 你沒有權限執行此操作 |
-| `23514` check violation（`settings_valid_range`） | `SETTING_OUT_OF_RANGE` | 保留時間需介於 5 至 1440 分鐘 |
-| `23505` unique violation（`favorites` 主鍵） | `ALREADY_FAVORITED` | 已在收藏清單中（前端應視為成功） |
-| `PGRST301` / JWT 過期 | `SESSION_EXPIRED` | 登入已逾時，請重新登入 |
-| 網路錯誤、逾時 | `NETWORK_ERROR` | 目前無法連線，請稍後再試（已保留你填寫的內容） |
-| 憑證無效（401 於啟動時） | `CONFIG_ERROR` | 資料庫設定有誤，請檢查 `src/config.js` |
+| 公開 | 無（須明確標註） | 房源瀏覽、搜尋、已通過審核的評論、服務條款 |
+| 需登入 | `get_current_user` | 訂單、收藏、評論送出、退款、個人檔案、訊息 |
+| 需管理員 | `require_admin` | 全部後台端點 |
 
-`CONFIG_ERROR` MUST NOT 靜默退回示範模式（FR-084）。
+移除 RLS 後**這是唯一的存取邊界**（[research R1](../research.md)）。
 
-### 6. 不使用的能力
+### 錯誤格式
 
-明確不在本次範圍內，且 MUST NOT 被引入：
+所有錯誤回應 MUST 為結構化 JSON：
 
-- **Realtime** — 「即時反映」定義為下次查詢即可見，不做推播訂閱
-- **Edge Functions / Database Webhooks / pg_cron** — 等同自建後端服務，
-  違反憲章原則 II。逾期訂單改以 `expire_stale_orders()` 於查詢時判定
-- **service_role key** — 任何情況下都不得出現於前端或版控（FR-085）
-- **email 相關流程** — 不寄送驗證信、密碼重設信、通知信或申訴信。
-  渠道控價的申訴郵件僅產生範本供管理員自行複製寄出（FR-112）
-- **Storage（除 `room-risk` 與 `room-photos` 外）** — 不建立其他 bucket；
-  首頁主視覺仍以圖片網址提供
-- **任何 OTA 平台的爬蟲或 API** — 渠道價格為種子資料（FR-109）。
-  跨網域抓取會被 CORS 擋下，伺服器端抓取需自建後端且可能違反對方服務條款
-- **任何 LLM / AI 服務** — 評論自動審核為規則式引擎（FR-103a）。
-  前端無處可安全存放 AI 服務金鑰
+```json
+{ "detail": "使用者可理解的繁體中文訊息", "code": "ROOM_UNAVAILABLE" }
+```
 
-## 本機介面（不跨網路）
+MUST NOT 回傳堆疊追蹤、SQL 語句或內部檔案路徑（憲章後端約束）。
 
-- SPA 內的 DOM 事件與路由切換
-- 示範模式的 `localStorage` 狀態管理（鍵名前綴 `sunny.`）
-- 拍照風險評分的 Canvas 處理，全程在瀏覽器內完成
-- 報表匯出的 SheetJS／CSV fallback
+| 狀態碼 | 用途 |
+|---|---|
+| 400 | 輸入驗證失敗 |
+| 401 | 未認證或 token 過期 |
+| 403 | 已認證但權限不足 |
+| 404 | 資源不存在 |
+| **409** | **與其他資料的競態衝突（房況重疊、email 已註冊）** |
+| 422 | Pydantic 驗證失敗（FastAPI 預設） |
+| 500 | 內部錯誤；MUST NOT 洩漏細節 |
+
+### 資料型別
+
+| 概念 | 線上格式 | 說明 |
+|---|---|---|
+| 日曆日 | `"YYYY-MM-DD"` | 無時區成分。前端 MUST NOT 用 `new Date(str)` 解析 |
+| 時間點 | ISO 8601 | `expires_at`、`created_at` 等 |
+| 金額 | JSON 整數 | 新臺幣元。**MUST NOT 出現小數** |
+| 識別碼 | UUID 字串 | |
+
+### CORS
+
+允許來源 MUST 明確列出。**MUST NOT 使用 `allow_origins=["*"]` 搭配
+`allow_credentials=True`**（憲章後端約束）。
+
+---
+
+## 關鍵端點的行為約定
+
+以下不是完整端點清單（那是 OpenAPI 的職責），而是**容易做錯、必須寫死的行為**。
+
+### `POST /auth/register`
+
+| 情境 | 回應 |
+|---|---|
+| 成功 | 201 + token |
+| email 已存在 | **409**，訊息「此電子郵件已被註冊」（FR-002） |
+| 密碼少於 6 字元 | 400，明確說明長度不足（FR-009b） |
+
+密碼 MUST 以 argon2id 雜湊後存入。回應 MUST NOT 包含 `password_hash`。
+
+### `POST /auth/login`
+
+| 情境 | 回應 |
+|---|---|
+| 成功 | 200 + token |
+| 帳號不存在 **或** 密碼錯誤 | 401，訊息**一律相同**：「電子郵件或密碼錯誤」 |
+| 該帳號 `password_hash` 為 null | 401，訊息「此帳號請以 Google 登入」 |
+
+⚠️ **兩種失敗必須無法區分**（FR-004）：訊息、狀態碼與**回應時間**都不得洩漏該 email
+是否已註冊。帳號不存在時 MUST 仍執行一次雜湊比對（對虛設值），否則回應時間差
+會構成帳號列舉管道。
+
+### `GET /auth/google` → `GET /auth/google/callback`
+
+Authorization Code Flow。**client secret MUST 只存在於後端環境變數。**
+
+| 情境 | 行為 |
+|---|---|
+| 該 email 已有帳號 | **進入既有帳號**，補上 `google_sub`。MUST NOT 建立第二筆（FR-088） |
+| 全新 email | 建立帳號，`password_hash` 為 null |
+| 使用者於 Google 取消 | 導回登入頁並顯示「已取消登入」，MUST NOT 建立任何帳號（FR-090） |
+
+### `GET /rooms`（搜尋）
+
+公開。查詢參數：關鍵字、`check_in`、`check_out`、`guest_count`、價格上限、
+`amenities[]`、`features[]`、排序。
+
+**條件式必填**（FR-010）：
+- 三者（入住日／退房日／人數）皆空 → 正常搜尋
+- 填了入住日或退房日任一 → 另一個與人數 MUST 一併填寫
+- 未填日期但填了人數 → 正常搜尋
+- 人數只要有填 MUST 為大於 0 的整數
+
+**MUST 於查詢前呼叫 `expire_stale_orders()`**，否則已逾期的訂單仍會佔用房況。
+
+`status = 'maintenance'` 的房源 MUST 與「已預訂」等同排除。
+
+### `POST /orders`（建立訂單）
+
+需登入。**這是全系統最需要小心的端點。**
+
+後端 MUST 重新計算並驗證，MUST NOT 信任用戶端送來的任何結論：
+
+| 項目 | 規則 |
+|---|---|
+| 入住日 | MUST ≥ 明日（Asia/Taipei） |
+| 退房日 | MUST > 入住日 |
+| 夜數 | 後端計算，MUST NOT 採用用戶端值 |
+| 總金額 | 後端依當下房價計算，MUST NOT 採用用戶端值 |
+| 房況 | 資料庫約束裁決 |
+
+**約束例外的分派（MUST 以約束名稱比對）**：
+
+| 約束 | 回應 |
+|---|---|
+| `orders_no_overlap` | **409**「此房源於所選日期已無空房」 |
+| `valid_date_range` | 400「退房日必須晚於入住日」 |
+| `nights_matches_dates` | 500（後端算錯，非使用者問題） |
+| `order_no` 唯一 | 500（序號碰撞） |
+
+⚠️ 四者都是 `IntegrityError`。只看例外型別會把「夜數對不上」回成「已無空房」，
+使用者照著訊息改日期永遠改不好。
+
+回應含 `expires_at`，供前端顯示付款倒數。
+
+### `POST /orders/{id}/pay`
+
+需登入且 MUST 為訂單擁有者。
+
+| 情境 | 回應 |
+|---|---|
+| 成功 | 200，狀態轉為 `confirmed` |
+| 已逾期 | 409，說明保留時間已過且該區間可能已被他人預訂 |
+| 非本人訂單 | **403**（不是 404——擁有者檢查失敗與資源不存在是不同的事） |
+
+「不得對已逾期訂單付款」由資料庫 trigger 守門（[data-model](../data-model.md)）。
+
+**MUST NOT 串接任何真實金流。** MUST NOT 接收或儲存真實卡號、有效期限、CVV
+或銀行帳號（憲章原則 VI）。
+
+### `POST /reviews`
+
+需登入。訂單 MUST 屬於該使用者且 MUST 為 `completed`。一筆訂單只能評論一次
+（`order_id` UNIQUE → 重複時回 409）。
+
+**規則式自動審核於後端執行**，寫入 `auto_verdict` 與 `auto_rules`。
+回應 MUST 標示為「自動審核（規則式）」，**MUST NOT 稱為 AI**（憲章原則 VI）。
+判定 MUST 可被管理員複核與覆寫。
+
+### `POST /admin/rooms/{id}/risk-checks`
+
+**需管理員。這是系統中唯一接收圖片的端點。**
+
+MUST 檢查檔案大小與 MIME 類型。圖片 MUST 已於瀏覽器內壓縮後才送出。
+
+⚠️ **前台的「安全檢測」沒有對應端點。** 使用者自行上傳的照片 MUST 全程留在瀏覽器
+（FR-086、SC-030）。前端亦 MUST NOT 存在任何能呼叫此端點的前台程式路徑
+（[research R8](../research.md)）。
+
+### 後台寫入端點（通則）
+
+所有管理員的變更 MUST 於**同一個交易內**寫入 `admin_logs`，
+MUST NOT 出現「改了但沒記錄」。
+
+`admin_logs` MUST NOT 有任何 UPDATE 或 DELETE 端點——連管理員也不行（SC-027）。
+資料庫層以 `REVOKE UPDATE, DELETE` 強制。
+
+### `GET /admin/channel-prices`
+
+需管理員。資料來自 `channel_prices` 種子表。
+
+**MUST NOT 實作爬蟲，MUST NOT 呼叫任何 OTA API。** 回應 MUST 帶有標示其為模擬資料的
+欄位，供前端常駐顯示。理由是**服務條款，不是技術限制**——後端的存在不改變這一點
+（[research B1-a](../research.md)）。
+
+---
+
+## 不存在的端點
+
+以下刻意不提供，列出以免日後被當成遺漏：
+
+| 端點 | 原因 |
+|---|---|
+| 前台照片上傳 | FR-086：使用者照片不得離開瀏覽器 |
+| `admin_logs` 的 UPDATE / DELETE | 僅可新增，連管理員也不行 |
+| 任何回傳 `password_hash` 的端點 | 憲章原則 VI |
+| 真實金流、簡訊、寄信 | 皆為模擬或不在範圍 |
+| OTA 價格擷取 | 服務條款風險 |
+| LLM 審核 | 規則式引擎替代 |
+| 排程觸發 | 逾期改以查詢時判定（憲章原則 IV） |

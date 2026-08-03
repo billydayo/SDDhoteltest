@@ -1,300 +1,337 @@
-# Research: Sunny 訂房平台
+# Research: Sunny 訂房平台（FastAPI + React 架構）
 
-> **修訂 2026-07-31（第二次）**：依產品企劃書修訂版納入渠道控價、操作日誌、
-> 系統參數、收藏、Google 登入、待付款時效與 AI 審核等需求。新增決策見下方
-> 「企劃書修訂版的四項技術取捨」。
+**Date**: 2026-08-03 | **Plan**: [plan.md](./plan.md) | **憲章**: v3.1.1
+
+> **本次修訂（2026-08-03）**：技術堆疊由「原生 JS + 瀏覽器直連 Supabase + 雙軌
+> localStorage adapter」改為「React + FastAPI + SQLAlchemy + Alembic」。
+> 技術**選型**已於憲章 v3.1.0 定案，本文件不重新評估選型，而是回答落實過程中
+> 必須先解決的問題（Part A），並重新檢視沿用的產品決策（Part B）。
 >
-> **修訂 2026-07-31（第一次）**：資料層由「僅瀏覽器 `localStorage`」改為
-> 「Supabase 為主、`localStorage` 為示範模式備援」。
+> 已作廢的決策：Supabase 為主資料層、雙 adapter repository、Supabase Auth、
+> `src/config.js` 憑證載入、RLS 作為存取邊界。
 
-## 企劃書修訂版的四項技術取捨
+---
 
-### Decision: 渠道比價以種子資料模擬，不實作爬蟲
+# Part A：架構變更的調查
 
-**Decision**: 渠道比價與控價模組的畫面、價差計算、賤賣預警與申訴郵件範本全部實作，
-但外部平台售價來自 `channel_prices` 表的種子資料。系統不爬取任何網站，不呼叫任何
-OTA 的 API。模組頂端常駐「模擬資料」標示。
+## R1. 既有 schema.sql 有多少能折進 Alembic？
 
-**Rationale**:
-- 企劃書指定「定時爬蟲 / API 對接」。瀏覽器無法執行定時作業，且跨網域抓取
-  Agoda／Booking 會被 CORS 擋下——這不是實作難度問題，是瀏覽器安全模型的硬限制。
-- 唯一的技術出路是伺服器端排程（Edge Function + pg_cron），但那等同自建後端服務，
-  違反憲章原則 II，也會讓示範模式無法運作。
-- 更重要的是：自動爬取 OTA 平台通常違反其服務條款。一個教學展示專案不應該把
-  法律風險寫進架構裡。
-- 以種子資料呈現，使用者仍能完整看到「發現價差 → 預警 → 產生申訴信」的營運流程，
-  這正是此模組要展示的價值。
+**問題**：憲章 v3.0.0 的遷移計畫聲稱 `supabase/schema.sql`「內容 MUST 完整保留」。
+該檔剛於全新專案實跑驗證通過（commit `2bc38ac`），假設它整份可搬是合理的直覺。
+但它是為「瀏覽器直連 Supabase」而寫的，需逐層查核。
 
-**Alternatives considered**:
-- Edge Function + pg_cron 真實拉取 — 否決。見上：違憲、示範模式失效、法律風險。
-- 前端直接 `fetch` OTA 頁面 — 否決。CORS 直接擋死，且同樣有 ToS 問題。
-- 使用第三方比價 API — 否決。需要付費金鑰，且金鑰無處可藏（前端不能放）。
-- 完全不做此模組 — 否決。企劃書明列為後台模組，且流程本身可展示。
+**調查方法**：對 `supabase/schema.sql`（972 行）逐類統計對 `auth` schema 的參照。
 
-### Decision: 評論的「AI 審核」以規則式引擎實作
+**發現**：全檔 **36 處**參照 Supabase 的 `auth` schema，集中在認證與授權層。
 
-**Decision**: 評論送出後由瀏覽器內的規則引擎初判為 `auto-pass` 或 `auto-reject`，
-並記錄觸發的規則代碼；管理員複核後才決定是否公開。介面一律稱為
-「自動審核（規則式）」，不使用「AI」字樣。管理員可覆寫任何自動判定。
-
-規則涵蓋：不當字詞、內容過短、評分與文字情緒明顯矛盾、重複送件、
-純符號或亂碼、含疑似聯絡方式或外部連結。
-
-**Rationale**:
-- 呼叫 LLM 需要 API 金鑰。前端放金鑰等同公開洩漏；藏在 Edge Function 則違反憲章
-  原則 II 並使示範模式失效。
-- 規則式引擎在兩種模式下行為完全一致，可離線執行，且判定結果**可解釋**——
-  管理員看得到觸發了哪條規則，這在審核場景比黑箱分數更有用。
-- 稱它為 AI 會是不誠實的標示，違反憲章原則 VI。稱為「自動審核」既準確又不減損價值。
-- 保留管理員覆寫權，避免規則誤判成為不可申訴的最終判定。
-
-**Alternatives considered**:
-- Edge Function 代呼叫 LLM — 否決。違憲、示範模式失效、需付費金鑰。
-- 前端直接呼叫 LLM API — 否決。金鑰必然外洩。
-- 瀏覽器內跑小型 ML 模型（如 transformers.js）— 否決。需下載數十 MB 模型，
-  違反「零建置、可離線、直接開啟」的定位，且中文內容審核的效果未必勝過規則。
-- 純人工審核 — 否決。企劃書明確要求送出後先經自動判定。
-
-### Decision: 兩條照片路徑，只有管理員的檢測圖會上雲
-
-**Decision**: 拍照風險預測拆為兩條獨立的程式路徑：
-
-| 路徑 | 使用者 | 照片去向 | 儲存 |
+| 層 | 數量 | 依賴 `auth`？ | 處置 |
 |---|---|---|---|
-| 前台「安全檢測」 | 任何人 | 只在瀏覽器記憶體 | 不存，離開頁面即消失 |
-| 後台「房源檢測」 | 僅管理員 | 上傳至 Storage `room-risk` bucket | 存，公開於房源詳情頁 |
+| 資料表定義 | 12 張 | 僅 `profiles.id` 外鍵 | 保留，改寫該外鍵 |
+| CHECK 約束 | 多條 | 否 | 原樣保留 |
+| 索引 | 24 個 | 否 | 原樣保留 |
+| `EXCLUDE USING gist` | 1 條 | 否 | **原樣保留** |
+| RLS 政策 | 38 條 | 30 條直接用 `auth.uid()` | **全數移除** |
+| 函式 | 11 個 | 6 個 | 5 個保留、6 個改寫或移除 |
+| 觸發器 | 7 個 | `on_auth_user_created` 掛在 `auth.users` | 該觸發器移除，其餘視函式而定 |
 
-兩條路徑 MUST NOT 共用同一個上傳函式。只有 `saveRoomRiskCheck()` 會碰到 Storage。
+函式逐一判定：
 
-**Rationale**:
-- 企劃書要求房源詳情頁顯示「實際完成風險檢測圖」，這需要儲存圖片；但憲章原本
-  一律禁止照片離開瀏覽器。兩者的衝突其實是**照片的所有權不同**：
-  前台是使用者的私人照片，後台是飯店自有的房間照片。
-- 以「誰的照片、給誰看」為切分依據，比以「功能名稱」切分更穩固：日後新增任何
-  上傳功能，都能用同一個問題判斷該走哪條路。
-- 程式路徑分離而非用旗標控制，是因為旗標會在某次重構中被設錯，而分離的函式不會
-  被誤呼叫——前台頁面根本不 import 上傳函式。
-- Storage bucket 設為公開讀取但僅管理員可寫，符合「已明示會公開的內容」的原則。
+| 函式 | 依賴 | 處置 |
+|---|---|---|
+| `pending_payment_minutes()` | 無 | ✅ 原樣保留 |
+| `expire_stale_orders()` | 無 | ✅ 原樣保留 |
+| `refresh_room_rating()` | 無 | ✅ 原樣保留 |
+| `enforce_refund_limit()` | 無 | ✅ 原樣保留 |
+| `guard_message_update()` | 無 | ✅ 原樣保留 |
+| `is_admin()` | `auth.uid()` | ❌ 移除，授權移至 FastAPI |
+| `prevent_role_escalation()` | `is_admin()` | ❌ 改為 FastAPI 層檢查 |
+| `guard_order_transition()` | `is_admin()` | ⚠️ 拆解，見 R2 |
+| `stamp_review_reply()` | `auth.uid()` | ❌ 改寫：回覆者由後端傳入 |
+| `stamp_message_sender()` | `auth.uid()` | ❌ 改寫：寄件者由後端傳入 |
+| `handle_new_user()` | 掛在 `auth.users`，讀 `raw_user_meta_data` | ❌ 移除，註冊改由 FastAPI 建立 profile |
 
-**Alternatives considered**:
-- 只存分數與建議、不存圖片 — 否決。企劃書明確要求顯示檢測圖，且無圖的檢測結果
-  對顧客的說服力大幅下降。
-- 兩條路徑共用上傳函式加旗標 — 否決。見上，旗標是未來的資安事故。
-- 全部都存 — 否決。使用者的私人照片沒有理由上雲，這是不可放寬的底線。
+**Decision**：憲章 v3.1.1 的遷移計畫表已依此拆為四列，不再宣稱「完整保留」。
 
-### Decision: 待付款訂單以「查詢時判定」處理逾期
+**Rationale**：`auth.uid()` 是 Supabase 依 JWT 注入的 session 變數。FastAPI 以固定的
+資料庫帳號連線，該函式不存在，引用它的政策不是全擋就是報錯。留著不是縱深防禦，
+是留下一層壞掉的程式碼。
 
-**Decision**: 訂單建立時狀態為 `pending-payment`，並寫入
-`expires_at = now() + system_settings.pending_payment_minutes`（預設 60）。
-待付款訂單**納入**排除約束，因此同樣阻擋他人預訂。逾期清理由
-`expire_stale_orders()` 函式負責，並於三個時機被強制呼叫：查詢房況前、
-建立訂單前、讀取訂單列表前。不使用 pg_cron 或任何排程。
+**Alternatives considered**：
+- *改寫 RLS 用 `current_setting('app.user_id')` + 每交易 `SET LOCAL`* —— 真正可行的
+  縱深防禦，但要改寫 38 條政策，且應用連線角色不得為表擁有者（否則 RLS 預設被繞過，
+  需 `FORCE ROW LEVEL SECURITY`）。最大風險是漏設 GUC 的路徑會靜默失效——政策看到
+  NULL 而拒絕全部，或在 `FORCE` 未開時放行全部。這是一整類新的失效模式，
+  換來的防護在「授權已完整實作於 FastAPI」的前提下重複。**已記錄為日後可選的強化項**，
+  需以修訂程序引入。
+- *保留 Supabase 只當認證服務* —— 憲章 v3.1.0 已定案排除。
 
-**Rationale**:
-- 企劃書要求「未付款訂單保留 1 小時，逾期自動取消」。若待付款訂單不佔房況，
-  保留就沒有意義；若佔了房況卻不清理，過期訂單會永久擋房——兩者都必須成立。
-- 排程作業是最直覺的解法，但違反憲章原則 II，且示範模式沒有排程可用。
-- 「查詢時判定」讓兩種模式的行為一致，且對使用者而言結果相同：下一次有人查詢
-  該房源時，過期的保留就已經釋出。唯一的差異是「自動取消」的可觀察時點是
-  下一次查詢，而非到期的那一秒——這已寫入 spec 的 Assumptions，不是隱藏行為。
-- 「建立訂單前必須先清理」是關鍵細節：否則殭屍訂單會誤觸發排除約束，
-  使用者會看到「已無空房」但實際上房是空的。
+---
 
-**Alternatives considered**:
-- pg_cron 定期清理 — 否決。違反憲章原則 II，且示範模式無對應機制。
-- 待付款訂單不佔房況 — 否決。那樣「保留 1 小時」形同虛設，且會出現
-  「我付了款但房間被別人訂走」。
-- 前端計時器到期後自動送出取消 — 否決。使用者關掉分頁就失效，且不同裝置各算各的。
-- 排除約束不含待付款、改以應用層檢查 — 否決。並行下必然出現重複預訂。
+## R2. `EXCLUDE USING gist` 在 SQLAlchemy 與 Alembic 中如何表達？
 
-### Decision: Google 登入使用 Supabase Auth 的 OAuth provider
+**問題**：憲章原則 IV 把「同一房源同一晚不得有兩筆有效訂單」押在資料庫層。
+這是全專案最不能出錯的一條，而它正好是 ORM 抽象最薄弱的地方。
 
-**Decision**: 以 `auth.signInWithOAuth({ provider: 'google' })` 實作，於 Supabase
-Dashboard 啟用 Google provider。示範模式下按鈕呈現為停用並說明原因。
-Supabase Auth 預設會以電子郵件合併同一使用者，因此既有的密碼帳號與相同信箱的
-Google 帳號會進入同一個 `auth.users`，`profiles` 也只會有一筆。
+現況約束：
 
-**Rationale**: 這是 Supabase 原生支援的能力，不需要自行處理 OAuth 流程、token 交換
-或 callback 伺服器，與零建置約束相容。既有的 `handle_new_user` trigger 對 OAuth
-註冊同樣生效，`raw_user_meta_data` 中的 `full_name` 可作為顯示名稱的來源。
+```sql
+exclude using gist (
+  room_id with =,
+  daterange(check_in, check_out, '[)') with &&
+) where (status in ('pending-payment', 'confirmed', 'refund-pending'))
+```
 
-**Alternatives considered**:
-- 自行實作 Google OAuth 流程 — 否決。需要伺服器端保管 client secret。
-- 不做第三方登入 — 否決。企劃書明列。
-- 示範模式以假的 Google 流程模擬 — 否決。假造第三方授權畫面會誤導使用者，
-  違反憲章原則 VI 的誠實標示要求；停用並說明原因才是正確做法。
+三個特性疊加：GiST 索引、`daterange` 半開區間、`where` 子句（部分排除約束，
+讓已取消與已退款的訂單釋出區間）。
 
-## Decision: Supabase as the primary data layer, localStorage as demo fallback
+**Decision**：模型端以 `sqlalchemy.dialects.postgresql.ExcludeConstraint` 宣告於
+`__table_args__`，運算式以 `text()` 承載；Alembic 遷移端以 `op.execute()` 寫原生 SQL，
+**不依賴 autogenerate**。
 
-**Decision**: 應用程式以 Supabase（託管 Postgres + Auth）作為預設資料層。
-`@supabase/supabase-js` v2 以 ESM CDN（`https://esm.sh/@supabase/supabase-js@2`）
-動態載入。若未提供憑證，應用程式自動綁定 `localStorage` adapter，功能完整且不發出
-任何網路請求。
+**Rationale**：
+- `ExcludeConstraint` 能表達 `room_id with =`，但 `daterange(a, b, '[)')` 是函式運算式，
+  `where` 是部分約束——組合後 autogenerate 的還原能力不可靠。
+- 更關鍵的風險不是「產不出來」而是**產出刪除敘述**：autogenerate 比對模型與資料庫時，
+  對無法解析的物件可能判定為多餘而產生 `op.drop_constraint`。這條約束一旦被靜默移除，
+  超賣不會報錯，只會安靜地發生，且要等到兩位客人同時抵達櫃台才會被發現。
+- 憲章 v3.1.0 已明訂 autogenerate 輸出 MUST 逐行審閱、MUST 確認不含非預期的 drop。
+  本專案將此列為遷移審查的固定檢查項。
 
-**Rationale**:
-- Supabase 提供託管的 Postgres、Auth 與 RLS，不需要自行撰寫或部署任何後端程式碼，
-  因此不違反憲章原則 II 的「零建置、無自建後端」約束。
-- 以 ESM CDN 動態 `import()` 引入，無需 `npm install` 或打包步驟；且因為是動態載入，
-  示範模式下這段程式碼根本不會被下載，能真正做到零網路請求。
-- 保留 `localStorage` 備援是產品要求（未填憑證即自動示範），也讓專案在沒有網路、
-  沒有帳號的教學場合仍可直接開啟使用。
+**必要前置**：`create extension if not exists btree_gist;` MUST 位於初始 revision 最前面——
+`room_id with =` 的等值比對需要它，缺了會在建立約束時失敗。
 
-**Alternatives considered**:
-- 純 `localStorage`（原方案）— 已被本次決策取代。無法跨裝置、無法多人共用資料，
-  且企劃書已將「串接後端資料庫」列為明確待辦。
-- 自建 Node/Express + 資料庫 — 否決。需要部署與建置步驟，直接違反憲章原則 II。
-- Firebase / Firestore — 否決。文件型資料模型不適合本專案以日期區間為核心的房況查詢；
-  Postgres 的 `daterange` 與排除約束正好能在資料庫層保證不重複預訂。
-- 只用 Supabase、移除示範模式 — 否決。使用者明確要求保留「未填憑證即自動示範」。
+**`guard_order_transition()` 的拆解**：該 trigger 原本做兩件事——(a) 管理員可自由改狀態、
+(b) 一般會員不得對已逾期訂單付款、不得從任意狀態跳到已確認。(a) 依賴 `is_admin()`，
+移至 FastAPI；(b) 不需知道「誰」，只需比對新舊狀態與 `expires_at`，MUST 保留於資料庫。
 
-## Decision: Dual-adapter repository with an async-only interface
+**Alternatives considered**：
+- *應用層鎖（`SELECT ... FOR UPDATE` 房源列）* —— ORM 友善，但把保證移回應用層，
+  違反原則 IV 明文「後端的檢查是授權與訊息品質，資料庫的約束才是保證」。
+- *唯一索引* —— 無法表達區間重疊，只能表達完全相同的區間。
 
-**Decision**: 建立 `src/data/adapters/supabase.js` 與 `src/data/adapters/local.js`
-兩個實作相同簽章的 adapter，由 `src/data/repository.js` 於啟動時依
-`isSupabaseConfigured` 擇一綁定。**所有**資料存取函式一律回傳 Promise，包含示範模式。
-資料庫使用 snake_case，前端使用 camelCase，欄位轉換只發生在 Supabase adapter 內部。
+---
 
-**Rationale**: 呼叫端若需區分兩種模式，等於要維護兩套 UI 邏輯，示範模式會很快腐爛。
-統一為非同步介面後，頁面與元件完全不知道資料從哪裡來；驗收案例也能原封不動地在兩種
-模式下各跑一次。
+## R3. 約束觸發時如何轉為使用者訊息而非 500？
 
-**Alternatives considered**:
-- 示範模式維持同步、Supabase 模式非同步 — 否決。呼叫端會被迫寫 `await` 與非 `await`
-  兩種分支，是最常見的腐爛來源。
-- 在每個頁面用 `if (demoMode)` 分岔 — 否決。分岔點會隨功能數量線性增長。
-- 只寫 Supabase adapter，示範模式用本機 Postgres 模擬器 — 否決。需要安裝步驟。
+**問題**：FR-082 要求衝突訂房被拒時使用者看到「此房源於所選日期已無空房」。
+排除約束在資料庫層觸發時 asyncpg 會拋例外，不攔截就是 500。
 
-## Decision: Supabase Auth for identity, `profiles` table for application data
+**Decision**：於建立訂單的 service 層攔截 SQLAlchemy 的 `IntegrityError`，
+自 `.orig` 取出 asyncpg 原始例外，**比對約束名稱 `orders_no_overlap`**，
+轉為 HTTP 409 與該訊息。
 
-**Decision**: 身分驗證使用 Supabase Auth 的 `signUp` / `signInWithPassword` /
-`signOut` / `onAuthStateChange`。密碼由 Supabase 雜湊保管，應用程式資料表
-**不存在任何密碼欄位**。應用層資料（角色、顯示名稱、聯絡電話）放在 `public.profiles`，
-主鍵即 `auth.users.id`，並由 `on auth.users` 的 trigger 於註冊時自動建立，
-預設角色為 `member`。示範模式沿用種子帳號的模擬登入。
+**Rationale**：
+- **必須比對約束名稱，不能只看例外型別**。`orders` 上還有 `valid_date_range`、
+  `nights_matches_dates` 兩條 CHECK 與 `order_no` 的唯一約束，全都產生 `IntegrityError`。
+  不分辨就會把「夜數對不上」也回成「已無空房」，使用者照著訊息改日期永遠改不好。
+- 選 409 而非 400：請求本身合法，是與其他資料的競態導致失敗。
 
-**Rationale**:
-- 原 schema 的 `users.password` 為明文欄位，即使是展示專案也不應該存在——資料一旦
-  離開使用者本機，明文密碼就是真實風險（使用者可能重用其他網站的密碼）。
-- 角色若存在 `auth.users` 的 metadata，使用者可自行修改（`updateUser` 可寫入
-  `user_metadata`），會讓「自我升級為管理員」變成一行程式碼。放在受 RLS 保護的
-  `profiles` 表並禁止一般使用者更新 `role` 欄位，才是正確做法。
-- 註冊即可用（不寄驗證信）符合展示需求，於 Supabase Dashboard 關閉
-  “Confirm email” 即可。
+**前端檢查的定位**：前端仍會先查可用性並即時提示，但那是 UX。兩位使用者同時送出時
+前端兩邊都會顯示可訂——真正的裁決在資料庫，這是設計預期而非缺陷。
 
-**Alternatives considered**:
-- 沿用自建 `users` 表比對明文密碼 — 否決。見上。
-- 角色存於 JWT custom claim — 否決。需要額外的 Auth Hook 設定，且本專案的權限查詢
-  頻率低，`profiles` 查詢已足夠。
-- 使用 Supabase Auth 的 admin API 建立示範帳號 — 否決。需要 service_role key，
-  禁止出現於前端。示範帳號改由 Dashboard 手動建立，並以 SQL 指定其管理員角色。
+---
 
-## Decision: Credentials loaded from a committed `src/config.js`, never from `.env`
+## R4. 逾期待付款訂單的「查詢時判定」
 
-**Decision**: 憑證由版控中的 `src/config.js` 提供，該檔在 `index.html` 中以一般
-`<script>` 前置載入並設定 `window.__SUNNY_CONFIG__`，預設值為空字串（即示範模式）。
-前端**不**讀取 `.env`、`process.env` 或 `import.meta.env`。`.env` 僅保留給日後可能的
-CI／工具使用，不參與執行期。`service_role` key 一律不得出現於前端或版控。
+**問題**：有了真正的後端後，排程作業變得技術可行，需確認是否改變原決策。
 
-**Rationale**:
-- 專案沒有建置步驟，`import.meta.env` 與 `process.env` 在直接開啟的瀏覽器中一律
-  `undefined`。原 `src/lib/supabase.js` 讀取它們的分支是永遠不會執行的死碼，也讓
-  「我填了 `.env` 卻還是示範模式」變成必然發生的困惑。
-- 若把 `config.js` 加入 `.gitignore`，缺檔時 `<script>` 會產生 404，違反憲章
-  「主控台零錯誤」；因此改為隨專案提供、預設留空。
-- anon key 是設計上可公開的識別碼（Supabase 官方稱為 publishable key），其防護來自
-  RLS 而非保密，因此可以安全地存在於前端設定檔中。這也正是 RLS 必須完整的原因。
+**Decision**：**維持查詢時判定**。保留 `expire_stale_orders()`，由資料存取層在三個時機
+呼叫：查詢房況前、建立訂單前、讀取訂單列表前。
 
-**Alternatives considered**:
-- `config.js` 加入 `.gitignore` + `<script onerror>` — 否決。404 仍會印在主控台。
-- 動態 `import('./config.js')` 包 try/catch — 否決。缺檔的網路錯誤同樣會出現在主控台。
-- 要求使用者跑一個產生設定檔的腳本 — 否決。等同引入建置步驟。
+**Rationale**：
+- 憲章原則 IV 的「MUST NOT 依賴外部排程」在 v3.0.0 更換堆疊後**未被移除**，仍然有效。
+- 排程會引入與請求週期無關的失效模式：排程掛了沒人會立刻發現，房況會安靜地停止釋出。
+  查詢時判定的失效是立即可見的。
+- 取捨已明載於 spec.md 的 Assumptions：「自動取消」的可觀察時點是下一次有人查詢時。
 
-## Decision: Database-enforced booking exclusivity
+**實作位置**：MUST 在資料存取層內部呼叫，MUST NOT 交由各路由自行記得——
+三個呼叫點集中於一處，新增路由時才不會漏掉。
 
-**Decision**: `orders` 表加上 `EXCLUDE USING gist (room_id WITH =,
-daterange(check_in, check_out, '[)') WITH &&) WHERE (status IN ('confirmed',
-'refund-pending'))`（需 `btree_gist` 擴充）。前端仍保留重疊檢查以提供即時回饋，
-但衝突的最終判定以資料庫的約束違反為準，並轉譯為「此房源於所選日期已無空房」。
+---
 
-**Rationale**: 資料改為多人共用後，「查詢後再寫入」之間存在競態窗口，純前端檢查無法
-保證唯一性。Postgres 的排除約束正好以半開區間 `[check_in, check_out)` 表達，與憲章
-原則 IV 的重疊規則完全一致，且自動處理「相鄰不重疊」的邊界案例。
+## R5. 密碼雜湊演算法
 
-**Alternatives considered**:
-- 僅靠前端檢查 — 否決。兩人同時下訂會同時成立。
-- 以 RPC + 交易 + `SELECT ... FOR UPDATE` 實作 — 否決。排除約束更簡短、更難寫錯，
-  且不需要維護額外的資料庫函式。
-- 唯一索引 — 否決。無法表達區間重疊，只能表達完全相同的日期。
+**Decision**：**argon2id**，透過 `argon2-cffi`。
 
-## Decision: Refund policy by days before check-in
+**Rationale**：
+- OWASP 現行首選，對 GPU 破解的抵抗力優於 bcrypt。
+- bcrypt 有 72 位元組的輸入截斷特性，超長密碼會被靜默截斷。FR-009b 只定下限 6 字元、
+  未定上限，這個特性會造成難以察覺的行為差異。
+- `argon2-cffi` 內建 `check_needs_rehash`，日後調高成本參數時可在使用者登入當下
+  自動重新雜湊，不需要求全體重設密碼。
 
-**Decision**:
-- 7+ days before check-in: 100% refund
-- 3–6 days before check-in: 50% refund
-- 1–2 days before check-in: 20% refund
-- same day / after check-in: 0% refund
+**種子帳號**：`guest123` / `admin123` MUST 在種子腳本執行時**計算**雜湊後寫入，
+MUST NOT 走特例路徑（FR-009a 已明訂無例外），也 MUST NOT 硬編碼雜湊值——
+硬編碼會讓日後調整參數時種子資料悄悄落後於正式路徑。
 
-**Rationale**: This is explicit, easy to calculate, and easy to validate in the browser. It also supports the review and admin process without leaving ambiguity.
+---
 
-**Alternatives considered**:
-- Full refund always — rejected because it does not express the planned business constraint.
-- Full refund with admin override only — rejected because it is less testable and less predictable for demo users.
+## R6. 認證的 token 形式
 
-## Decision: Photo risk scoring formula
+**Decision**：JWT 存於 `localStorage`，由前端 API client 統一附加
+`Authorization: Bearer` 標頭。
 
-**Decision**: Score three metrics (brightness, clutter, contrast) on a 0–100 scale, then compute overall risk as:
+**Rationale**：
+- 憲章原則 III 允許 `localStorage` 保存「UI 偏好與認證 token」，明文排除業務資料。
+- 選 `localStorage` 而非 httpOnly cookie：前後端分離部署時 cookie 需處理跨站設定
+  （`SameSite=None; Secure`）與 CSRF 防護，複雜度高於本專案需要。
+- **代價必須誠實記錄**：`localStorage` 中的 token 可被 XSS 讀取。緩解措施是 React 預設的
+  JSX 逸出（不使用 `dangerouslySetInnerHTML`）與較短的 token 有效期。
+  這是刻意取捨，不是疏漏。
 
-`100 - (0.4 × brightness + 0.35 × clutter + 0.25 × contrast)`
+**FR-009d 的對應**：token 過期時 API 回 401，前端 API client MUST 統一攔截、導向登入頁
+並保留原本要前往的位置，MUST NOT 由各元件各自處理。
 
-Risk levels:
-- 0–34: low risk
-- 35–59: medium risk
-- 60–100: high risk
+---
 
-**Rationale**: The rule is simple, deterministic, and can be implemented entirely in-browser with Canvas without external services.
+## R7. Google 登入
 
-**Note (2026-07-31)**: 即使專案已有雲端儲存能力，風險檢測的照片仍 MUST NOT 上傳至
-Supabase Storage 或任何資料表。分析全程留在瀏覽器內，這是憲章原則 VI 的明文要求。
+**問題**：原以 Supabase Auth 的 `signInWithOAuth` 實作，該能力隨 Supabase 移除。
 
-**Alternatives considered**:
-- Binary pass/fail only — rejected because it is not expressive enough for the admin and user guidance requirement.
-- External AI model — rejected because it violates the browser-only and no-network requirement.
+**Decision**：以 Authorization Code Flow 自行實作，**code 交換由 FastAPI 執行**。
+前端只負責導向 Google 與接回 code；client secret MUST 只存在於後端環境變數。
 
-## Decision: Date correctness model
+**FR-088 的關鍵**：以既有電子郵件的 Google 帳號登入時必須進入同一帳號。實作 MUST 以
+電子郵件比對既有 profile 並綁定，MUST NOT 建立第二筆。此處 MUST 有測試覆蓋——
+這是最容易在重構中失守的一條，而失守的表現是使用者「登入後訂單不見了」，
+不是任何錯誤訊息。
 
-**Decision**: Use `YYYY-MM-DD` strings in Asia/Taipei timezone; compare by calendar dates, not timestamps; use half-open interval logic to detect overlaps.
+---
 
-**Rationale**: The constitution explicitly requires this to prevent booking logic errors. It also matches the user-facing requirements and reduces timezone confusion.
+## R8. 兩條照片路徑如何在新架構下維持分離
 
-**Note (2026-07-31)**: Postgres 的 `date` 型別無時區成分，與 `YYYY-MM-DD` 字串一對一
-對應，因此 adapter 於轉換時 MUST NOT 經過 `Date` 物件或 `toISOString()`，避免時區位移。
+**Decision**：維持結構性隔離，分三層：
 
-**Alternatives considered**:
-- Timestamp comparisons in local timezone — rejected because it can shift around DST or browser timezone differences.
-- Simple string comparisons without interval rules — rejected because it fails on adjacent and nested date edge cases.
+1. **共用**：`riskScore.ts`（純函式，Canvas 指標計算），兩條路徑都用。
+2. **前台**：安全檢測頁面只 import `riskScore.ts`。整個前台不存在任何能上傳圖片的函式。
+3. **管理端**：上傳能力只存在於管理端模組，且後端上傳端點 MUST 驗證管理員身分。
 
-## Decision: Access control enforced by RLS, mirrored in the UI
+**Rationale**：以旗標控制（`shouldUpload: boolean`）看似簡單，但失效模式是上傳使用者的
+私人照片——那不是能靠測試補救的錯誤類型。讓前台**沒有**上傳函式可呼叫，
+使該錯誤在結構上無法發生。
 
-**Decision**: 資料庫模式下，會員／管理員的存取邊界由 Supabase Row Level Security 政策
-強制執行；前端的路由檢查與畫面隱藏僅為使用者體驗，不被視為安全機制。示範模式僅有
-前端檢查，並明確標示其非安全機制。
+**新架構下這條更重要**：舊架構沒有後端可以接收照片，禁令某種程度上由架構代為保證；
+現在有了，禁令才真正需要被執行。
 
-**Rationale**: 前端與 anon key 都在使用者可控範圍內，任何只靠畫面隱藏的權限都可被繞過。
-RLS 是唯一實際的邊界，因此「會員不得讀取他人訂單」等要求必須在資料庫層表達。
+**驗證**：SC-030 要求「前台安全檢測照片出現在儲存或資料表中的次數為 0」。除人工驗收外，
+MUST 有一項自動檢查：前台模組的相依圖中不得出現上傳模組。
 
-**Alternatives considered**:
-- 僅前端檢查（原方案）— 已被取代。資料上雲後，僅前端檢查等於全站資料公開可讀。
-- 以 Edge Function 包一層 API — 否決。等同自建後端，且沒有 RLS 做不到的事。
+---
 
-## Decision: Simulated payment and refund model
+## R9. 測試策略
 
-**Decision**: Payment methods are present in the interface, but they are clearly labeled as virtual and never store or request real financial data.
+| 層 | 工具 | 覆蓋範圍 |
+|---|---|---|
+| 後端單元 | pytest | 原則 IV 的**每一條**日期與房況規則，含所列邊界 |
+| API 契約 | pytest + httpx | 每個需授權端點的未認證與越權存取皆被拒 |
+| 前端單元 | Vitest + React Testing Library | 表單驗證、日期呈現 |
+| 端對端 | 現有 puppeteer 測試改寫 | 主要流程 |
 
-**Rationale**: This matches the constitution’s “No False Security, No False Payment” principle and the requirement to show simulation clearly.
+**授權測試的具體要求**：憲章明訂「僅測試 happy path 的授權測試 MUST NOT 被視為已覆蓋」。
+**移除 RLS 後這一層是唯一的存取邊界**，因此每個受保護端點 MUST 有三個案例：
+未認證、以他人身分認證、以正確身分認證。
 
-**Note (2026-07-31)**: 認證改為真實之後，付款仍為模擬。介面 MUST 分別標示，
-避免使用者由「登入是真的」推論「付款也是真的」。
+**gist 約束的測試**：MUST 有一項並行測試實際觸發 `orders_no_overlap`，驗證恰有一筆成立
+且另一筆收到正確訊息（SC-020）。僅測試前端檢查不算覆蓋——前端檢查在並行情境下
+兩邊都會放行。
 
-**Alternatives considered**:
-- Card entry forms with fake fields — rejected because it risks user confusion and does not meet the product disclosure requirement.
-- No payment selection UI — rejected because the feature requirement explicitly calls for payment methods.
+---
+
+## R10. 遷移順序
+
+**Decision**：資料庫 → 後端 → 前端，且新舊不同時部署。
+
+**Rationale**：資料庫是唯一在新舊架構間共用的資產。先把 schema 折進 Alembic 並確認
+gist 約束與各項 CHECK 在新環境下行為一致，後端才有可信的基礎；後端的 OpenAPI 契約
+穩定後，前端才有可對接的目標。反向進行會讓前端對著會變動的契約重寫兩次。
+
+**舊碼處置**：憲章遷移計畫已訂——舊實作 MAY 保留至新實作通過全部驗收清單為止，
+保留期間 MUST NOT 加入新功能，通過後 MUST 移除。本專案將舊前端保留為**行為比對來源**，
+特別是那些寫在 JS 裡但沒寫進 spec 的細節（錯誤訊息措辭、排序穩定性、空狀態文案）。
+
+---
+
+# Part B：沿用的產品決策
+
+## B1. 理由已改變，結論不變 ⚠️
+
+以下三項決策的結論維持不變，但**原本的理由已經失效**。誠實記錄這件事很重要：
+原理由都是「架構上做不到」，現在架構做得到了，禁令因此變成一項**選擇**。
+若不更新，日後會有人正確地指出「我們現在有後端了」，而找不到任何反對的記錄。
+
+### B1-a. 渠道比價以種子資料模擬，不實作爬蟲
+
+**結論不變**：外部平台售價來自 `channel_prices` 種子資料。不爬取任何網站，
+不呼叫任何 OTA API。模組頂端常駐「模擬資料」標示。
+
+| | 舊理由（已失效） | 新理由（現行） |
+|---|---|---|
+| 主要 | 瀏覽器無法定時作業，跨網域被 CORS 擋死 | — 後端可以，此理由不再成立 |
+| 次要 | 伺服器端排程等同自建後端，違反憲章原則 II | — 已自建後端，此理由不再成立 |
+| **現行** | — | **爬取 OTA 平台通常違反其服務條款。這是法律與倫理的限制，不是技術限制。** |
+
+憲章 v3.0.0 已預先寫入這一點：「**後端的存在 MUST NOT 被當成『現在可以寫爬蟲了』的
+理由——限制的理由是法律與倫理，不是技術可行性。**」
+
+### B1-b. 評論的「AI 審核」以規則式引擎實作
+
+**結論不變**：以規則式引擎實作，介面標示為「自動審核（規則式）」而非「AI 審核」。
+判定 MUST 可被管理員複核與覆寫。
+
+| | 舊理由（已失效） | 新理由（現行） |
+|---|---|---|
+| 主要 | 無建置步驟的前端沒有地方安全存放 API 金鑰 | — 後端環境變數可以安全存放，此理由不再成立 |
+| **現行** | — | **刻意的範圍決定**：本專案為展示用，不引入外部 LLM 的成本、延遲與不確定性；且規則式判定可解釋、可覆寫，符合「MUST NOT 成為不可申訴的最終判定」 |
+
+**實作位置變更**：規則式引擎由瀏覽器移至後端。審核結果會影響評論是否公開，
+屬授權範圍內的決定，MUST 在後端執行——留在前端等於讓使用者自行決定自己的評論過不過審。
+
+### B1-c. 待付款訂單以「查詢時判定」處理逾期
+
+見 R4。舊理由含「憲章原則 II 禁止排程」，該原則已改寫；現行理由為原則 IV 的明文禁令
+與「排程失效不可見」的運維考量。
+
+---
+
+## B2. 理由不變，原文沿用 ✅
+
+以下決策與技術堆疊無關，維持原判：
+
+### B2-a. 退款政策依距入住日分級
+
+- 入住前 7 天以上：全額退款
+- 入住前 3–6 天：50%
+- 入住前 1–2 天：20%
+- 入住當日或已入住：不退款
+
+**Rationale**：規則明確、易於計算與驗收，且支援後台審核流程而不留模糊地帶。
+
+### B2-b. 照片風險評分公式
+
+三項指標（亮度、雜亂度、對比）各 0–100，總風險：
+
+`100 - (0.4 × 亮度 + 0.35 × 雜亂度 + 0.25 × 對比)`
+
+等級：0–34 低風險／35–59 中風險／60–100 高風險。
+
+**Rationale**：簡單、確定性、可完全在瀏覽器內以 Canvas 實作。
+**前台使用者的受檢照片仍 MUST NOT 離開瀏覽器**（見 R8）。
+
+### B2-c. 日期正確性模型
+
+`YYYY-MM-DD` 字串、Asia/Taipei、日曆日比較、半開區間重疊判定。
+
+**Rationale**：憲章原則 IV 的明文要求。
+
+**新架構補充**：PostgreSQL 的 `date` 型別無時區成分，與 `YYYY-MM-DD` 一對一對應。
+後端 MUST 使用 `datetime.date`，MUST NOT 經過 `datetime.datetime` 或帶時區的轉換；
+序列化為 JSON 時 MUST 輸出 `YYYY-MM-DD` 字串。前端 MUST NOT 用 `new Date(str)` 解析
+日曆日——該建構式會依瀏覽器時區位移一天。
+
+### B2-d. 模擬付款與退款
+
+介面呈現付款方式，但明確標示為虛擬，絕不儲存或索取真實金融資訊。
+
+**Rationale**：憲章原則 VI。**認證為真、付款為假，兩者 MUST 分別標示**，
+避免使用者由「登入是真的」推論「付款也是真的」。此規定 MUST NOT 因改用真實後端而放寬——
+反而因為現在真的有伺服器會收到這些欄位而更重要。

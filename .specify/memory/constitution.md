@@ -1,5 +1,23 @@
 <!--
 Sync Impact Report
+- Version change: 3.1.0 → 3.1.1
+- Bump rationale: PATCH。修正 v3.0.0／v3.1.0 對既有 schema 的一項事實誤述，
+  並據此確定 RLS 的處置。不新增、移除或重新定義任何原則，故為 PATCH。
+- Corrected:
+  - 遷移計畫表原稱 `supabase/schema.sql`「內容 MUST 完整保留」。查核後為誤：
+    該檔有 36 處參照 Supabase 的 `auth` schema——`profiles.id` 外鍵指向
+    `auth.users`、`on_auth_user_created` 觸發器掛在 `auth.users` 上、
+    38 條 RLS 政策中 30 條呼叫 `auth.uid()`、42 處呼叫 `is_admin()`。
+    這些隨 Supabase Auth 一併消失，無法原樣保留。該列已拆為四列，
+    逐層標明何者原樣保留、何者必須改寫。
+  - 資料庫約束的 RLS 條原寫「MAY 保留為縱深防禦」，同屬未查核下的誤判。
+    改為 MUST 全數移除，並新增一條要求保留「不依賴身分的資料庫保證」
+    （gist 排除約束、CHECK 約束、`admin_logs` 僅可新增），後者改以資料表權限
+    （`REVOKE UPDATE, DELETE`）實作。
+- 依據：使用者於 2026-08-03 於 `/speckit-plan` 階段確認「完全移除 RLS」。
+  查核證據見該次對話與 `specs/001-booking-site/research.md`。
+
+Sync Impact Report（前一版）
 - Version change: 3.0.0 → 3.1.0
 - Bump rationale: MINOR。解決 v3.0.0 遺留的兩個 TODO，並新增 ORM 與遷移機制的
   規定。原憲章未指定資料存取方式（僅要求「MUST 使用非同步驅動」），亦未指定
@@ -382,9 +400,16 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
   MUST 與之一致。MUST NOT 另外維護一份手寫的全量 schema SQL 作為平行副本——
   兩份事實來源必然分歧，而本專案已經歷過一次（見 Governance 遷移計畫）。
   MAY 由工具產生唯讀快照供閱讀，但 MUST 標示為衍生產物。
-- **RLS**：Row Level Security 不再是本專案的授權機制——授權邊界在 FastAPI（原則 VI）。
-  既有的 RLS 政策 MAY 保留為縱深防禦，但 MUST NOT 被當作唯一的存取控制，
-  也 MUST NOT 讓「RLS 會擋」成為後端省略權限檢查的理由。
+- **RLS**：Row Level Security **MUST 全數移除**。授權邊界在 FastAPI（原則 VI）。
+  （2026-08-03 修正：原條文寫「MAY 保留為縱深防禦」，是在未查核既有政策的情況下寫的。
+  實際上 38 條政策中 30 條直接呼叫 `auth.uid()`、42 處呼叫依賴它的 `is_admin()`——
+  該函式隨 Supabase Auth 一併消失，留著的政策不是全擋就是報錯。
+  「保留」在此情境下不是縱深防禦，是留下一層壞掉的程式碼。）
+- **不依賴身分的資料庫保證 MUST 保留**：`EXCLUDE USING gist` 房況約束、CHECK 約束，
+  以及 `admin_logs` 的僅可新增特性。後者 MUST 改以資料表權限實作
+  （對應用角色 `REVOKE UPDATE, DELETE`），MUST NOT 因為 RLS 移除就一併失去。
+  這些保證不需要知道「誰」在操作，因此不受認證變更影響——它們才是原則 IV
+  與稽核日誌條款的實際承載者。
 - **稽核日誌**：管理員的後台變更操作 MUST 被記錄。日誌 MUST 為僅可新增
   （append-only）：任何角色皆 MUST NOT 能更新或刪除既有紀錄，包含管理員本人。
   日誌 MUST NOT 記錄密碼、秘鑰或任何真實個資。
@@ -461,10 +486,12 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 | `styles/`（5 個 CSS 檔） | 手寫 CSS 自訂屬性 | 不合規，色值與字級 MUST 移入 Tailwind theme |
 | `src/config.js` / `window.__SUNNY_CONFIG__` | 前端持有 Supabase 憑證 | 不合規，MUST 移除，憑證改入後端環境變數 |
 | localStorage adapter | 示範模式的資料層 | 不合規，MUST 移除（原則 III） |
-| `supabase/schema.sql`（12 張表、38 條 RLS、11 個函式、1 條 gist 排除約束） | 已於全新專案實跑驗證通過 | **內容 MUST 完整保留**，但 MUST 折進 Alembic 的初始 revision（以原生 SQL 承載），MUST NOT 續存為平行維護的檔案 |
+| `supabase/schema.sql` → 資料表、CHECK 約束、24 個索引 | 已實跑驗證通過 | **MUST 原樣折進 Alembic 初始 revision**（`profiles.id` 對 `auth.users` 的外鍵除外） |
+| `supabase/schema.sql` → `EXCLUDE USING gist` 房況約束 | 原則 IV 的資料庫層保證 | **MUST 原樣保留**，純 PostgreSQL，不受認證變更影響 |
+| `supabase/schema.sql` → 38 條 RLS 政策 | 授權機制 | **MUST 移除**（見下方修正說明） |
+| `supabase/schema.sql` → 11 個函式 | 業務規則與守門 | 5 個純 PostgreSQL 者 MUST 保留；`is_admin`、`prevent_role_escalation`、`guard_order_transition`、`stamp_review_reply`、`stamp_message_sender` 與掛在 `auth.users` 上的 `handle_new_user` MUST 改寫或移除 |
 | `supabase/migrations.sql`（356 行） | 供舊資料庫補上後續變更 | 其內容已完整包含於 `schema.sql`（見該檔標頭）。初始 revision 建立後即無用途，MUST 移除 |
-| `supabase/seed*.sql` | 種子資料 | 合規，MUST 保留 |
-| RLS 政策 | 授權機制 | 降級為縱深防禦，MAY 保留但 MUST NOT 為唯一邊界 |
+| `supabase/seed*.sql` | 種子資料 | 合規，MUST 保留（帳號密碼改為雜湊值） |
 | `tests/`（unit.js、e2e、rest） | 瀏覽器內測試 + puppeteer | 過渡期 MAY 保留供比對；後端測試 MUST 以 pytest 重建 |
 
 過渡期規則：
@@ -491,4 +518,4 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 在修復之前，主要按鈕 MUST NOT 被描述為符合 WCAG AA。
 移植至 Tailwind theme 時 MUST 一併處理此項，MUST NOT 把已知的不合規色值原樣搬過去。
 
-**Version**: 3.1.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-03
+**Version**: 3.1.1 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-03

@@ -38,8 +38,7 @@ export function createFilterBar(onChange, vocabulary) {
 
   // 條件式必填的規則要先說，不要等使用者按了搜尋才用紅字告訴他
   const stayHint = document.createElement('p');
-  stayHint.className = 'field__hint';
-  stayHint.style.marginTop = 'calc(var(--sp-2) * -1)';
+  stayHint.className = 'field__hint filter-bar__hint';
   stayHint.textContent = '不填日期也可以搜尋，只是不會排除當天訂滿的房源。'
     + '要查特定日期的空房時，入住日、退房日與入住人數請一起填寫。';
   form.append(stayHint);

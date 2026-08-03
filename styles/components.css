@@ -228,6 +228,15 @@
 }
 .filter-bar .field { margin-bottom: 0; }
 
+/* 條件式必填的說明。它講的是整排欄位的規則，不是某一格的補充，
+   所以與欄位之間留出跟欄位間距同級的呼吸空間，不要黏在輸入框下緣。
+   max-width 是給滿寬版面用的——兩行字橫跨整個寬螢幕會難以閱讀。 */
+.filter-bar__hint {
+  margin-top: var(--sp-4);
+  max-width: 68ch;
+  line-height: 1.7;
+}
+
 .filter-bar__actions {
   display: flex;
   gap: var(--sp-3);

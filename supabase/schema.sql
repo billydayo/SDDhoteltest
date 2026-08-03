@@ -356,7 +356,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   if new.admin_reply is distinct from old.admin_reply then
     if not public.is_admin() then
@@ -372,7 +372,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists trg_stamp_review_reply on public.reviews;
 create trigger trg_stamp_review_reply

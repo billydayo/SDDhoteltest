@@ -58,14 +58,6 @@ export function writeCollection(name, value) {
   }
 }
 
-export function removeCollection(name) {
-  try {
-    window.localStorage.removeItem(key(name));
-  } catch {
-    // 移除失敗不影響使用者流程，忽略
-  }
-}
-
 /** 清除本應用程式的所有資料（供「還原為初始種子資料」使用） */
 export function clearAll() {
   try {

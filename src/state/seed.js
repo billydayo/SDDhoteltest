@@ -467,4 +467,3 @@ export function buildSeedData() {
   };
 }
 
-export { ROOM_IDS };

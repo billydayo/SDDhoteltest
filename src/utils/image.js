@@ -10,7 +10,7 @@
  * 壓縮全程用 Canvas 在本機完成，不需要任何外部服務。
  */
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;   // 原始檔上限 10 MB
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;   // 原始檔上限 10 MB
 
 /** 房源展示照片：長邊上限與 JPEG 品質 */
 const ROOM_PHOTO = { maxEdge: 1600, quality: 0.82 };

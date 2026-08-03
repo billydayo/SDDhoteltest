@@ -24,7 +24,7 @@ import { normalizeText, REVIEW_MIN_LENGTH } from '../utils/validation.js';
 export const MIN_LENGTH = REVIEW_MIN_LENGTH;
 
 /** 規則代碼 → 給管理員看的說明 */
-export const RULES = Object.freeze({
+const RULES = Object.freeze({
   PROFANITY:      { label: '含不當字詞', severity: 'reject' },
   TOO_SHORT:      { label: '內容過短', severity: 'reject' },
   GIBBERISH:      { label: '疑似亂碼或無意義字元', severity: 'reject' },

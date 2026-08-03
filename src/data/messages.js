@@ -25,9 +25,3 @@ export const sendMessage = (input) => repo.sendMessage(input);
 /** 把對方送來、自己還沒讀的標為已讀 */
 export const markRead = (threadUserId, readerRole) =>
   repo.markMessagesRead(threadUserId, readerRole);
-
-/** 會員端的未讀數：管理員說了話但自己還沒讀 */
-export async function unreadForMember(userId) {
-  const messages = await listMessages(userId);
-  return messages.filter((m) => m.senderRole === 'admin' && !m.readAt).length;
-}

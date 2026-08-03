@@ -61,4 +61,3 @@ export function mutate(name, mutator) {
   return next;
 }
 
-export { COLLECTIONS };

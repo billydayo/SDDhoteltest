@@ -120,7 +120,7 @@ export function isGoogleLoginAvailable() {
 
 const REDIRECT_KEY = 'sunny.postAuthRedirect';
 
-export function savePostAuthRedirect(hash) {
+function savePostAuthRedirect(hash) {
   try { window.sessionStorage.setItem(REDIRECT_KEY, hash); } catch { /* 無痕模式可能不可用 */ }
 }
 
@@ -194,7 +194,7 @@ export async function updateOwnProfile(patch) {
 export const isSignedIn = () => store.isSignedIn();
 export const isAdmin = () => store.isAdmin();
 
-export function requireSignedIn() {
+function requireSignedIn() {
   if (!store.isSignedIn()) throw appError('SESSION_EXPIRED', '請先登入後再繼續。');
 }
 
@@ -207,9 +207,4 @@ export function requireSignedIn() {
 export function requireAdmin() {
   requireSignedIn();
   if (!store.isAdmin()) throw appError('FORBIDDEN', '此頁面僅限管理員存取。');
-}
-
-/** 工作階段逾時的統一處理（FR-009d） */
-export function isSessionExpired(err) {
-  return isAppError(err, 'SESSION_EXPIRED');
 }

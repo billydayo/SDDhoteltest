@@ -84,22 +84,5 @@ export async function createBooking(input) {
   return { order, room, nights, totalAmount };
 }
 
-/** 完成模擬付款：待付款 → 已確認（FR-096）。逾期會被拒絕（FR-100）。 */
-export async function payBooking(orderId) {
-  return repo.payOrder(orderId);
-}
-
-/** 保留時間（分鐘），供畫面顯示「請於 N 分鐘內完成付款」 */
-export const holdMinutes = () => getPendingPaymentMinutes();
-
-// 退款相關邏輯集中於 src/services/refunds.js，本模組不重複實作。
-
-// ---------------------------------------------------------------------------
-// 房況
-// ---------------------------------------------------------------------------
-
-/** 某房源在指定區間是否可訂。供詳情頁的即時提示使用。 */
-export async function isRoomBookable(roomId, checkIn, checkOut) {
-  const rooms = await repo.getRooms({ checkIn, checkOut });
-  return rooms.some((r) => r.id === roomId);
-}
+// 付款走 data/orders.js 的 payOrder；退款集中於 services/refunds.js。
+// 本模組不再包一層轉呼叫——那只會讓同一件事有兩條路徑，而兩條路徑遲早會分歧。

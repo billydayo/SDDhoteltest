@@ -42,7 +42,7 @@ export async function eligibleOrdersForRoom(roomId) {
 }
 
 /** 表單驗證。回傳 { field: message }，空物件代表通過。 */
-export function validateReviewForm({ rating, comment, category }) {
+function validateReviewForm({ rating, comment, category }) {
   const errors = {};
 
   const ratingError = validateRating(rating);

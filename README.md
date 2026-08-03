@@ -42,9 +42,11 @@
 
 **後台（十二個模組）**
 
-儀表板、房源管理、訂單管理（含營運指標）、用戶管理、評論審核、退款審核、
-報表匯出（Excel / CSV fallback）、內容編輯、管理員操作日誌、
-渠道比價與控價、系統與參數設定。
+儀表板、房源管理、訂單管理（含營運指標）、用戶管理、評論審核、會員訊息、
+退款審核、內容編輯、房源品質檢測、渠道比價與控價、操作日誌、系統與參數設定。
+
+報表匯出（Excel／CSV fallback）刻意**不是**獨立模組——匯出按鈕嵌在各資料頁面內，
+範圍是該頁當前的篩選結果。獨立分頁取不到別頁的篩選條件，只能匯出全部。
 
 ## 模擬功能的誠實聲明
 
@@ -82,12 +84,13 @@ SDDhoteltest/
 │   │   ├── channel.js       # 渠道比價（模擬資料）
 │   │   ├── audit.js         # 稽核日誌寫入
 │   │   └── export.js        # Excel / CSV 匯出
-│   ├── pages/               # 前台 10 頁 + 後台 12 模組
+│   ├── pages/               # 前台 11 頁（含 404）+ 後台 12 模組
 │   ├── components/ state/ utils/
 │   └── main.js
 ├── supabase/
-│   ├── schema.sql           # 十一張表、約束、trigger、RLS 政策、Storage
-│   └── seed.sql             # 示範房源、網站內容與模擬渠道價格
+│   ├── schema.sql           # 十二張表、約束、trigger、RLS 政策、Storage
+│   ├── seed.sql             # 示範房源、網站內容與模擬渠道價格
+│   └── migrations.sql       # 既有資料庫的升級；全新安裝不需要
 ├── tests/                   # 自動化測試；依憲章，刪掉整個目錄應用仍完整可用
 │   ├── index.html runner.js unit.js   # 第一層：零依賴，開瀏覽器就跑
 │   └── e2e/                 # 第二層：Node + 無頭瀏覽器的端對端測試
@@ -122,7 +125,7 @@ python -m http.server 8000
 1. 建立 Supabase 專案，並於 Authentication → Providers → Email 關閉 "Confirm email"
 2. （選用）於 Authentication → Providers → Google 啟用第三方登入
 3. 於 SQL Editor 依序執行 `supabase/schema.sql` 與 `supabase/seed.sql`
-   - 既有專案升級時，另需依序執行 `supabase/migrate-*.sql`（見下方「資料庫遷移」）
+   - 既有專案升級時，另需執行 `supabase/migrations.sql`（見下方「資料庫遷移」）
    - 若專案曾裝過舊版 schema（`public` 底下看得到 `users`、或看不到 `profiles`），
      必須先執行 `supabase/reset-legacy.sql`。直接重跑 schema.sql 無效——
      `create table if not exists` 會靜默跳過既有的舊表，留下結構錯誤的資料庫。
@@ -134,18 +137,33 @@ python -m http.server 8000
 
 ## 資料庫遷移
 
-`schema.sql` 只給全新安裝。既有的資料庫要跟上新功能，必須另外執行對應的
-`migrate-*.sql`——`create table if not exists` 對已存在的表是靜默跳過的，
-重跑 schema.sql 補不到後來新增的欄位、政策與 trigger。
+**全新安裝不需要這一節**——`schema.sql` 已包含全部內容。
 
-| 檔案 | 內容 | 沒執行的症狀 |
-|---|---|---|
-| `migrate-room-status.sql` | 移除 `rooms.status` 的 `booked` | 房態可被設成永久賣不出去的值 |
-| `migrate-room-vocabulary.sql` | 設施／特色改存 `system_settings` | 後台無法增刪設施與特色 |
-| `migrate-order-cancel.sql` | 會員可取消待付款訂單（FR-035a） | 按下取消回「不允許的訂單狀態變更」 |
-| `migrate-messages.sql` | 評論回覆與私訊（FR-103d、FR-123~128） | 客服訊息頁顯示「資料表尚未建立」 |
+既有的資料庫要跟上新功能，執行 `supabase/migrations.sql` 一支即可。
+重跑 `schema.sql` 是沒有用的：`create table if not exists` 對已存在的表是靜默
+跳過，補不到後來新增的欄位、政策與 trigger，卻會讓人以為已經更新了。
 
-未執行時，畫面會直接說出該跑哪一支，而不是丟一個看不懂的錯誤。
+| `migrations.sql` 的四段 | 沒執行的症狀 |
+|---|---|
+| rooms.status 移除 `booked` | 房態可被設成永久賣不出去的值 |
+| 設施／特色改存 `system_settings` | 後台無法增刪設施與特色 |
+| 會員可取消待付款訂單（FR-035a） | 按下取消回「不允許的訂單狀態變更」 |
+| 評論回覆與私訊（FR-103d、FR-123~128） | 客服訊息頁顯示「資料表尚未建立」 |
+
+四段依相依順序排列且可重複執行，整份貼上即可，不需要判斷自己缺哪幾段。
+未執行時畫面會直接說出該跑什麼，而不是丟一個看不懂的錯誤。
+
+### `supabase/` 各檔用途
+
+| 檔案 | 什麼時候跑 |
+|---|---|
+| `schema.sql` | **必要**。十二張表、約束、trigger、RLS 政策與 Storage |
+| `seed.sql` | **必要**。示範房源、網站內容與模擬渠道價格 |
+| `bootstrap-admin.sql` | 建立第一個管理員。應用程式內沒有任何路徑能自我升權，只能在這裡做 |
+| `migrations.sql` | 既有資料庫升級用。全新安裝不需要 |
+| `seed-demo-data.sql` | 選用。大量示範訂單與評論，只清理自己上次產生的資料 |
+| `seed-past-stay.sql` | 選用。補一筆「已入住完畢」的訂單——正常流程做不出可評論的訂單 |
+| `reset-legacy.sql` | ⚠️ 會刪資料。僅用於曾裝過 2026-07-31 改版前 schema 的專案 |
 
 ## 測試帳號
 
@@ -208,7 +226,7 @@ npm test
 
 ## 參考文件
 
-- 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v2.3.0）
+- 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v2.6.0）
 - 規格文件：[`specs/001-booking-site/spec.md`](specs/001-booking-site/spec.md)
 - 實作計畫：[`specs/001-booking-site/plan.md`](specs/001-booking-site/plan.md)
 - 研究紀錄：[`specs/001-booking-site/research.md`](specs/001-booking-site/research.md)

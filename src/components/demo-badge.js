@@ -32,8 +32,3 @@ export function renderModeBanner(container) {
 
   container.append(banner);
 }
-
-/** 表單或按鈕旁的簡短說明，用於 Google 登入等示範模式不支援的功能 */
-export function demoUnsupportedNote(featureName) {
-  return `${featureName}需要連線至資料庫，示範模式不支援。`;
-}

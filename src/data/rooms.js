@@ -62,14 +62,11 @@ export function formatRating(averageRating) {
 //
 // 用 `storage:` 前綴而非直接存公開網址，是為了刪除時能還原出物件路徑。
 // 存公開網址就得反解析 URL 才知道要刪哪個檔，那很容易在 Supabase 改版時壞掉。
+//
+// 前綴的解析全部收在 adapters/supabase.js——只有那裡需要把前綴換回物件路徑。
+// 本模組曾經另外放過一份 STORAGE_PREFIX／isStorageRef／toStoragePath，
+// 但從來沒有人呼叫，兩份定義各自演化只會讓「哪一份才算數」變成問題。
 // ---------------------------------------------------------------------------
-
-export const STORAGE_PREFIX = 'storage:';
-
-export const isStorageRef = (value) => typeof value === 'string' && value.startsWith(STORAGE_PREFIX);
-
-/** `storage:rooms/xxx.jpg` → `rooms/xxx.jpg` */
-export const toStoragePath = (value) => (isStorageRef(value) ? value.slice(STORAGE_PREFIX.length) : null);
 
 /** 把 images 陣列中的任一項轉成可直接放進 <img src> 的字串 */
 export const resolveImageUrl = (value) => repo.resolveRoomPhotoUrl(value);

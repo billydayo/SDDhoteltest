@@ -4,7 +4,7 @@
  *
  * 全程跑示範模式：這一支會真的送出訊息、真的公開一則回覆、真的取消訂單。
  * 私訊的權限邊界在資料庫模式是由 RLS 與 stamp_message_sender trigger 執行的，
- * 那一層由 supabase/migrate-messages.sql 末端的驗證清單以 SQL 驗，
+ * 那一層由 supabase/migrations.sql 末端的驗證清單以 SQL 驗，
  * 不在這裡重複——瀏覽器測不到「繞過前端直接寫入」的情形。
  */
 

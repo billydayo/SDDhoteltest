@@ -111,6 +111,27 @@ US9（房源檢測與詳情頁展示）。
 > 合併為單一的 `supabase/migrations.sql`（內容逐字保留，僅去掉重複四次的樣板說明）。
 > 上文保留原始檔名，因為那是當時實際發生的事。
 
+**`schema.sql` 已於 2026-08-03 在一個全新的 Supabase 專案實際執行驗證通過**
+（973 行，`Success. No rows returned`），接著執行 `seed.sql` 亦成功。這是第一次
+真正跑過整支 schema——先前所有驗證都在既有資料庫上，而既有資料庫是靠 migrate 檔
+建起來的，永遠不會經過 schema.sql。
+
+這次驗證抓到兩個只有實跑才會現形的缺陷，兩者都在同一次「把 migration 同步進
+schema.sql」的操作中產生：
+
+| 缺陷 | 症狀 |
+|---|---|
+| `create table public.messages` 整段遺漏，且兩個 trigger 被放到所有資料表之前 | 全新安裝在 `drop trigger ... on public.messages` 就中止 |
+| `stamp_review_reply` 的 `$$` 少了一個 `$`（第 359、375 行） | 42601 syntax error。Postgres 會先整份解析多語句字串，因此**整支檔案一列都不會執行** |
+
+第二個特別值得記：錯誤訊息指向第 359 行，但真正的後果是整份檔案失效——
+單看行號會以為只是某個函式壞掉。判斷依據是接著跑 `seed.sql` 時回報
+`relation "public.rooms" does not exist`，證明**前面 358 行也全部沒有生效**。
+
+已補上三項靜態檢查（dollar-quoting 成對、與 `migrations.sql` 的共有定義逐字比對、
+trigger 引用的函式是否都有定義），但它們只是輔助——`schema.sql` 改動後仍應在
+全新專案實跑一次，那是唯一的真憑據。
+
 ### 2026-08-03 的第三批修正
 
 驗收時追加回報的三項，都屬於「功能會動但用起來不對」的類型：

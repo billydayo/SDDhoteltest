@@ -88,6 +88,9 @@ SDDhoteltest/
 ├── supabase/
 │   ├── schema.sql           # 十一張表、約束、trigger、RLS 政策、Storage
 │   └── seed.sql             # 示範房源、網站內容與模擬渠道價格
+├── tests/                   # 自動化測試；依憲章，刪掉整個目錄應用仍完整可用
+│   ├── index.html runner.js unit.js   # 第一層：零依賴，開瀏覽器就跑
+│   └── e2e/                 # 第二層：Node + 無頭瀏覽器的端對端測試
 ├── specs/
 │   └── 001-booking-site/
 │       ├── spec.md
@@ -152,6 +155,42 @@ python -m http.server 8000
 > 這些帳號僅為展示用途。本站為展示專案，請勿使用你在其他網站的真實密碼，
 > 也請勿輸入真實金融資訊。
 
+## 測試
+
+兩層，依憲章都只存在於 `tests/` 之下——應用程式不 import 任何一支，
+刪掉整個目錄，應用仍完整可用。
+
+**第一層・單元測試**（零依賴）：起一個靜態伺服器後開
+`http://127.0.0.1:8000/tests/index.html`，全綠即通過。純函式與判定規則，
+不需要 Node 也不需要 `npm install`。
+
+**第二層・端對端測試**（Node + 無頭 Chrome）：真的開瀏覽器、真的點按鈕、
+真的比對畫面與資料庫。
+
+```bash
+cd tests
+npm install        # 只裝 puppeteer-core，不下載 Chromium
+npm run serve      # 另開一個終端機
+npm test
+```
+
+| 指令 | 內容 |
+|---|---|
+| `npm test` | 全部（端對端 161 項，另含單元測試 40 項斷言） |
+| `npm run test:unit` | 第一層，收進同一個出口 |
+| `npm run test:search` | 首頁搜尋與篩選（資料庫模式） |
+| `npm run test:orders` | 會員端訂單與取消 |
+| `npm run test:admin` | 逐日房態、匯出、設施／特色增刪 |
+| `npm run test:photos` | 房源照片管理與上傳邊界 |
+| `npm run test:messaging` | 私訊與評論回覆 |
+| `npm run test:google` | Google 第三方登入 |
+
+各支跑在哪個模式、為什麼，見 [`tests/README.md`](tests/README.md)。
+
+**自動化不取代人工驗收。** 版面、對比、照片好不好看這類需要人眼判斷的項目，
+以及需要真實 Google 帳密的登入往返（FR-088／SC-025），仍以
+[瀏覽器驗收清單](specs/001-booking-site/checklists/browser-acceptance.md) 把關。
+
 ## 開發限制
 
 - 不使用 React、Vue、Angular 等前端框架
@@ -177,6 +216,8 @@ python -m http.server 8000
 - 介面契約：[`specs/001-booking-site/contracts/README.md`](specs/001-booking-site/contracts/README.md)
 - 任務清單：[`specs/001-booking-site/tasks.md`](specs/001-booking-site/tasks.md)
 - 快速驗收：[`specs/001-booking-site/quickstart.md`](specs/001-booking-site/quickstart.md)
+- 瀏覽器驗收清單：[`specs/001-booking-site/checklists/browser-acceptance.md`](specs/001-booking-site/checklists/browser-acceptance.md)
+- 自動化測試：[`tests/README.md`](tests/README.md)
 
 ## 三條不可跨越的界線
 

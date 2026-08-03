@@ -43,13 +43,6 @@
   color: var(--c-text-invert);
 }
 
-.btn--forest {
-  background: var(--c-forest);
-  border-color: var(--c-forest);
-  color: var(--c-text-invert);
-}
-.btn--forest:hover:not(:disabled) { background: var(--c-forest-strong); color: var(--c-text-invert); }
-
 .btn--danger { color: var(--c-danger); border-color: var(--c-border); }
 .btn--danger:hover:not(:disabled) { background: var(--c-danger-soft); border-color: var(--c-danger); color: var(--c-danger); }
 
@@ -60,8 +53,6 @@
   letter-spacing: 0.02em;
 }
 .btn--ghost:hover { background: var(--c-brand-soft); border-color: transparent; color: var(--c-text); }
-
-.btn--block { width: 100%; }
 
 /* --------------------------------------------------------------- 標籤 */
 

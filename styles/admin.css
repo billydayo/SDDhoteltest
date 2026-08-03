@@ -134,11 +134,6 @@
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr:hover { background: var(--c-brand-soft); }
 
-.data-table td.is-numeric {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 /* 賤賣預警等需要一眼看見的列 */
 .data-table tr.is-alert { background: var(--c-danger-soft); }
 .data-table tr.is-alert:hover { background: var(--c-danger-soft); }

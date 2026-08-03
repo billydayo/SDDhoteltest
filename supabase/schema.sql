@@ -22,61 +22,6 @@
 -- btree_gist 讓 uuid 的 `=` 能與 daterange 的 `&&` 併用於排除約束。
 -- 若 SQL Editor 回報找不到 operator class，先執行：set search_path = public, extensions;
 
-create or replace function public.stamp_message_sender()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  new.sender_id := auth.uid();
-  new.sender_role := case when public.is_admin() then 'admin' else 'member' end;
-
-  -- 會員只能在自己的討論串裡發言；管理員可以在任何一串回覆
-  if new.sender_role = 'member' and new.thread_user_id <> auth.uid() then
-    raise exception '只能在自己的討論串中發言' using errcode = '42501';
-  end if;
-
-  new.read_at := null;                 -- 新訊息一律未讀，由對方讀取時才標記
-  new.created_at := now();
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_stamp_message_sender on public.messages;
-create trigger trg_stamp_message_sender
-  before insert on public.messages
-  for each row execute function public.stamp_message_sender();
-
-/*
- * 訊息內容不可竄改，只有已讀時間可以更新。
- *
- * 與操作日誌同精神：一則已送出的訊息若能事後改字，整份對話就失去佐證能力。
- */
-
-create or replace function public.guard_message_update()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if new.body is distinct from old.body
-     or new.sender_id is distinct from old.sender_id
-     or new.sender_role is distinct from old.sender_role
-     or new.thread_user_id is distinct from old.thread_user_id
-     or new.created_at is distinct from old.created_at then
-    raise exception '訊息送出後不可修改' using errcode = '42501';
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists trg_guard_message_update on public.messages;
-create trigger trg_guard_message_update
-  before update on public.messages
-  for each row execute function public.guard_message_update();
-
 create extension if not exists btree_gist;
 
 -- ---------------------------------------------------------------------------
@@ -577,6 +522,86 @@ create table if not exists public.admin_logs (
 
 comment on table public.admin_logs is
   '僅可新增。刻意不提供 UPDATE/DELETE 政策——任何角色（含管理員）都不得竄改稽核紀錄。';
+
+-- ---------------------------------------------------------------------------
+-- messages — 會員與管理員的私訊（FR-123 ~ FR-127）
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  -- 討論串的擁有者永遠是那位會員。管理員只是參與者，因此不存 recipient——
+  -- 存了就得回答「哪一位管理員」，而那正是我們不想綁定的東西。
+  thread_user_id uuid not null references public.profiles(id) on delete cascade,
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  sender_role text not null check (sender_role in ('member', 'admin')),
+  body text not null check (char_length(body) between 1 and 2000),
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.messages is
+  '討論串屬於 thread_user_id 那位會員；任何管理員都看得到、都能回（FR-127）。只增不刪。';
+
+/*
+ * sender_role 由伺服器判定，不採信前端送來的值。
+ *
+ * 前端若能自稱 admin，會員就能偽造一則「官方回覆」給自己看——
+ * 資料是自己的討論串，RLS 擋不住這種寫入，只有 trigger 擋得住。
+ * 同時強制 sender_id = auth.uid()：訊息不能冒名。
+ */
+create or replace function public.stamp_message_sender()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.sender_id := auth.uid();
+  new.sender_role := case when public.is_admin() then 'admin' else 'member' end;
+
+  -- 會員只能在自己的討論串裡發言；管理員可以在任何一串回覆
+  if new.sender_role = 'member' and new.thread_user_id <> auth.uid() then
+    raise exception '只能在自己的討論串中發言' using errcode = '42501';
+  end if;
+
+  new.read_at := null;                 -- 新訊息一律未讀，由對方讀取時才標記
+  new.created_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_stamp_message_sender on public.messages;
+create trigger trg_stamp_message_sender
+  before insert on public.messages
+  for each row execute function public.stamp_message_sender();
+
+/*
+ * 訊息內容不可竄改，只有已讀時間可以更新。
+ *
+ * 與操作日誌同精神：一則已送出的訊息若能事後改字，整份對話就失去佐證能力。
+ */
+create or replace function public.guard_message_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.body is distinct from old.body
+     or new.sender_id is distinct from old.sender_id
+     or new.sender_role is distinct from old.sender_role
+     or new.thread_user_id is distinct from old.thread_user_id
+     or new.created_at is distinct from old.created_at then
+    raise exception '訊息送出後不可修改' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_message_update on public.messages;
+create trigger trg_guard_message_update
+  before update on public.messages
+  for each row execute function public.guard_message_update();
 
 -- ---------------------------------------------------------------------------
 -- Indexes

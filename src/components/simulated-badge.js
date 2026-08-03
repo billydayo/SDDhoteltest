@@ -10,7 +10,7 @@
  * @param {{title: string, body: string}} config
  * @returns {HTMLElement}
  */
-export function createSimulatedBadge({ title, body }) {
+function createSimulatedBadge({ title, body }) {
   const box = document.createElement('div');
   box.className = 'simulated-badge';
   box.setAttribute('role', 'note');

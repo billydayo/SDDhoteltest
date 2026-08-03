@@ -22,7 +22,7 @@ import { formatDateTime } from '../utils/dates.js';
  * @returns {Array<{id, roomId, roomName, channel, websitePrice, channelPrice,
  *                  gap, gapPercent, isUndercut, capturedAt, resolved}>}
  */
-export function buildComparison(prices, rooms) {
+function buildComparison(prices, rooms) {
   const roomById = new Map(rooms.map((r) => [r.id, r]));
 
   return prices

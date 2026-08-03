@@ -28,7 +28,8 @@ import { renderMessages } from './pages/messages.js';
 import { renderRiskCheck } from './pages/risk-check.js';
 import { renderTerms } from './pages/terms.js';
 import { renderAdmin } from './pages/admin.js';
-import { placeholderPage } from './pages/placeholder.js';
+import { renderNotFound } from './pages/not-found.js';
+import { ADMIN_MODULES } from './components/admin-panel.js';
 import { renderModeBanner } from './components/demo-badge.js';
 
 async function boot() {
@@ -118,12 +119,15 @@ function startExpirySweep() {
   }, SWEEP_INTERVAL_MS);
 }
 
-const ADMIN_ROUTES = [
-  '#/admin', '#/admin/rooms', '#/admin/orders', '#/admin/users',
-  '#/admin/reviews', '#/admin/refunds', '#/admin/content',
-  '#/admin/risk', '#/admin/channel', '#/admin/logs', '#/admin/settings',
-  '#/admin/messages'
-];
+/*
+ * 後台路由直接由 ADMIN_MODULES 推導，不另外手抄一份。
+ *
+ * 這裡原本是一份寫死的清單，於是同一組路由在專案裡有三份：導覽（ADMIN_MODULES）、
+ * 路由註冊（這裡）、分派表（pages/admin.js）。新增模組時漏改任何一份都不會報錯，
+ * 只會表現成「導覽點了沒反應」或「網址進得去但選單看不到」——最難查的那種。
+ * 分派表必須留著（它要對應到各自的 render 函式），但這一份是純粹的重複。
+ */
+const ADMIN_ROUTES = ADMIN_MODULES.map((mod) => mod.route);
 
 function registerRoutes() {
   router.register('#/', renderHome);
@@ -142,15 +146,10 @@ function registerRoutes() {
   router.register('#/risk-check', renderRiskCheck);
   router.register('#/terms', renderTerms);
 
-  // 後台：十一個模組共用同一個守衛與版面，由 pages/admin.js 分派
+  // 後台：十二個模組共用同一個守衛與版面，由 pages/admin.js 分派
   ADMIN_ROUTES.forEach((route) => router.register(route, renderAdmin));
 
-  router.setNotFound(placeholderPage({
-    title: '找不到頁面',
-    story: '這個網址不存在',
-    taskRange: '請由上方導覽重新選擇',
-    description: '你要找的頁面不存在，或尚未實作。'
-  }));
+  router.setNotFound(renderNotFound);
 
   router.onAfterNavigate(({ blocked, message }) => {
     refreshHeader();

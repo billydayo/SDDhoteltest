@@ -4,7 +4,7 @@
  * 所有訊息為繁體中文（台灣用語），可直接顯示給使用者（FR-069、FR-075）。
  */
 
-export const PASSWORD_MIN_LENGTH = 6;   // Supabase Auth 的下限（FR-009b）
+const PASSWORD_MIN_LENGTH = 6;   // Supabase Auth 的下限（FR-009b）
 export const REVIEW_MIN_LENGTH = 10;
 export const REFUND_REASON_MIN_LENGTH = 5;
 
@@ -51,13 +51,6 @@ export function validateGuestCount(count, maxGuests) {
 export function validateRating(value) {
   const n = Number(value);
   return Number.isInteger(n) && n >= 1 && n <= 5 ? null : '請給予 1 至 5 分的評分。';
-}
-
-export function validateInRange(value, min, max, label) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return `${label}必須是數字。`;
-  if (n < min || n > max) return `${label}需介於 ${min} 至 ${max} 之間。`;
-  return null;
 }
 
 /**

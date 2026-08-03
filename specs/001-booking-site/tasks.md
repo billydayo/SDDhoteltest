@@ -72,8 +72,8 @@ US9（房源檢測與詳情頁展示）。
 
 | 變更 | 內容 | 影響 |
 |---|---|---|
-| **會員主動取消訂單**（FR-035a） | 待付款訂單可由會員自行取消，含二次確認；取消原因以 `member-cancelled` 與逾期的 `payment-timeout` 區分，兩者都計入「未付款取消訂單數」。已確認訂單不提供直接取消，須走退款審核 | T054／T060／T074；migration `supabase/migrate-order-cancel.sql` |
-| **房源詞彙表可維護**（FR-010a） | 設施與特色改為可在後台新增／移除，不再是寫死的常數 | T007／T076；新增 `src/data/room-vocabulary.js`、migration `supabase/migrate-room-vocabulary.sql` |
+| **會員主動取消訂單**（FR-035a） | 待付款訂單可由會員自行取消，含二次確認；取消原因以 `member-cancelled` 與逾期的 `payment-timeout` 區分，兩者都計入「未付款取消訂單數」。已確認訂單不提供直接取消，須走退款審核 | T054／T060／T074；migration 見 `supabase/migrations.sql` |
+| **房源詞彙表可維護**（FR-010a） | 設施與特色改為可在後台新增／移除，不再是寫死的常數 | T007／T076；新增 `src/data/room-vocabulary.js`、migration 見 `supabase/migrations.sql` |
 | **自動化測試兩層** | 第一層純函式單元測試（開瀏覽器就跑）、第二層 Puppeteer 端對端。憲章升版 2.5.0 → 2.6.0 增訂「關於自動化測試」 | 新增 `tests/`；不改動任何應用程式模組 |
 
 自動化測試現況（2026-08-03 全數通過）：
@@ -103,8 +103,13 @@ US9（房源檢測與詳情頁展示）。
 | 8 | 上傳非圖片檔沒有錯誤提示 | 提示有產生、文字也對，但後台浮窗是原生 `<dialog>` + `showModal()`，渲染在瀏覽器 **top layer**，`.toast-stack` 的 z-index 再高都會被蓋住 | 提示容器改掛進當下開著的浮窗，關窗前接回 body |
 
 **兩支 migration 已於 2026-08-03 由管理員執行完畢**，並以 REST ＋ 真實帳號實測 22 項全過
-（清單見 `migrate-messages.sql` 末端）。其中「會員可取消待付款訂單」——也就是第 1 項
+（清單見 `supabase/migrations.sql` 末端）。其中「會員可取消待付款訂單」——也就是第 1 項
 真正壞掉的那一條——確認已修復，取消後同區間可立即重新預訂。
+
+> 本節提到的 `migrate-room-status.sql`、`migrate-room-vocabulary.sql`、
+> `migrate-order-cancel.sql`、`migrate-messages.sql` 四支，已於 2026-08-03 的整理
+> 合併為單一的 `supabase/migrations.sql`（內容逐字保留，僅去掉重複四次的樣板說明）。
+> 上文保留原始檔名，因為那是當時實際發生的事。
 
 ### 2026-08-03 的第三批修正
 

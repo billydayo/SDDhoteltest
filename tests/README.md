@@ -143,7 +143,7 @@ HeadlessChrome → 斷線，一般 Chrome UA → 200）。因此 harness 把 UA 
 `messaging` 跑**示範模式**：它會真的送出訊息、真的公開一則評論回覆、真的取消訂單。
 私訊的權限邊界（會員讀不到他人的討論串、前端無法偽造 sender_role）在資料庫模式
 是由 RLS 與 `stamp_message_sender` trigger 執行的，那一層由
-`supabase/migrate-messages.sql` 末端的驗證清單以 SQL 驗——瀏覽器測不到
+`supabase/migrations.sql` 末端的驗證清單以 SQL 驗——瀏覽器測不到
 「繞過前端直接寫入」的情形。
 
 ---

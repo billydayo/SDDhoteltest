@@ -15,7 +15,7 @@ import * as repo from './repository.js';
 import { DEFAULT_AMENITIES, DEFAULT_ROOM_FEATURES } from './vocabulary.js';
 
 /** system_settings 的 key。與 supabase/schema.sql 的預設列一致。 */
-export const VOCABULARY_KEYS = Object.freeze({
+const VOCABULARY_KEYS = Object.freeze({
   amenities: 'room_amenities',
   features: 'room_features'
 });

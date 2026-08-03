@@ -12,18 +12,10 @@ const twd = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0
 });
 
-const plain = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 });
-
 /** 顯示為「NT$3,200」 */
 export function formatTWD(amount) {
   if (!Number.isFinite(amount)) return '—';
   return twd.format(Math.round(amount));
-}
-
-/** 顯示為「3,200」，用於表格中已有欄位標題說明幣別的場合 */
-export function formatAmount(amount) {
-  if (!Number.isFinite(amount)) return '—';
-  return plain.format(Math.round(amount));
 }
 
 /** 總金額＝每晚房價 × 夜數。入住人數不影響價格（見 spec Assumptions）。 */

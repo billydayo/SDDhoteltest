@@ -15,11 +15,6 @@
   color: var(--c-warn);
   border-bottom: 1px solid rgba(138, 100, 32, 0.2);
 }
-.mode-banner--error {
-  background: var(--c-danger-soft);
-  color: var(--c-danger);
-  border-bottom: 1px solid rgba(140, 63, 53, 0.2);
-}
 .mode-banner strong { font-weight: 600; }
 
 /* ------------------------------------------------------------------- 頁首 */
@@ -213,16 +208,6 @@
 
 /* 沒有主圖時不需要遮罩，改用砂色底 */
 .hero--plain { min-height: auto; background: var(--c-surface-alt); }
-
-/* 區塊標題：小型全大寫標籤，精品飯店常見的 eyebrow 處理 */
-.eyebrow {
-  font-size: var(--f-tiny);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--c-brand-strong);
-  font-weight: 600;
-  margin: 0 0 var(--sp-3);
-}
 
 /* ------------------------------------------------------------------- 頁尾 */
 

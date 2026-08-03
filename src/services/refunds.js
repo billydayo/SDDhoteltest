@@ -35,7 +35,7 @@ export const REFUND_POLICY = Object.freeze([
  * 被駁回 5 次的人就再也不能申請任何退款——那會讓兩條規則互相矛盾，
  * 而且懲罰的是「申請被拒絕」這件本來就對會員不利的事。
  */
-export const MAX_REFUNDS_PER_MEMBER = 5;
+const MAX_REFUNDS_PER_MEMBER = 5;
 
 /** 計入上限的狀態 */
 const COUNTED_STATUSES = ['pending', 'approved'];

@@ -19,7 +19,7 @@ import { isDemoMode } from '../data/repository.js';
 import { toUserMessage } from '../utils/errors.js';
 import { toast } from '../app.js';
 
-export const MAX_PHOTOS = 8;
+const MAX_PHOTOS = 8;
 
 /**
  * @param {{ roomId: string|null, images: string[], onNotify?: Function }} config

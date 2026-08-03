@@ -58,7 +58,7 @@ function daysInMonth(y, m) {
  * 日期 → 自 1970-01-01 起的天數。純算術，不經過 Date 物件，因此不受時區影響。
  * 用於夜數計算與區間比較。
  */
-export function toDayNumber(value) {
+function toDayNumber(value) {
   const { y, m, d } = splitDate(value);
   // Howard Hinnant 的 days_from_civil 演算法
   const yy = m <= 2 ? y - 1 : y;
@@ -70,7 +70,7 @@ export function toDayNumber(value) {
 }
 
 /** 天數 → YYYY-MM-DD，toDayNumber 的反函式 */
-export function fromDayNumber(days) {
+function fromDayNumber(days) {
   const z = days + 719468;
   const era = Math.floor(z / 146097);
   const doe = z - era * 146097;
@@ -108,8 +108,7 @@ export function rangesOverlap(aStart, aEnd, bStart, bEnd) {
   return a < d && c < b;
 }
 
-export function isBefore(a, b) { return toDayNumber(a) < toDayNumber(b); }
-export function isAfter(a, b)  { return toDayNumber(a) > toDayNumber(b); }
+function isBefore(a, b) { return toDayNumber(a) < toDayNumber(b); }
 export function isSameOrBefore(a, b) { return toDayNumber(a) <= toDayNumber(b); }
 
 /** 距離入住日還有幾天（以 Asia/Taipei 的今天為基準），用於退款級距 */

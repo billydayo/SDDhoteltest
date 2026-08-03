@@ -16,10 +16,6 @@ export function remainingMs(order) {
   return Math.max(0, Date.parse(order.expiresAt) - Date.now());
 }
 
-export function isExpired(order) {
-  return order?.status === 'pending-payment' && remainingMs(order) === 0;
-}
-
 /** 逾期未付款而取消的訂單，顯示上要與管理員手動取消區分開來 */
 export function isPaymentTimeout(order) {
   return order?.status === 'cancelled' && order?.cancelReason === 'payment-timeout';

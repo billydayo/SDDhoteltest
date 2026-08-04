@@ -2,443 +2,500 @@
 
 **Input**: 設計文件來自 `/specs/001-booking-site/`
 
-**Prerequisites**: `plan.md`（必要）、`spec.md`（必要）、`data-model.md`、`quickstart.md`、`contracts/`
+**Prerequisites**: `plan.md`（必要）、`spec.md`（必要）、`data-model.md`、`quickstart.md`、
+`contracts/README.md`、`research.md`、`.specify/memory/constitution.md`（v3.1.1）
 
 **Organization**: 任務依使用者故事分組，讓每個故事都能獨立執行、測試與交付。
 
-**修訂 2026-07-31（第二次）**：依產品企劃書修訂版重寫。新增 US10（收藏）、
-US11（渠道控價・模擬）、US12（操作日誌與系統參數），並擴充 US1（設施／特色篩選）、
-US2（Google 登入）、US3（待付款時效）、US5（規則式自動審核）、US6（營運指標）、
-US9（房源檢測與詳情頁展示）。
+---
 
-**修訂 2026-07-31（第一次）**：依「改用 Supabase」決策重寫，補上遺漏的 US9，
-修正 T004 編號重複。
+**修訂 2026-08-04（本次重寫）**：對應憲章 **v3.1.1** 與 `plan.md` 的 2026-08-03 修訂。
+前一版任務清單（119 項，原生 JS + 瀏覽器直連 Supabase + 雙軌 localStorage adapter）
+**已完全作廢**——那 119 項雖全部標記完成，但它們交付的是一個依新憲章已不合規的實作。
+
+**本次交付的性質**：這不是新功能，是**同一組需求的重新實作**。需求（155 條 FR、
+31 條有效 SC）在前一版堆疊上已完整驗收通過。任務的重心因此不是「要做什麼」，
+而是「哪些保證必須在換堆疊後依然成立」。
+
+**關於測試**：本清單**包含測試任務，且非選用**。憲章「自動化測試」節明訂三項強制：
+（1）原則 IV 的**每一條**日期與房況規則 MUST 有 pytest 覆蓋；
+（2）API 契約測試 MUST 涵蓋所有需授權端點的**未認證與越權**存取；
+（3）自動化測試 MUST NOT 取代 `checklists/` 的手動驗收。
 
 ## Summary
 
-- 總任務數：119（Setup 7、資料庫 10、雙軌資料層 16、使用者故事 78、法律頁 1、Polish 7）
-- 依故事分佈：US1 8、US2 9、US3 9、US4 5、US5 8、US6 7、US7 4、US8 3、US9 8、US10 5、US11 6、US12 6
-- 平行機會：Setup / 資料庫 / 兩個 adapter / 各故事的資料層與頁面層
-- MVP 建議：Phase 1–3 + US1 作為最小可行版本，再依序補齊 US2 → US12
-- **雙模式要求**：標註 `[2M]` 的驗證任務 MUST 在 Supabase 模式與示範模式下各執行一次（FR-080、SC-017）。
-  比對**功能**是否一致即可；兩模式的資料內容（房源筆數、照片、訂單）不必一致（2026-08-01 修訂）
-- **模擬標示要求**：US11（渠道控價）與 US5 的自動審核 MUST 於畫面標示為模擬／規則式（FR-110、FR-103a）
+- 總任務數：**192**（Setup 10、Foundational 37、使用者故事 126、會員訊息 5、Polish 14）
+- 依故事分佈：US1 16、US2 16、US3 18、US4 12、US5 11、US6 14、US7 6、US8 7、
+  US9 8、US10 4、US11 6、US12 8
 
-### 目前進度（2026-08-03）
+**修訂 2026-08-04（`/speckit-analyze` 後）**：依一致性分析補上 8 項任務，
+編號採字母後綴（T021a、T065a…）以免重編既有的 183 個 ID 讓引用靜默失準。
+補的是三項零覆蓋的需求（FR-099a 前端定期清理、SC-015 執行期網路驗證、
+FR-073 還原入口）、兩項缺漏的越權契約測試（`/me`、`/refunds`）、
+SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a）。
+- 平行機會：Setup 的前後端兩側、Foundational 的 12 個 ORM 模型、各故事的測試層，
+  以及故事間（Foundational 完成後 US1–US12 彼此獨立）
+- MVP 建議：Phase 1–3（Setup + Foundational + US1），即一個能搜尋與瀏覽房源的公開站台
 
-**122 / 122 完成。14 關的瀏覽器驗收全數走過一輪；第 6 關的補測已於 2026-08-03
-由自動化補齊，同日啟用 Google provider（T009）並完成驗收。**
+### 三項不可在遷移中遺失的保證
 
-| 階段 | 狀態 |
-|---|---|
-| Phase 1 Setup（T001–T007） | ✅ |
-| Phase 2 Supabase 專案與資料庫（T008、T010–T017） | ✅ 已以 REST 實測驗證 |
-| Phase 3 雙軌資料層（T018–T032） | ✅ |
-| Phase 4 US1 訪客瀏覽與搜尋（T034–T040） | ✅ |
-| Phase 5 US2 會員與 Google 登入（T042–T049） | ✅ |
-| Phase 6 US3 訂房與保留時效（T051–T058） | ✅ |
-| Phase 7 US4 訂單與退款申請（T060–T063） | ✅ |
-| Phase 8 US5 評論與自動審核（T065–T071） | ✅ |
-| Phase 9 US6 後台核心與營運指標（T073–T078） | ✅ |
-| Phase 10 US7 評論與退款審核（T080–T082） | ✅ |
-| Phase 11 US8 匯出與內容編輯（T084–T085） | ✅ |
-| Phase 12 US9 風險檢測（T087–T093） | ✅ |
-| Phase 13 US10 收藏（T095–T098） | ✅ |
-| Phase 14 US11 渠道控價・模擬（T100–T104） | ✅ |
-| Phase 15 US12 日誌與參數（T106–T110） | ✅ |
-| Phase 16 服務條款（T112） | ✅ |
-| Phase 17 Polish（T113–T116、T119） | ✅ |
+這三件事在舊實作中已成立，換堆疊後**最容易靜默消失**，因此在此標明並各自綁定任務：
 
-**所有任務已完成。**
-
-**T009 Google provider 已於 2026-08-03 啟用**：`/auth/v1/authorize?provider=google`
-回應 302 導向 `accounts.google.com`，回呼位址為專案的 `/auth/v1/callback`，
-授權範圍 `email profile`。瀏覽器端行為由 `tests/e2e/google-auth.e2e.mjs` 驗證
-（25 項）。完成授權後的兩件事——登入成功導回原頁、同信箱不產生第二個帳號
-（FR-088／SC-025）——需要真實 Google 帳密，自動化測不到，已於同日以人工
-驗收通過（見 `browser-acceptance.md`）。
-
-**第 6 關的 19 項補測已完成（2026-08-03）**：房源照片管理（12）、上傳邊界（3）、
-訂單管理的房源篩選（4）。改以 `tests/e2e/photos.e2e.mjs` 驗證，全數通過。
-`room-photos` bucket 早在 2026-08-01 就已建立，先前那句「補測前需重跑 schema.sql」
-已不成立。
-
----
-
-### 2026-08-01 之後的變更（tasks.md 原進度表未涵蓋）
-
-以下三項是 T001–T119 全部完成之後才進來的需求，不新增任務編號，
-但會動到既有任務的驗收範圍：
-
-| 變更 | 內容 | 影響 |
+| 保證 | 任務 | 消失時的表現 |
 |---|---|---|
-| **會員主動取消訂單**（FR-035a） | 待付款訂單可由會員自行取消，含二次確認；取消原因以 `member-cancelled` 與逾期的 `payment-timeout` 區分，兩者都計入「未付款取消訂單數」。已確認訂單不提供直接取消，須走退款審核 | T054／T060／T074；migration 見 `supabase/migrations.sql` |
-| **房源詞彙表可維護**（FR-010a） | 設施與特色改為可在後台新增／移除，不再是寫死的常數 | T007／T076；新增 `src/data/room-vocabulary.js`、migration 見 `supabase/migrations.sql` |
-| **自動化測試兩層** | 第一層純函式單元測試（開瀏覽器就跑）、第二層 Puppeteer 端對端。憲章升版 2.5.0 → 2.6.0 增訂「關於自動化測試」 | 新增 `tests/`；不改動任何應用程式模組 |
+| `EXCLUDE USING gist` 房況約束 | T015、T080 | 超賣不報錯，等到兩位客人同時抵達櫃台才發現 |
+| `admin_logs` 僅可新增 | T019、**T021a**、T160 | 無錯誤訊息，日誌只是變得可以竄改 |
+| 前台照片不離開瀏覽器 | T144、T144a、T146 | 使用者的私人照片被上傳，且沒有任何測試會失敗 |
+| **資料庫只有一個存取者** | **T019a** | RLS 移除後，公開的 anon key 經 PostgREST 讀寫全部資料表 |
 
-自動化測試現況（2026-08-03 全數通過）：
+**T021a 是第二項保證的前提**：`REVOKE` 只對非擁有者生效。若 FastAPI 以資料表擁有者
+身分連線，那道 `REVOKE` 是一句沒有作用的 SQL，而它不會報錯。
 
-| 套件 | 模式 | 內容 | 結果 |
-|---|---|---|---|
-| `test:unit` | — | 40 項純函式與判定規則 | ✅ |
-| `test:search` | 資料庫＋示範 | 首頁搜尋與篩選、條件式必填、整理中房態，32 項 | ✅ |
-| `test:orders` | 示範 | 會員端訂單與取消，13 項 | ✅ |
-| `test:admin` | 資料庫＋示範 | 逐日房態、七模組匯出、詞彙增刪，15 項 | ✅ |
-| `test:photos` | 示範＋資料庫 | 照片管理、上傳邊界、訂單房源篩選，48 項 | ✅ |
-| `test:messaging` | 示範 | 私訊、評論回覆、訂單取消入口，28 項 | ✅ |
+### 格式
 
-### 2026-08-03 的第二批修正
+`- [ ] [TaskID] [P?] [Story?] 描述與檔案路徑`
 
-驗收回報的七項，全部完成。其中三項的根因與回報的表象不同：
-
-| # | 回報 | 實際根因 | 處置 |
-|---|---|---|---|
-| 1 | 會員無法取消未付款訂單 | **`migrate-order-cancel.sql` 從未在正式資料庫執行**，守門 trigger 仍是舊版；另外列表上根本沒有取消入口 | 列表加入付款／取消入口（FR-035b）、錯誤訊息改為可行動、**待管理員執行 migration** |
-| 2 | 後台表單需獨立滾輪 | 浮窗本身已會內捲，但背景頁面沒有鎖定，滾輪會捲到底下的列表 | 開窗時鎖住 `html` 捲動，關窗還原 |
-| 3 | 匯出未記錄操作日誌 | 未實作 | 各模組的匯出統一寫入 `report.export`（FR-058a） |
-| 4 | 房源日期篩選需要區間 | 原本只有單日 | 改為起／迄兩欄，含頭含尾（FR-051b） |
-| 5 | 寬度應與視窗相符 | `--content-max: 1240px` 寫死 | 改為 `none`，全站滿寬 |
-| 6 | 評論回覆＋私訊 | 未實作 | 新增 FR-103d 與 FR-123~128，**需執行 `migrate-messages.sql`** |
-| 7 | 相簿左右切換 | 已存在且可用 | 依確認結果不修改 |
-| 8 | 上傳非圖片檔沒有錯誤提示 | 提示有產生、文字也對，但後台浮窗是原生 `<dialog>` + `showModal()`，渲染在瀏覽器 **top layer**，`.toast-stack` 的 z-index 再高都會被蓋住 | 提示容器改掛進當下開著的浮窗，關窗前接回 body |
-
-**兩支 migration 已於 2026-08-03 由管理員執行完畢**，並以 REST ＋ 真實帳號實測 22 項全過
-（清單見 `supabase/migrations.sql` 末端）。其中「會員可取消待付款訂單」——也就是第 1 項
-真正壞掉的那一條——確認已修復，取消後同區間可立即重新預訂。
-
-> 本節提到的 `migrate-room-status.sql`、`migrate-room-vocabulary.sql`、
-> `migrate-order-cancel.sql`、`migrate-messages.sql` 四支，已於 2026-08-03 的整理
-> 合併為單一的 `supabase/migrations.sql`（內容逐字保留，僅去掉重複四次的樣板說明）。
-> 上文保留原始檔名，因為那是當時實際發生的事。
-
-**`schema.sql` 已於 2026-08-03 在一個全新的 Supabase 專案實際執行驗證通過**
-（973 行，`Success. No rows returned`），接著執行 `seed.sql` 亦成功。這是第一次
-真正跑過整支 schema——先前所有驗證都在既有資料庫上，而既有資料庫是靠 migrate 檔
-建起來的，永遠不會經過 schema.sql。
-
-這次驗證抓到兩個只有實跑才會現形的缺陷，兩者都在同一次「把 migration 同步進
-schema.sql」的操作中產生：
-
-| 缺陷 | 症狀 |
-|---|---|
-| `create table public.messages` 整段遺漏，且兩個 trigger 被放到所有資料表之前 | 全新安裝在 `drop trigger ... on public.messages` 就中止 |
-| `stamp_review_reply` 的 `$$` 少了一個 `$`（第 359、375 行） | 42601 syntax error。Postgres 會先整份解析多語句字串，因此**整支檔案一列都不會執行** |
-
-第二個特別值得記：錯誤訊息指向第 359 行，但真正的後果是整份檔案失效——
-單看行號會以為只是某個函式壞掉。判斷依據是接著跑 `seed.sql` 時回報
-`relation "public.rooms" does not exist`，證明**前面 358 行也全部沒有生效**。
-
-已補上三項靜態檢查（dollar-quoting 成對、與 `migrations.sql` 的共有定義逐字比對、
-trigger 引用的函式是否都有定義），但它們只是輔助——`schema.sql` 改動後仍應在
-全新專案實跑一次，那是唯一的真憑據。
-
-### 2026-08-03 的第三批修正
-
-驗收時追加回報的三項，都屬於「功能會動但用起來不對」的類型：
-
-| # | 回報 | 實際根因 | 處置 |
-|---|---|---|---|
-| 1 | 首頁搜尋說明與欄位貼太近 | 該行帶著 inline 的**負值上邊距** `calc(var(--sp-2) * -1)`，抵銷掉 `.field__hint` 的 0.25rem 後淨值是 -0.25rem | 改用 `.filter-bar__hint`，上邊距對齊欄位間距（`--sp-4`）；併同加上 `max-width: 68ch`，那是全站滿寬後的連帶問題 |
-| 2 | 縮小視窗時後台左側目錄看不全 | `.admin-nav` 是 `position: sticky` 但沒有限高。sticky 元素高過視窗就只會黏住上緣，下半截要把**整頁**捲到底才看得到——而要捲多遠取決於右邊表格有幾百列 | 導覽加上 `max-height: calc(100dvh - 92px - var(--sp-5))` ＋ `overflow-y: auto` ＋ `overscroll-behavior: contain`，自己捲，與主內容完全脫鉤 |
-| 3 | 操作日誌沒有匯出 | 六個模組有匯出，唯獨日誌沒有 | 加入匯出（FR-058 擴為七個模組），範圍跟著篩選走；匯出動作本身照樣寫入日誌 |
-
-### 瀏覽器實測進度
-
-驗收清單見 [checklists/browser-acceptance.md](./checklists/browser-acceptance.md)
-（288 項，分 14 關；**已全數通過**）。
-
-| 關卡 | 對應任務 | 狀態 |
-|---|---|---|
-| 第 0 關 啟動與模式切換 | T033 | ✅ |
-| 第 1 關 訪客瀏覽與搜尋 | T041 | ✅ |
-| 第 2 關 會員與登入 | T050 | ✅ |
-| 第 3 關 訂房與付款 | T059 | ✅ |
-| 第 4 關 訂單與退款 | T064 | ✅ |
-| 第 5 關 評論與自動審核 | T072 | ✅ |
-| 第 6 關 後台核心 | T079 | ✅（19 項補測於 2026-08-03 由 `test:photos` 補齊） |
-| 第 7 關 審核閉環 | T083 | ✅ |
-| 第 8 關 匯出與內容 | T086 | ✅ |
-| 第 9 關 風險檢測 | T094 | ✅ |
-| 第 10 關 收藏 | T099 | ✅ |
-| 第 11 關 渠道比價 | T105 | ✅ |
-| 第 12 關 日誌與參數 | T111 | ✅ |
-| 第 13 關 跨切面與雙模式 | T117、T118 | ✅ |
-
-十四關共 288 項全數通過，且未回報任何問題。涵蓋範圍包含最難的幾項：
-排除約束的相鄰不重疊、待付款佔房與逾期釋出、規則式審核的五種樣本判定、
-退款上限與駁回不佔額度、稽核日誌不可竄改、前台照片零外傳，
-以及第 13 關的雙模式重跑與 320px 響應式。
-
-第 1 關原本未勾的 20 項（搜尋與篩選的驗證規則、AND 邏輯設施篩選）是隨
-`篩選debug` 系列修正補進清單的，已於 2026-08-03 全部補進
-`tests/e2e/search.e2e.mjs`：條件式必填的六種組合、三項填妥後的標題註記、
-補齊欄位時紅字即時消除、標籤不得出現「（必填）」、房型特色篩選的完整性
-（以資料反查交叉比對，不比對房名清單），以及示範模式下的整理中房態。
-該套件本身跑資料庫模式，因此第 122 項「設施／特色要在資料庫模式再驗一次」
-也一併滿足。
-
-本開發環境**已可執行 node**（v24），因此第二層端對端測試跑得起來，
-不再是所有介面驗收都得人工執行。仍需人眼的是版面、對比、照片觀感這類判斷。
-
-### 已完成的驗證（2026-07-31）
-
-**靜態分析**：72 個模組的 import 全數解析、頁面與元件皆未直接呼叫 localStorage
-或 Supabase client、前台安全檢測的傳遞相依中不含任何上傳模組、14 條後台變更
-路徑全部包在 withAudit 內、使用者可見文字中無「AI」字樣。
-
-**資料庫層（以 REST + 真實帳號實測）**：
-
-| 項目 | 結果 |
-|---|---|
-| schema 與 seed | 11 張表齊備、10 筆房源含 features、8 筆模擬渠道價格 |
-| `handle_new_user` trigger | 註冊即自動建立 profile，預設 role = member |
-| Confirm email | 已關閉，註冊立即回傳 session |
-| 自行升權防護 | 以會員身分改自己的 role → 被 trigger 擋下 |
-| `admin_logs` 不可竄改 | 管理員的 UPDATE 與 DELETE 皆回 403（SC-027） |
-| anon 可讀範圍 | 僅 rooms／site_content／system_settings／room_risk_checks／已公開評論 |
-| 排除約束・相鄰不重疊 | 03/01–03/03 與 03/03–03/05 兩筆皆成立 |
-| 排除約束・部分重疊 | 03/02–03/04 被擋（23P01） |
-| 排除約束・完全包含 | 03/01–03/05 被擋 |
-| 待付款佔房 | pending-payment 訂單確實阻擋他人預訂（FR-097） |
-| `expires_at` | 依 system_settings 計算為 60 分鐘 |
-| `expire_stale_orders()` | 逾期訂單轉為 cancelled／payment-timeout |
-| 逾期後釋出 | 同區間可重新預訂（SC-023） |
-| 逾期付款防護 | 無法對已取消訂單付款（SC-024） |
-| 狀態轉換守門 | 會員無法自行標記已完成、無法竄改金額 |
-| storage bucket | 會員上傳被擋、管理員可寫、匿名可公開讀 |
-
-測試資料已全數清除（訂單 0 筆、storage 測試檔已刪）。唯一殘留是稽核日誌中一筆
-`test.probe` 紀錄——那是驗證「日誌不可刪除」時寫入的，依設計無法移除。
+- **[P]**：可平行執行（不同檔案、不依賴未完成的任務）
+- **[Story]**：所屬使用者故事；Setup、Foundational、會員訊息與 Polish 階段不帶此標籤
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup（共用基礎建設）
 
-- [X] T001 [P] Create project structure per implementation plan in index.html, styles/, and src/
-- [X] T002 Initialize app shell and entry point in index.html and src/main.js
-- [X] T003 [P] Create src/config.js with empty credential placeholders and src/config.example.js, and load config.js via a plain `<script>` tag before the app module in index.html
-- [X] T004 [P] Add assets/rooms/ placeholder images and assets/hero.svg (self-made SVG, ~1 KB each) referenced by supabase/seed.sql and src/state/seed.js
-- [X] T005 [P] Establish CSS custom properties for the beige palette and type scale in styles/base.css
-- [X] T006 [P] Add .gitignore entries and confirm no service_role key exists anywhere in the repository (FR-085, SC-022)
-- [X] T007 [P] Define the shared vocabulary lists for amenities and room features in src/data/vocabulary.js so filters, seed data, and admin forms stay in sync
+**Purpose**: 建立前後端兩個獨立專案的骨架、套件管理與工具鏈
 
----
-
-## Phase 2: Supabase 專案與資料庫 (Blocking Prerequisite)
-
-**⚠️ CRITICAL**: 未完成 RLS 政策的資料表視為未完成（憲章 Supabase 約束）
-
-**⚠️ 需人工操作**: 本階段全部需要在 Supabase Dashboard 與 SQL Editor 中執行，
-無法由開發工具代勞。SQL 腳本已備妥於 `supabase/schema.sql` 與 `supabase/seed.sql`。
-未完成此階段前，應用程式會以示範模式運作，功能完整。
-
-- [X] T008 Create the Supabase project and disable "Confirm email" under Authentication → Providers → Email
-- [X] T009 Enable the Google provider in Supabase Auth and register the callback URL in Google Cloud's authorized redirect URIs
-- [X] T010 Run supabase/schema.sql in the SQL Editor and verify btree_gist, all eleven tables, triggers, functions, and constraints exist
-- [X] T011 [P] Verify RLS is enabled with explicit policies on all eleven tables, and that anon can read only rooms, approved reviews, site_content, room_risk_checks, and system_settings
-- [X] T012 [P] Verify admin_logs rejects UPDATE and DELETE for every role including admin (SC-027)
-- [X] T013 [P] Verify the room-risk storage bucket exists, is public-read, and rejects writes from a non-admin account
-- [X] T014 [P] Run supabase/seed.sql and confirm 10 rooms with amenities/features, the singleton site_content row, and 8 simulated channel prices appear
-- [X] T015 Create demo accounts guest@sunny.com and admin@sunny.com in the dashboard, then promote admin via the SQL snippet at the end of supabase/schema.sql
-- [X] T016 Manually verify orders_no_overlap: adjacent bookings succeed, overlapping and fully-contained bookings are rejected, and a pending-payment order blocks the same range
-- [X] T017 Manually verify expire_stale_orders() releases an expired pending-payment order, and that guard_order_transition rejects paying for it afterwards
+- [X] T001 建立 `backend/` 與 `frontend/` 兩個獨立目錄骨架，依 plan.md 的 Project Structure 建立子目錄與 `.gitkeep`
+- [X] T002 建立 `backend/pyproject.toml`：`requires-python = ">=3.12"`，宣告 fastapi、uvicorn、python-multipart、sqlalchemy[asyncio]、asyncpg、alembic、pydantic-settings、argon2-cffi、**pyjwt[crypto]**、httpx、openpyxl；執行 `uv sync` 產生 `backend/uv.lock` 並納入版控
+  （2026-08-04 修訂：JWT 函式庫由原訂的 python-jose 改為 **PyJWT**。python-jose 已數年未有實質維護，而 plan.md 的相依表未指定 JWT 函式庫，此處無牴觸。實際鎖定 Python 3.12.13）
+- [X] T003 [P] 設定 ruff 於 `backend/pyproject.toml`（lint + format，含 `ASYNC` 規則以攔截 `async def` 中的阻塞式 I/O），確認 `uv run ruff check .` 可執行
+- [X] T004 [P] 建立 `backend/.env.example`，列出全部必要變數：`DATABASE_URL`、**`MIGRATION_DATABASE_URL`**、**`APP_DB_PASSWORD`**（後兩者為 T021a 的雙角色連線所需）、`JWT_SECRET`、`JWT_EXPIRE_MINUTES`、`CORS_ORIGINS`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REDIRECT_URI`、`UPLOAD_DIR`、`MAX_UPLOAD_BYTES`
+- [ ] T005 建立 `frontend/` 的 Vite + React 19 + TypeScript 專案（`package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`），以 `npm install` 產生 `frontend/package-lock.json` 並納入版控
+- [ ] T006 [P] 建立 `frontend/tailwind.config.ts`，將舊 `styles/` 的配色、字級與圓角移入 theme 具名 token；**品牌色 MUST 為 `#7A6132`（白字 5.9:1）而非既有的 `#96793F`（4.1:1）**，並於註解標註各色與背景的對比度
+- [ ] T007 [P] 設定 `frontend/eslint.config.js` 與 `frontend/tsconfig.json` 的 `strict: true`，禁止未說明理由的 `any`
+- [X] T008 [P] 更新根目錄 `.gitignore`：加入 `backend/.env`、`backend/.venv`、`__pycache__/`、`frontend/node_modules/`、`frontend/dist/`、`backend/uploads/`；一併移除舊有的「`src/config.js` 刻意不列入忽略」註記（該例外的前提是瀏覽器直連 Supabase 並以 RLS 防護，兩者皆已隨憲章 v3.0.0 移除）
+- [X] T009 建立 `backend/tests/conftest.py` 與 pytest 設定於 `backend/pyproject.toml`（`asyncio_mode = "auto"`），確認 `uv run pytest` 可執行。測試資料庫以 `SUNNY_TEST_DATABASE_URL` 指定，未設定時**跳過**而非連上 `DATABASE_URL` 就地破壞開發資料
+- [ ] T010 [P] 設定 `frontend/vitest.config.ts` 與 React Testing Library，確認 `npm run test` 可執行
 
 ---
 
-## Phase 3: Foundational — 雙軌資料層 (Blocking Prerequisites)
+## Phase 2: Foundational（阻塞所有使用者故事）
 
-**⚠️ CRITICAL**: 在完成此階段前，不得開始任何使用者故事的實裝
+**Purpose**: 資料庫遷移、ORM 模型、認證與授權骨架、資料存取層、前端 API client
 
-- [X] T018 Rewrite src/lib/supabase.js to read credentials only from window.__SUNNY_CONFIG__, remove the dead import.meta.env / process.env branches, and lazy-load the client via dynamic import only when configured
-- [X] T019 Define the shared async data-access interface and mode-binding facade in src/data/repository.js
-- [X] T020 Enforce the expireStaleOrders() call sites inside the repository layer (before availability queries, order creation, and order list reads) so individual pages cannot forget them, plus a once-a-minute sweep in main.js that only repaints when something actually expired and never on form pages (FR-099a)
-- [X] T021 [P] Implement the localStorage adapter with seed bootstrap and async signatures in src/data/adapters/local.js, src/state/seed.js, and src/state/persistence.js
-- [X] T022 [P] Implement the Supabase adapter with snake_case⇄camelCase mapping in src/data/adapters/supabase.js
-- [X] T023 Implement the error-translation table from contracts/README.md in src/data/adapters/supabase.js so callers see business errors, never raw database messages
-- [X] T024 Implement centralized state store and mutation helpers in src/state/store.js
-- [X] T025 [P] Implement date, money, validation, and storage utilities in src/utils/dates.js, src/utils/money.js, src/utils/validation.js, src/utils/storage.js, and src/utils/errors.js
-- [X] T026 [P] Implement per-entity data modules delegating to the repository in src/data/rooms.js, orders.js, reviews.js, refunds.js, profiles.js, favorites.js, risk-checks.js, channel-prices.js, admin-logs.js, settings.js, and site-content.js
-- [X] T027 Build auth/session flow over Supabase Auth with a simulated fallback for demo mode in src/services/auth.js, and guest/member/admin guards in src/router.js
-- [X] T028 Implement the audit-log writer in src/services/audit.js and wire it into every admin mutation path so a change can never be saved without a log entry (FR-114)
-- [X] T029 Create shared header, layout shell, loading and error states, and app container in src/components/header.js and src/app.js
-- [X] T030 [P] Add the persistent demo-mode indicator in src/components/demo-badge.js and the reusable simulated-data indicator in src/components/simulated-badge.js (FR-079, FR-110)
-- [X] T031 Implement booking and search core logic with half-open overlap rules, room-state checks, and pending-payment occupancy in src/services/search.js and src/services/booking.js
-- [X] T032 [P] Configure role-aware admin access and navigation for all eleven back-office modules in src/components/admin-panel.js and the admin shell in src/main.js
-- [X] T033 [2M] Verify both modes boot correctly: with credentials the app reads from Supabase; with empty credentials it enters demo mode and issues zero network requests (SC-018) — **待瀏覽器實測**。已完成靜態驗證（39 個模組的 import 全數解析、index.html 引用的檔案全數存在），但本機無 node 與可用的 python，無法啟動伺服器實際執行。請開啟 index.html 並檢查 Network 面板確認。
+**⚠️ CRITICAL**: 本階段完成前，任何使用者故事都不能開始
 
-**Checkpoint**: 基礎設施完成後，所有使用者故事都可以在平行中開始實作
+**執行順序**：依 research R10，資料庫 → 後端 → 前端。反向進行會讓前端對著會變動的契約重寫兩次。
 
----
+### 資料庫遷移（Alembic 初始 revision）
 
-## Phase 4: User Story 1 - 訪客瀏覽、搜尋與篩選房源 (Priority: P1) 🎯 MVP
+- [X] T011 建立 `backend/alembic.ini` 與 `backend/alembic/env.py`，設定為讀取 `DATABASE_URL` 並支援 async engine
+- [X] T012 於 `backend/alembic/versions/0001_initial.py` 最前面寫入 `op.execute("create extension if not exists btree_gist")`；**MUST 為整支 revision 的第一個敘述**，缺了會在建立 gist 約束時失敗（research R2）
+- [X] T013 於 `backend/alembic/versions/0001_initial.py` 建立 12 張表，內容自 `supabase/schema.sql` 折入；**`profiles` MUST 取回身分欄位**：`id` 改為 `default gen_random_uuid()` 的自有主鍵、新增 `email text not null unique`、`password_hash text NULL`、`google_sub text unique`，並移除對 `auth.users` 的外鍵（data-model.md）
+- [X] T014 於 `backend/alembic/versions/0001_initial.py` 原樣折入全部 CHECK 約束與 24 個索引（含 `amenities`／`features` 的 GIN 索引、`site_content_singleton`）
+- [X] T015 於 `backend/alembic/versions/0001_initial.py` 以 `op.execute()` 原生 SQL 建立 `orders_no_overlap` 排除約束：`exclude using gist (room_id with =, daterange(check_in, check_out, '[)') with &&) where (status in ('pending-payment','confirmed','refund-pending'))`；**MUST NOT 依賴 autogenerate**
+- [X] T016 於 `backend/alembic/versions/0001_initial.py` 原樣折入 5 個純 PostgreSQL 函式與其觸發器：`pending_payment_minutes()`、`expire_stale_orders()`、`refresh_room_rating()`、`enforce_refund_limit()`、`guard_message_update()`
+- [X] T017 於 `backend/alembic/versions/0001_initial.py` 寫入拆解後的 `guard_order_transition()`：**只保留不需身分的兩項守門**——不得對已逾期訂單付款、不得從任意狀態跳至 `confirmed`；「管理員可自由改狀態」的分支 MUST 移除，改由 FastAPI 判定（research R2）
+- [X] T018 於 `backend/alembic/versions/0001_initial.py` 寫入改寫後的 `stamp_review_reply()` 與 `stamp_message_sender()`：操作者改由後端明確傳入，MUST NOT 引用 `auth.uid()`
+- [X] T019 於 `backend/alembic/versions/0001_initial.py` 末尾寫入 `REVOKE UPDATE, DELETE ON public.admin_logs FROM sunny_app`（角色由 T021a 建立）；**這是本次遷移最容易漏掉的一項**——RLS 一併刪除時此保證會無聲消失（data-model.md、SC-027）
+- [X] T019a 於 `backend/alembic/versions/0001_initial.py` 末尾**關閉 PostgREST 的存取路徑**：`REVOKE ALL ON ALL TABLES / SEQUENCES / FUNCTIONS IN SCHEMA public FROM anon, authenticated`、`REVOKE USAGE ON SCHEMA public FROM anon, authenticated`，並以 `ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated` 讓日後新建的表不再自動開放。
+  **這是托管於 Supabase 才會有的第二扇門**：Supabase 對 `public` 設有 `ALTER DEFAULT PRIVILEGES ... GRANT ALL TO anon, authenticated`，Alembic 建的表會自動繼承；而 anon key 依設計可公開、其防護**只**來自 RLS，RLS 又要被本次遷移全數移除。三者相加的結果是任何人都能經 PostgREST 讀寫全部十二張表。research R1 推導「授權邊界在 FastAPI」時只算了 FastAPI 這條路。違反憲章原則 III「資料庫 MUST 只有一個存取者」。
+  另需手動於 Dashboard → Settings → API 將 `public` 自 Exposed schemas 移除——程式面與設定面兩道一起關（2026-08-04 新增）
+- [X] T020 逐行審閱 `backend/alembic/versions/0001_initial.py`，確認**不含任何非預期的 `drop`**，且不含 38 條 RLS 政策、`is_admin()`、`handle_new_user()`、`on_auth_user_created`；於 `backend/alembic/versions/README.md` 記錄本次審閱結論（憲章資料庫約束）
 
-**Independent Test**: 在未登入情境下設定日期、人數、價格上限、設施與特色條件和排序，確認列表更新、房型切換與詳情頁顯示均正確
+### 後端核心
 
-- [X] T034 [P] [US1] Build room list rendering and room card layout in src/pages/home.js and src/components/room-card.js
-- [X] T035 [P] [US1] Build the filter bar with multi-select amenities and features in src/components/filter-bar.js
-- [X] T036 [US1] Implement guest search, sort, and AND-logic amenity/feature filtering in src/services/search.js
-- [X] T037 [US1] Display active filters with a one-click clear control in src/components/filter-bar.js (FR-010)
-- [X] T038 [US1] Implement room detail page, rating display (null shows 尚無評分, never 0), and total price calculation in src/pages/room-detail.js and src/utils/dates.js
-- [X] T039 [US1] Add room status UX, loading state, empty state, and no-result messaging in src/pages/home.js and src/components/room-card.js
-- [X] T040 [US1] Wire booking CTA redirect for guests and preserve filter state across navigation in src/pages/room-detail.js and src/router.js
-- [X] T041 [P] [US1] [2M] Validate homepage and detail-page acceptance scenarios against the browser flow in quickstart.md — **待瀏覽器實測**（開發環境無法執行 JS）
+- [X] T021 建立 `backend/src/sunny/config.py`：以 pydantic-settings 讀取全部環境變數；缺少必要變數時 MUST 於啟動時明確失敗，**`JWT_SECRET` MUST NOT 有預設值 fallback**
+- [X] T021a 於 `backend/alembic/versions/0001_initial.py` 建立**非擁有者**的應用連線角色 `sunny_app`，授予 12 張表的 `SELECT, INSERT, UPDATE, DELETE`（`admin_logs` 的 UPDATE／DELETE 隨後由 T019 收回）；於 `backend/.env.example` 與 `backend/src/sunny/config.py` 分離兩組連線字串：`DATABASE_URL`（應用，以 `sunny_app` 連線）與 `MIGRATION_DATABASE_URL`（遷移，以擁有者連線）。**應用 MUST NOT 以資料表擁有者身分連線**——擁有者保有隱含權限，`REVOKE` 對它形同無效，`admin_logs` 的僅可新增保證會安靜失效（research R1 對 RLS 提過同一陷阱，此處同樣適用）
+- [ ] T022 建立 `backend/src/sunny/db.py`：async engine 與 session factory（asyncpg），MUST NOT 混用同步 engine
+- [ ] T023 [P] 建立 `backend/src/sunny/models/profile.py` 與 `backend/src/sunny/models/room.py`（SQLAlchemy 2.0 `Mapped[...]` 宣告式）
+- [ ] T024 [P] 建立 `backend/src/sunny/models/order.py`，於 `__table_args__` 以 `ExcludeConstraint` 宣告 `orders_no_overlap`（運算式以 `text()` 承載，供模型完整性；實際建立仍由 T015 負責）
+- [ ] T025 [P] 建立 `backend/src/sunny/models/review.py` 與 `backend/src/sunny/models/refund.py`
+- [ ] T026 [P] 建立 `backend/src/sunny/models/favorite.py`、`risk_check.py`、`channel_price.py`
+- [ ] T027 [P] 建立 `backend/src/sunny/models/admin_log.py`、`message.py`、`system_setting.py`、`site_content.py`
+- [ ] T028 建立 `backend/src/sunny/main.py`：FastAPI app 與 CORS middleware；允許來源 MUST 自 `CORS_ORIGINS` 明確列出，**MUST NOT 使用 `allow_origins=["*"]` 搭配 `allow_credentials=True`**
+- [ ] T029 於 `backend/src/sunny/main.py` 註冊全域例外處理器，統一輸出 `{"detail": "繁體中文訊息", "code": "..."}`；MUST NOT 回傳堆疊追蹤、SQL 語句或內部檔案路徑
+- [X] T030 建立 `backend/src/sunny/errors.py`：`DomainError`／`InternalError` 型別，以及 `IntegrityError` → **以約束名稱分派**的轉譯層，涵蓋 `orders_no_overlap`(409)、`valid_date_range`(400)、`nights_matches_dates`(500)、`order_no` 唯一(500)、`profiles_email_key`(409)、`reviews_order_id_key`(409)；只看例外型別會把「夜數對不上」回成「已無空房」
+  （2026-08-04 修訂：路徑由原訂的 `services/errors.py` 改為 `sunny/errors.py`。`utils/dates.py` 需要引用 `DomainError`，而 utils 匯入 services 是反向的分層）
+- [ ] T031 建立 `backend/src/sunny/services/auth.py`：argon2id 雜湊與驗證（argon2-cffi，含 `check_needs_rehash`）、JWT 簽發與解析
+- [ ] T032 建立 `backend/src/sunny/deps.py`：`get_current_user` 與 `require_admin`；**預設不是「公開」而是「需登入」**——新增路由時忘記標註 MUST 導致拒絕而非放行
+- [ ] T033 建立 `backend/src/sunny/repositories/base.py`：session 取得與 `expire_stale_orders()` 的呼叫封裝；**三個呼叫點（查詢房況前、建立訂單前、讀取訂單列表前）MUST 收於 repository 層內部**，MUST NOT 交由各路由自行記得
+- [ ] T034 建立 `backend/src/sunny/services/audit.py`：管理員變更寫入 `admin_logs` 的統一入口，**MUST 與變更在同一個交易內**；MUST NOT 記錄密碼、秘鑰或真實個資
+- [X] T035 [P] 建立 `backend/src/sunny/utils/dates.py`：Asia/Taipei 時區於程式內明確指定（MUST NOT 依賴伺服器本機時區）、日曆日以 `datetime.date` 承載、夜數計算、明日下限判定、半開區間重疊判定
+  （2026-08-04：`tzdata` 已加入執行期相依。Windows 沒有系統時區資料庫，`ZoneInfo("Asia/Taipei")` 會直接拋 `ZoneInfoNotFoundError`；鎖進 `uv.lock` 也讓各環境拿到同一份時區資料，而非碰運氣看主機裝了哪一版。
+  另：`parse_calendar_date` 以正規式強制**補零**。`strptime` 會接受 `2026-8-4`，而該字串在字典序下大於 `2026-08-05`——這種錯不會拋例外，只會讓排序悄悄錯掉）
+- [ ] T036 建立 `backend/src/sunny/seed.py`（可重複執行）：12 張表的示範資料，含 8–12 個房源、示範訂單／評論／退款、`channel_prices` 種子；**`guest123` 與 `admin123` MUST 於執行時計算 argon2id 雜湊，MUST NOT 硬編碼雜湊值**（research R5、FR-072）
+- [ ] T037 建立 `backend/tests/conftest.py` 的共用 fixtures：測試資料庫（含 `btree_gist`）、`member_token`、`admin_token`、`other_member_token`（供越權測試使用）
 
----
+### 前端核心
 
-## Phase 5: User Story 2 - 會員註冊、登入與帳戶管理 (Priority: P2)
+- [ ] T038 建立 `frontend/src/api/client.ts`：**前端唯一的網路出口**；統一附加 `Authorization: Bearer`、統一攔截 401 並導向登入頁且保留原目的地（FR-009d）
+- [ ] T039 [P] 建立 `frontend/src/api/types.ts`：對應後端 Pydantic 模型的 TypeScript 型別；日曆日為 `string`、金額為 `number`（整數）
+- [ ] T040 建立 `frontend/src/router.tsx` 與 `frontend/src/App.tsx`：路由表與角色守衛；守衛 MUST NOT 被描述為安全機制，它只改變畫面呈現
+- [ ] T041 [P] 建立 `frontend/src/components/Header.tsx` 與 `frontend/src/components/Footer.tsx`：語意化 `header`／`nav`／`footer`，頁尾含服務條款連結
+- [ ] T042 [P] 建立 `frontend/src/components/ErrorState.tsx` 與 `frontend/src/components/LoadingState.tsx`：API 不可用時顯示可理解訊息，MUST NOT 靜默失敗、MUST NOT 退回本機假資料（FR-084）
+- [ ] T043 [P] 建立 `frontend/src/styles/index.css`：Tailwind 指令與極少數無法以 utility 表達的樣式（拱形 `border-radius` 雙值語法、Playfair Display 的 `font-display: swap`）
+- [ ] T044 [P] 建立 `frontend/src/lib/dates.ts`：日曆日處理；**MUST NOT 使用 `new Date("YYYY-MM-DD")` 解析**——該建構式視字串為 UTC，在台北時區會退成前一天
+- [ ] T045 [P] 建立 `frontend/src/lib/money.ts`：整數新臺幣元運算與顯示格式化，MUST NOT 出現小數
 
-**Independent Test**: 註冊、登出、重新登入、以 Google 登入、更新顯示名稱後刷新確認資料維持；再於另一瀏覽器以同一帳號登入確認資料一致
-
-- [X] T042 [P] [US2] Create registration and login forms with the demo-project password warning and public test accounts in src/pages/login.js
-- [X] T043 [US2] Implement signUp/signIn/signOut over Supabase Auth with display_name passed through user metadata in src/services/auth.js
-- [X] T044 [US2] Implement signInWithGoogle and the OAuth return flow, restoring the originally requested route in src/services/auth.js and src/main.js
-- [X] T045 [US2] Disable the Google button in demo mode with an explanation, never faking a consent screen (FR-089)
-- [X] T046 [US2] Handle the user-cancelled OAuth case with a 已取消登入 message and no account creation (FR-090)
-- [X] T047 [US2] Implement session restore via getSession and onAuthStateChange, plus session-expiry handling in src/services/auth.js and src/state/store.js
-- [X] T048 [US2] Add password-length and duplicate-email validation with messages that never reveal whether an email exists in src/pages/login.js and src/services/auth.js
-- [X] T049 [US2] Add account settings page, profile update handling, logout, role-aware routing, and header name sync in src/pages/account.js, src/router.js, and src/components/header.js
-- [X] T050 [P] [US2] [2M] Validate registration, login, Google login, account merging by email, logout, persistence, and cross-browser identity (SC-021, SC-025) — **待瀏覽器實測**
-
----
-
-## Phase 6: User Story 3 - 三步驟訂房、虛擬支付與保留時效 (Priority: P3)
-
-**Independent Test**: 建立一筆訂單、確認房源在保留期間不可再訂、逾期後確認自動釋出
-
-- [X] T051 [P] [US3] Build three-step booking form UI with contact name, phone, email, and step persistence in src/components/booking-form.js
-- [X] T052 [US3] Calculate nights, total amount, and validation errors in src/services/booking.js and src/utils/dates.js
-- [X] T053 [US3] Implement payment selection with the 虛擬支付 notice and confirmation summary in src/components/booking-form.js
-- [X] T054 [US3] Persist order creation as pending-payment with expires_at, guest-count checks, availability re-check, and order number generation in src/data/orders.js and src/services/booking.js
-- [X] T055 [US3] Implement payOrder (pending-payment → confirmed) and the order confirmation screen in src/services/booking.js and src/pages/orders.js
-- [X] T056 [US3] Build the remaining-time countdown for pending-payment orders in src/components/payment-countdown.js (FR-102)
-- [X] T057 [US3] Handle ORDER_EXPIRED on late payment with a clear message and a re-book entry point (FR-100)
-- [X] T058 [US3] Handle ROOM_UNAVAILABLE as a friendly 已無空房 message that preserves the filled form, and add reload-safe form behavior in src/components/booking-form.js
-- [X] T059 [P] [US3] [2M] Validate booking, payment, expiry release, and late-payment rejection; in Supabase mode also verify two concurrent conflicting submissions yield exactly one order (SC-020, SC-023, SC-024) — **待瀏覽器實測**
+**Checkpoint**: 資料庫、後端骨架與前端 API client 就緒——使用者故事可開始，且可平行進行
 
 ---
 
-## Phase 7: User Story 4 - 我的訂單與退款申請 (Priority: P4)
+## Phase 3: User Story 1 - 訪客瀏覽、搜尋與篩選房源 (Priority: P1) 🎯 MVP
 
-- [X] T060 [P] [US4] Implement order list and detail page showing all six statuses in src/pages/orders.js
-- [X] T061 [US4] Create refund request form and reason validation in src/pages/orders.js and src/services/refunds.js
-- [X] T062 [US4] Enforce one-pending-refund rules, the 5-per-member cap (pending + approved only; rejected must not consume quota), date validity checks, and tiered refund amount logic in src/services/refunds.js and the enforce_refund_limit trigger
-- [X] T063 [US4] Reflect admin approval/rejection updates back to the member order view in src/pages/orders.js（審核結果與管理員說明於下次載入訂單時呈現，見 spec「資料更新的即時性」）
-- [X] T064 [P] [US4] [2M] Validate refund flow and status changes; in Supabase mode verify a member cannot read another member's order by ID (SC-019) — **待瀏覽器實測**
+**Goal**: 不需登入即可瀏覽、搜尋、篩選、排序房源並進入詳情頁
 
----
+**Independent Test**: 完全不登入，調整各項篩選條件與排序確認列表正確變動；切換房型頁籤確認分類正確；進入詳情頁確認評分、評論與房態顯示無誤
 
-## Phase 8: User Story 5 - 評論撰寫、自動審核與公開 (Priority: P5)
+### Tests for User Story 1
 
-**⚠️ 標示要求**: 自動審核 MUST 標示為「自動審核（規則式）」，MUST NOT 稱為 AI（FR-103a）
+- [ ] T046 [P] [US1] 契約測試 `GET /rooms` 為公開端點且條件式必填規則正確於 `backend/tests/contract/test_rooms_public.py`：三者皆空放行、只填單邊日期被拒、只填人數放行、人數非正整數被拒（FR-010）
+- [ ] T047 [P] [US1] 單元測試設施 AND 篩選與逐日房態推導於 `backend/tests/unit/test_search.py`：勾選兩項設施僅回傳同時具備者；同一房源 8/1 已預訂 MUST NOT 使 8/2 也顯示已預訂（FR-015）
 
-- [X] T065 [P] [US5] Create review submission form and validation in src/pages/room-detail.js and src/services/reviews.js
-- [X] T066 [US5] Implement the rule-based moderation engine (profanity, too-short, rating/sentiment mismatch, duplicate, gibberish, contact info or external links) returning a verdict plus triggered rule codes in src/services/moderation.js
-- [X] T067 [US5] Persist autoVerdict and autoRules on submission, keeping status pending until an admin confirms (FR-103)
-- [X] T068 [US5] Implement pending/approved/rejected state transitions and one-review-per-order enforcement in src/services/reviews.js
-- [X] T069 [US5] Publish approved reviews and surface the recomputed room average rating in src/data/reviews.js (Supabase 模式由 trigger 重算，示範模式於 adapter 內以相同規則重算)
-- [X] T070 [US5] Add public review filtering, category tabs, and no-review empty-state handling in src/pages/room-detail.js
-- [X] T071 [US5] Label the mechanism as 規則式自動審核 wherever it is surfaced to users or admins (FR-103a)
-- [X] T072 [P] [US5] [2M] Validate moderation outcomes against the five sample reviews and confirm pending reviews are invisible to anon (SC-007, SC-029) — **待瀏覽器實測**
+### Implementation for User Story 1
 
----
+- [ ] T048 [US1] 建立 `backend/src/sunny/repositories/rooms.py`：房源查詢與房態推導；**MUST 於查詢前呼叫 `expire_stale_orders()`**（contracts/README.md）
+- [ ] T049 [US1] 建立 `backend/src/sunny/services/search.py`：FR-010 的條件式必填檢查、設施／特色以 jsonb 包含運算子做 AND 篩選、價格與評分排序
+- [ ] T050 [US1] 於 `backend/src/sunny/repositories/rooms.py` 實作逐日房態推導：「已預訂」由該日期的有效訂單即時推導，**MUST NOT 寫入 `rooms.status` 欄位**；`status = 'maintenance'` 與已預訂等同排除（FR-015、FR-016、FR-051a）
+- [ ] T051 [P] [US1] 建立 `backend/src/sunny/schemas/room.py`：`RoomOut` 明列輸出欄位；`average_rating` 為 null 時 MUST 保持 null，**MUST NOT 以 0 表示**（FR-047）
+- [ ] T052 [US1] 建立 `backend/src/sunny/routers/rooms.py`：`GET /rooms`、`GET /rooms/{id}`，**MUST 明確標註為公開端點**
+- [ ] T053 [US1] 建立 `backend/src/sunny/routers/vocabulary.py`：設施與房型特色可選項目的公開讀取端點；尚未設定過時 MUST 退回程式內建預設值（FR-010a）
+- [ ] T054 [P] [US1] 建立 `frontend/src/components/RoomCard.tsx`：直向拱形卡片，拱形 MUST 以 `border-radius` 雙值語法實作（水平半徑遠大於垂直半徑），顯示照片、房名、房型、每晚價格、人數上限與平均評分（FR-013）
+- [ ] T055 [P] [US1] 建立 `frontend/src/components/FilterBar.tsx`：七項篩選條件、目前生效條件的顯示與一鍵清除；欄位標籤 MUST NOT 標示「必填」，改以說明文字交代三者連動；缺漏 MUST 逐欄顯示訊息並將焦點移至第一個有問題的欄位；清單為空時 MUST 隱藏該組篩選（FR-010、FR-010a）
+- [ ] T056 [US1] 建立 `frontend/src/pages/Home.tsx`：房型頁籤（切換 MUST NOT 清除其他篩選條件）、排序切換、滿版主視覺；條件檢查 MUST 只在按下「搜尋」時執行，首次載入 MUST 顯示全部房源（FR-010、FR-012）
+- [ ] T057 [US1] 建立 `frontend/src/pages/RoomDetail.tsx`：照片縮圖切換（僅一張時 MUST NOT 顯示單格縮圖列）、設施、特色、描述、平均評分、已公開評論、目前房態、依所選日期的夜數與總金額（FR-014、FR-017）
+- [ ] T058 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 顯示最新一次房源品質檢測結果；尚未檢測 MUST 顯示「尚未檢測」而非 0 分或空白區塊（FR-014）
+- [ ] T059 [P] [US1] 建立 `frontend/src/pages/Terms.tsx`：服務條款與隱私聲明，明確說明本站為展示用專案、不提供真實住宿服務與真實交易（FR-121、FR-122）
+- [ ] T060 [P] [US1] 建立 `frontend/src/components/EmptyState.tsx` 並套用於房源列表：無結果時顯示「查無符合條件的房源」與調整建議，而非空白畫面（FR-018）
+- [ ] T061 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 實作未登入點選「立即訂房」導向登入頁並提示需先登入（FR-019）
 
-## Phase 9: User Story 6 - 後台核心管理與營運指標 (Priority: P6)
-
-- [X] T073 [P] [US6] Build admin dashboard and room management screens in src/pages/admin.js and src/components/admin-panel.js
-- [X] T074 [US6] Implement the order statistics block: total orders, total placed, paid orders, unpaid-cancelled orders, conversion rate, total revenue, average order value
-- [X] T075 [US6] Render 「—」 instead of 0 or a division error when there are no orders
-- [X] T076 [US6] Implement room CRUD including amenities and features editing, maintenance state changes, and future-order protection with double confirmation in src/data/rooms.js and src/pages/admin-rooms.js
-- [X] T076a [US6] Add keyword/type/status/price-range filtering to 房源管理, with the export button following the filtered result
-- [X] T076b [US6] Multi-photo management (up to 8, cover first, reorder, remove) with local upload into the room-photos bucket plus URL entry, client-side compression before upload, and orphan cleanup on cancel — src/components/image-manager.js, src/utils/image.js (FR-050a–f)
-- [X] T076c [US1] Render the cover photo on room cards with a photo-count badge, and a switchable thumbnail gallery on the detail page (FR-014)
-- [X] T077 [US6] Add order search, filter, and status editing in src/pages/admin.js and src/services/booking.js
-- [X] T078 [US6] Implement user management and admin promotion via profiles in src/pages/admin.js and src/services/auth.js
-- [X] T079 [P] [US6] [2M] Validate admin dashboard, statistics, and role-aware access; in Supabase mode verify a member's direct write to rooms is rejected by RLS (SC-008)
+**Checkpoint**: 一個能搜尋、篩選、排序並瀏覽詳情的公開站台已可獨立驗收——MVP 達成
 
 ---
 
-## Phase 10: User Story 7 - 後台審核：評論審核與退款審核 (Priority: P7)
+## Phase 4: User Story 2 - 會員註冊、登入與帳戶管理 (Priority: P2)
 
-- [X] T080 [P] [US7] Implement the review moderation queue showing each item's auto verdict and triggered rules in src/pages/admin.js
-- [X] T081 [US7] Implement admin override of auto verdicts and deletion of published reviews, both writing to the audit log (FR-103b, FR-103c)
-- [X] T082 [US7] Implement refund moderation queue and release the date range on approved refunds in src/pages/admin.js and src/services/refunds.js
-- [X] T083 [P] [US7] [2M] Validate review and refund approval/rejection flows across admin and member views (SC-006)
+**Goal**: 自建認證：註冊、電子郵件密碼登入、Google 登入、帳戶維護
 
----
+**Independent Test**: 註冊新帳號、登出、重新登入、修改個人資料、重整後資料仍在；於另一個瀏覽器以同一帳號登入確認資料一致——全程不需建立任何訂單
 
-## Phase 11: User Story 8 - 後台輔助：報表匯出與內容編輯 (Priority: P8)
+### Tests for User Story 2
 
-- [X] T084 [P] [US8] Implement Excel export with CSV fallback and the zero-row guard in src/services/export.js, surfaced as a reusable export button embedded in each admin data page (訂單管理／房源管理) rather than a standalone 報表匯出 module — the export scope must be the page's current filter result (FR-058)
-- [X] T085 [US8] Add homepage title/subtitle/image editing with live content updates in src/data/site-content.js and src/pages/home.js
-- [X] T086 [P] [US8] [2M] Validate export fallback and content editing UX in browser-based checks (SC-010)
+- [ ] T062 [P] [US2] 契約測試註冊與登入於 `backend/tests/contract/test_auth.py`：email 已存在回 409、密碼少於 6 字元回 400、**帳號不存在與密碼錯誤的訊息與狀態碼一律相同**（FR-002、FR-004、FR-009b）
+- [ ] T063 [P] [US2] 單元測試帳號列舉防護於 `backend/tests/unit/test_auth_timing.py`：帳號不存在時 MUST 仍對虛設值執行一次雜湊比對，確認兩種失敗的回應時間無顯著差異
+- [ ] T064 [P] [US2] 契約測試 Google 登入於 `backend/tests/contract/test_google_auth.py`：以既有電子郵件的 Google 帳號登入時 MUST 進入既有帳號且**帳號總數不變**（FR-088、SC-025）
+- [ ] T065 [P] [US2] 單元測試密碼保管於 `backend/tests/unit/test_password.py`：argon2id 雜湊可驗證；`password_hash` MUST NOT 出現在任何 Pydantic 回應模型的欄位中（FR-009a）
+- [ ] T065a [P] [US2] 契約測試個人檔案端點於 `backend/tests/contract/test_profile_authz.py`：`GET`／`PATCH /me` 的三案例（未認證 401／他人 token 只能取得自己的資料／正確身分 200）；會員 MUST NOT 能讀取或修改他人的個人檔案（FR-081）
 
----
+### Implementation for User Story 2
 
-## Phase 12: User Story 9 - 拍照風險預測與房源品質檢測 (Priority: P9)
+- [ ] T066 [US2] 於 Google Cloud Console 建立 OAuth 2.0 client，將 client id／secret／redirect URI 填入 `backend/.env` 並更新 `backend/.env.example`；**client secret MUST 只存在於後端環境變數**
+- [ ] T067 [US2] 建立 `backend/src/sunny/repositories/profiles.py`：以 email 與 `google_sub` 查詢、建立與更新 profile
+- [ ] T068 [P] [US2] 建立 `backend/src/sunny/schemas/auth.py` 與 `backend/src/sunny/schemas/profile.py`：`ProfileOut` **MUST 明列輸出欄位**，MUST NOT 用 `from_attributes` 把 ORM 物件全欄位倒出去（data-model.md）
+- [ ] T069 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/register`：argon2id 雜湊、6 字元下限、email 重複回 409；回應 MUST NOT 包含 `password_hash`
+- [ ] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
+- [ ] T071 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `GET /auth/google` 與 `GET /auth/google/callback`：Authorization Code Flow，**code 交換由後端執行**；以 email 比對既有 profile 並補上 `google_sub`；使用者取消時導回登入頁且 MUST NOT 建立任何帳號（FR-087、FR-088、FR-090）
+- [ ] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
+- [ ] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
+- [ ] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
+- [ ] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除
+- [ ] T076 [US2] 建立 `frontend/src/pages/Account.tsx`：維護顯示名稱與聯絡電話，儲存後頁首與訂單資料中的顯示名稱同步更新（FR-007）
 
-**⚠️ 約束**: 前台使用者上傳的照片 MUST NOT 離開瀏覽器。兩條路徑的程式碼 MUST 分離——
-`pages/risk-check.js` MUST NOT import `services/risk-upload.js` 或 `data/risk-checks.js`（FR-086、憲章原則 VI）
-
-- [X] T087 [P] [US9] Build the front-of-house risk check page with upload control, preview, and processing state in src/pages/risk-check.js
-- [X] T088 [US9] Implement in-browser Canvas analysis of brightness, clutter, and contrast in src/services/risk-score.js (shared by both paths — computation only, no storage)
-- [X] T089 [US9] Implement the weighted risk score, three risk levels, and per-metric improvement suggestions in src/services/risk-score.js
-- [X] T090 [US9] Add file-type and size validation, and ensure a second upload fully replaces the previous result in src/pages/risk-check.js
-- [X] T091 [US9] Implement the admin-only room check upload in src/services/risk-upload.js, including the explicit 「此圖將公開顯示」 confirmation before saving (FR-105)
-- [X] T092 [US9] Delete the previous image from storage when a room is re-checked so old images stop being publicly readable (FR-107)
-- [X] T093 [US9] Display the latest check (date, level, three metrics, image) on the room detail page, with a 尚未檢測 state when absent (FR-106)
-- [X] T094 [P] [US9] [2M] Validate scoring differentiation, zero outbound requests during front-of-house analysis, and that no visitor photo reaches storage or any table (SC-015, SC-016, SC-030)
-
----
-
-## Phase 13: User Story 10 - 收藏房源 (Priority: P10)
-
-- [X] T095 [P] [US10] Add the favorite star control to room cards and the detail page in src/components/room-card.js and src/pages/room-detail.js
-- [X] T096 [US10] Implement addFavorite/removeFavorite with optimistic UI and ALREADY_FAVORITED treated as success in src/data/favorites.js
-- [X] T097 [US10] Build the 我的收藏 page with newest-first ordering and an empty state in src/pages/favorites.js
-- [X] T098 [US10] Redirect unauthenticated users to login and complete the pending favorite after returning (FR-093)
-- [X] T099 [P] [US10] [2M] Validate favorite persistence, deleted-room handling, and that a member cannot read another member's favorites
+**Checkpoint**: US1 與 US2 皆可獨立運作
 
 ---
 
-## Phase 14: User Story 11 - 渠道比價與控價預警（模擬） (Priority: P11)
+## Phase 5: User Story 3 - 三步驟訂房與虛擬支付 (Priority: P3)
 
-**⚠️ 模擬功能**: 價格來自種子資料。MUST NOT 實作爬蟲，MUST NOT 呼叫任何 OTA API（FR-109）
+**Goal**: 核心轉換動作——建立訂單、佔用房況、模擬付款、逾期釋出
 
-- [X] T100 [P] [US11] Build the channel comparison page with the persistent 模擬資料 banner in src/pages/admin-channel.js (FR-110)
-- [X] T101 [US11] Implement price-gap and undercut calculation in src/services/channel.js
-- [X] T102 [US11] Render the per-room comparison table with website price, each channel price, gap amount, and gap percentage
-- [X] T103 [US11] Surface unresolved undercut alerts on the dashboard and implement resolve-with-audit-log in src/pages/admin.js and src/services/channel.js (FR-111, FR-113)
-- [X] T104 [US11] Implement the copyable complaint email template with an explicit 系統不會代為寄送 notice in src/services/channel.js (FR-112)
-- [X] T105 [P] [US11] [2M] Validate alert detection, template generation, empty state, and confirm zero requests to any external booking platform (SC-028)
+**Independent Test**: 以 `guest@sunny.com` 登入完成一筆訂房，再以相同日期搜尋同一房源，確認它已不可訂
+
+**⚠️ 本階段的測試是憲章唯一明訂「必須有測試」的區域**（原則 IV）。T077–T082 MUST 全數通過才可視為完成。
+
+### Tests for User Story 3
+
+- [X] T077 [P] [US3] 單元測試日期規則於 `backend/tests/unit/test_booking_dates.py`：夜數 = 退房 − 入住、退房當日不計一晚、入住日至少為明日、退房日 MUST 晚於入住日；邊界含**單晚（8/01–8/02 = 1）、跨月（8/30–9/02 = 3）、跨年（12/30–01/02 = 3）、明日入住**（FR-022、FR-023、SC-004、SC-005）
+- [X] T078 [P] [US3] 單元測試半開區間重疊於 `backend/tests/unit/test_overlap.py`：**相鄰不重疊必須成功**（A 為 8/01–8/03、B 訂 8/03–8/05）、完全包含必須被拒（既有 8/01–8/10、新訂 8/03–8/05）（SC-003）
+- [X] T079 [P] [US3] 單元測試四個約束的分派於 `backend/tests/unit/test_constraint_dispatch.py`：`orders_no_overlap`→409「此房源於所選日期已無空房」、`valid_date_range`→400、`nights_matches_dates`→500、`order_no` 唯一→500；**每個約束名稱 MUST 有各自的案例**
+- [ ] T080 [P] [US3] 並行測試於 `backend/tests/unit/test_concurrent_booking.py`：兩個 session 同時送出同一房源同一區間的訂房，**成立筆數 MUST 恰為 1**，另一筆收到正確訊息；此測試 MUST 實際觸發資料庫約束，僅測前端檢查不算覆蓋（SC-020、research R9）
+- [ ] T081 [P] [US3] 單元測試逾期釋出於 `backend/tests/unit/test_expiry.py`：`expire_stale_orders()` 於查詢房況前、建立訂單前、讀取訂單列表前皆被呼叫；逾期後該區間立即可重新預訂；對已逾期訂單付款 MUST 被拒（FR-099、FR-100、SC-023、SC-024）
+- [ ] T082 [P] [US3] 契約測試 `POST /orders` 於 `backend/tests/contract/test_orders.py`：後端 MUST 重新計算夜數與總金額，**送出偽造的 `nights` 與 `total_amount` MUST NOT 被採信**；未認證回 401
+
+### Implementation for User Story 3
+
+- [ ] T083 [US3] 建立 `backend/src/sunny/repositories/orders.py`：訂單讀寫；**建立訂單前與讀取訂單列表前 MUST 呼叫 `expire_stale_orders()`**
+- [ ] T084 [US3] 建立 `backend/src/sunny/services/booking.py`：日期驗證、夜數計算、**總金額以 `int` 依當下房價計算並凍結於訂單上**（MUST NOT 用 `float`）、人數上限檢查（FR-024、FR-032）
+- [ ] T085 [P] [US3] 於 `backend/src/sunny/services/booking.py` 實作 `order_no` 產生器：`SN` + 台北日期 + 序號，對使用者可見且唯一（FR-030）
+- [ ] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；回應含 `expires_at` 供前端倒數
+- [ ] T087 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/pay`：MUST 為訂單擁有者（非本人回 **403 而非 404**）；已逾期回 409 並說明該區間可能已被他人預訂（contracts/README.md）
+- [ ] T088 [US3] 建立 `backend/src/sunny/repositories/settings.py`：讀取 `pending_payment_minutes()` 作為 `expires_at` 預設；**變更 MUST NOT 回溯影響既有訂單**（FR-098、FR-101）
+- [ ] T089 [US3] 建立 `frontend/src/pages/Booking.tsx`：三步驟流程與步驟間往返，已填內容 MUST 被保留；重整行為 MUST 可預期（回到該步驟保留內容，或明確回到起點並告知），MUST NOT 呈現半殘狀態（FR-020、FR-021）
+- [ ] T090 [US3] 於 `frontend/src/pages/Booking.tsx` 實作付款方式選擇（LINE Pay／信用卡／銀行轉帳）與「虛擬支付，不會產生任何實際交易」的明顯標示；**畫面上 MUST NOT 有任何要求輸入真實卡號、有效期限、CVV 或銀行帳號的欄位**（FR-027、FR-028、FR-029）
+- [ ] T091 [US3] 建立 `frontend/src/pages/OrderConfirm.tsx`：訂單確認頁含訂單編號、房源、日期、夜數、人數、付款方式與總金額（FR-031）
+- [ ] T092 [P] [US3] 建立 `frontend/src/components/PaymentCountdown.tsx`：待付款訂單的剩餘付款時間（FR-102）
+- [ ] T093 [US3] 於 `frontend/src/pages/Booking.tsx` 實作送出失敗的處理：伺服器逾時或拒絕時顯示可理解訊息並**保留使用者已填內容**，MUST NOT 靜默失敗、MUST NOT 改存本機後假裝成功（FR-083）
+- [ ] T093a [US3] 建立 `frontend/src/state/useStaleOrderSweep.ts`：應用開啟期間**至多每分鐘一次**主動觸發逾期訂單清理，使房源可訂狀態在使用者未主動操作時也能更新；**分頁不可見時 MUST 暫停**（`visibilitychange`），且 **MUST NOT 在使用者填寫表單的頁面上觸發重繪**（訂房流程與各表單頁 MUST 抑制）。此為前端輪詢，與 T081 的 repository 三個呼叫點是不同層次的機制，兩者皆需（FR-099a）
+
+**Checkpoint**: 平台從型錄變成訂房系統；房況保證已由資料庫實際驗證
 
 ---
 
-## Phase 15: User Story 12 - 管理員操作日誌與系統參數設定 (Priority: P12)
+## Phase 6: User Story 4 - 我的訂單與退款申請 (Priority: P4)
 
-- [X] T106 [P] [US12] Build the audit log viewer with actor, time, action, target, and change summary in src/pages/admin-logs.js
-- [X] T107 [US12] Add filtering by actor, action type, and date range in src/pages/admin-logs.js
-- [X] T108 [US12] Build the system settings page for pending_payment_minutes with range validation and the SETTING_OUT_OF_RANGE message in src/pages/admin-settings.js (FR-119)
-- [X] T109 [US12] Verify setting changes apply to new orders only and never alter existing expires_at values (FR-101)
-- [X] T110 [US12] Audit every admin mutation path to confirm a log entry is written, and that no log contains passwords, keys, or real personal data (FR-118, SC-026)
-- [X] T111 [P] [US12] [2M] Validate log immutability from the UI and from a direct database call, including as an admin (SC-027)
+**Goal**: 訂單的完整生命週期——檢視、取消待付款、申請退款、查詢審核進度
+
+**Independent Test**: 以會員身分建立訂單、於「我的訂單」看到它、送出退款申請、確認狀態變為「退款審核中」且無法重複申請
+
+### Tests for User Story 4
+
+- [ ] T094 [P] [US4] 契約測試越權存取於 `backend/tests/contract/test_orders_authz.py`：會員 A 以訂單編號存取會員 B 的訂單 MUST 取不到任何資料；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-034、SC-019）
+- [ ] T095 [P] [US4] 單元測試退款分級金額於 `backend/tests/unit/test_refund_amount.py`：入住前 7 天以上全額、3–6 天 50%、1–2 天 20%、當日起 0%（FR-041）
+- [ ] T096 [P] [US4] 單元測試退款額度於 `backend/tests/unit/test_refund_limit.py`：每位會員上限 5 筆（由 `enforce_refund_limit()` 於**資料庫端**強制，非僅前端檢查）；**已駁回的申請 MUST NOT 佔用額度**，被駁回 5 次的會員仍能提出申請；同一會員 MUST 能對**不同訂單**分別申請、不限一筆（FR-036a、FR-036b、FR-036d、SC-031）
+- [ ] T096a [P] [US4] 契約測試退款端點於 `backend/tests/contract/test_refunds_authz.py`：`POST /refunds` 對他人訂單申請退款 MUST 被拒；`GET /refunds` MUST 只回傳本人的申請；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-081）
+
+### Implementation for User Story 4
+
+- [ ] T097 [US4] 建立 `backend/src/sunny/repositories/refunds.py` 與 `backend/src/sunny/services/refunds.py`：分級金額計算與額度判定
+- [ ] T098 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `GET /orders`（僅本人、依入住日排序）與 `GET /orders/{id}`（FR-033）
+- [ ] T099 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/cancel`：**僅 `pending-payment` 可取消**，`cancel_reason` 以 `member-cancelled` 與 `payment-timeout` 區分；已確認的訂單 MUST 走退款申請路徑（FR-035a）
+- [ ] T100 [US4] 於 `backend/src/sunny/routers/refunds.py` 實作 `POST /refunds` 與 `GET /refunds`：同一訂單 MUST NOT 同時存在兩筆審核中的申請（FR-036、FR-037）
+- [ ] T101 [US4] 建立 `frontend/src/pages/Orders.tsx`：依入住日排序顯示全部訂單；**待付款訂單的付款與取消入口 MUST 同時出現在列表上**，不只在詳情頁（FR-035b）
+- [ ] T102 [US4] 建立 `frontend/src/pages/OrderDetail.tsx`：取消的二次確認流程（此操作不可復原、房間會立刻開放）；列表上的入口導向本頁，二次確認 MUST 只實作一份（FR-035a）
+- [ ] T103 [US4] 建立 `frontend/src/pages/RefundForm.tsx`：必填退款原因；已有審核中申請時該操作不可用並顯示目前進度（FR-035、FR-036）
+- [ ] T104 [US4] 於 `frontend/src/pages/Orders.tsx` 實作「退款已駁回」顯示層標籤：**訂單資料仍為 `confirmed`**，僅最新一次申請遭駁回時顯示此標籤並於狀態分頁獨立成一類，MUST NOT 新增資料庫狀態值；未達退款上限時 MUST NOT 顯示已使用或剩餘次數（FR-039、FR-036c、SC-032）
+
+**Checkpoint**: 訂單生命週期閉環（除管理員審核端，見 US7）
 
 ---
 
-## Phase 16: 跨切面 — 法律與說明
+## Phase 7: User Story 5 - 撰寫與瀏覽評論評分 (Priority: P5)
 
-- [X] T112 Build the terms of service and privacy notice page, linked from the site footer, stating this is a demo project with no real accommodation, transactions, or personal data collection (FR-121, FR-122)
+**Goal**: 評論送出 → 規則式自動審核 → 管理員複核 → 前台公開
+
+**Independent Test**: 以會員身分對一筆已入住的訂單撰寫評論，確認前台尚未出現；以管理員審核通過後確認評論出現且平均評分更新
+
+### Tests for User Story 5
+
+- [ ] T105 [P] [US5] 單元測試規則式審核於 `backend/tests/unit/test_moderation.py`：5 則樣本（含不當字詞、過短、評分與內容矛盾、重複送件、正常）**100% 產生可解釋且附觸發規則的判定**（SC-029）
+- [ ] T106 [P] [US5] 契約測試評論權限於 `backend/tests/contract/test_reviews.py`：無該房源已完成訂單者不可評論；同一訂單重複評論回 409；未通過審核的評論在公開端點的出現次數為 0（FR-042、FR-043、SC-007）
+
+### Implementation for User Story 5
+
+- [ ] T107 [US5] 建立 `backend/src/sunny/services/moderation.py`：規則式引擎，輸出 `auto_verdict`（`auto-pass`／`auto-reject`）與 `auto_rules`；**MUST 於後端執行**——留在前端等於讓使用者自行決定自己的評論過不過審（research B1-b）
+- [ ] T108 [US5] 建立 `backend/src/sunny/repositories/reviews.py`
+- [ ] T109 [US5] 於 `backend/src/sunny/routers/reviews.py` 實作 `POST /reviews`（需登入、訂單 MUST 屬本人且為 `completed`）：送出後 MUST 進入待審核，**MUST NOT 因自動審核結果而直接公開**（FR-045、FR-103）
+- [ ] T110 [US5] 於 `backend/src/sunny/routers/rooms.py` 實作 `GET /rooms/{id}/reviews`（公開）：僅回傳 `approved` 的評論，支援依評論類型篩選（FR-046、FR-048）
+- [ ] T111 [P] [US5] 於 `backend/tests/unit/test_rating.py` 驗證 `refresh_room_rating()` trigger：評論狀態變更時重算 `rooms.average_rating`；1 則評論時平均等於該則、0 則時為 null（FR-046、FR-047）
+- [ ] T112 [US5] 建立 `frontend/src/pages/ReviewForm.tsx`：自訂單進入，1–5 評分與文字內容；已評論過時該操作不可用並導向既有評論（FR-043、FR-044）
+- [ ] T113 [US5] 於 `frontend/src/pages/RoomDetail.tsx` 實作評論清單與類型篩選；無通過審核的評論時顯示「尚無評論」且平均評分顯示為**「尚無評分」而非 0 分**（FR-047、FR-048）
+- [ ] T114 [P] [US5] 於 `frontend/src/pages/ReviewForm.tsx` 與後台相關文案將機制標示為「**自動審核（規則式）**」；**MUST NOT 被描述為 AI 或人工智慧判讀**（FR-103a）
+- [ ] T115 [US5] 於 `frontend/src/pages/RoomDetail.tsx` 顯示業者公開回覆：位於該評論下方且視覺上可區分，標示為業者立場，**MUST NOT 顯示回覆者姓名**（FR-103d）
+
+**Checkpoint**: 前台內容閉環（審核端見 US7）
 
 ---
 
-## Phase 17: Polish & Cross-Cutting Concerns
+## Phase 8: User Story 6 - 後台核心管理：儀表板、房源、訂單、用戶 (Priority: P6)
 
-- [X] T113 [P] Review accessibility, responsive layout, and keyboard-safe controls across index.html, styles/, and src/components/*
-- [X] T114 [P] Audit error handling and edge-case guards across all modules, including offline behavior and session expiry in Supabase mode
-- [X] T115 [P] Verify no page or component calls the Supabase client or localStorage directly — all access goes through src/data/repository.js
-- [X] T116 [P] Verify src/pages/risk-check.js has no import path reaching src/services/risk-upload.js
-- [X] T117 [2M] Run the full quickstart.md validation in both modes and fix any acceptance gaps (SC-017)
-- [X] T118 Confirm zero console errors and warnings during normal flows in both modes (SC-014)
-- [X] T119 Documentation updates and code cleanup in README.md and inline source comments
+**Goal**: 業者可自助維運房源、訂單與會員
+
+**Independent Test**: 以 `admin@sunny.com` 登入，新增一間房源並於前台確認它出現；將某房源房態改為「整理中」，確認前台不再可訂
+
+### Tests for User Story 6
+
+- [ ] T116 [P] [US6] 契約測試後台授權於 `backend/tests/contract/test_admin_authz.py`：**每個 `/admin/*` 端點皆需三案例**（未認證 401／一般會員 403／管理員 200）；僅測 happy path MUST NOT 被視為已覆蓋（FR-009、SC-008、憲章自動化測試節）
+- [ ] T117 [P] [US6] 單元測試儀表板除零於 `backend/tests/unit/test_dashboard.py`：系統中無任何訂單時，成交率與平均客單價 MUST 顯示為「—」而非 0 或除以零錯誤
+
+### Implementation for User Story 6
+
+- [ ] T118 [US6] 建立 `backend/src/sunny/routers/admin_dashboard.py`：`GET /admin/dashboard` 回傳總訂單數、今日入住與退房數、各房態房源數、待審核評論與退款筆數、本月營收（FR-049）
+- [ ] T119 [US6] 建立 `backend/src/sunny/routers/admin_rooms.py`：房源 CRUD；刪除仍有未來有效訂單的房源 MUST 提出警告並列出受影響訂單、需二次確認（`on delete restrict` 保護）（FR-050、FR-052）
+- [ ] T120 [US6] 於 `backend/src/sunny/routers/admin_rooms.py` 實作房態調整：**可人工設定的僅有 `available` 與 `maintenance`**，「已預訂」MUST NOT 開放人工設定（FR-051）
+- [ ] T121 [US6] 於 `backend/src/sunny/repositories/rooms.py` 實作房態的日期**區間**查詢（含頭含尾，期間內任一天有有效訂單即視為已預訂）；只填一端視為單日；起始晚於結束 MUST 明確提示而非回傳空清單；篩選「已預訂」MUST 要求先選定日期（FR-051b、FR-053a）
+- [ ] T122 [US6] 建立 `backend/src/sunny/routers/admin_orders.py`：訂單搜尋與篩選（訂單編號、狀態、日期區間）與狀態變更；狀態變更 MUST 經 T034 寫入 `admin_logs`（FR-053、FR-054）
+- [ ] T123 [US6] 建立 `backend/src/sunny/routers/admin_users.py`：會員資料檢視編輯與角色升降；**`role` 變更 MUST 只能由此端點執行且 MUST 進稽核日誌**（原 `prevent_role_escalation()` trigger 的職責移至此）（FR-055、data-model.md）
+- [ ] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
+- [ ] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
+- [ ] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
+- [ ] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
+- [ ] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
+- [ ] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
+
+**Checkpoint**: 後台核心可用；前後台資料互相反映
+
+---
+
+## Phase 9: User Story 7 - 後台審核：評論審核與退款審核 (Priority: P7)
+
+**Goal**: 讓 US4 與 US5 的送出端得到處理端，完成閉環
+
+**Independent Test**: 建立一則待審核評論與一筆退款申請，以管理員分別通過與駁回，確認前台與會員端狀態同步變更
+
+### Tests for User Story 7
+
+- [ ] T130 [P] [US7] 契約測試審核端點於 `backend/tests/contract/test_admin_moderation.py`：三案例授權；核准退款後該房源該區間 MUST 於下一次搜尋重新出現（SC-006）
+
+### Implementation for User Story 7
+
+- [ ] T131 [US7] 建立 `backend/src/sunny/routers/admin_reviews.py`：通過／駁回／**覆寫自動審核結果**／刪除已公開評論；四者皆 MUST 寫入 `admin_logs`；刪除後平均評分 MUST 重新計算（FR-056、FR-103b、FR-103c）
+- [ ] T132 [US7] 於 `backend/src/sunny/routers/admin_reviews.py` 實作業者回覆的撰寫、修改與收回：清空內容等同收回；**待審核與已駁回的評論 MUST NOT 提供回覆入口**；三種操作皆寫入 `admin_logs`（FR-103d）
+- [ ] T133 [US7] 建立 `backend/src/sunny/routers/admin_refunds.py`：核准／駁回；核准後訂單轉 `refunded` 並**立即釋回該區間**；駁回後回到 `confirmed` 且會員可再次申請（FR-038、FR-039、FR-057）
+- [ ] T134 [P] [US7] 建立 `frontend/src/pages/admin/Reviews.tsx`：依送出時間顯示待審核評論，含房源、會員、評分、內容、自動審核判定與觸發規則；無待審核項目時顯示引導性空狀態
+- [ ] T135 [P] [US7] 建立 `frontend/src/pages/admin/Refunds.tsx`：顯示對應訂單、申請人、退款原因、申請時間與分級後的退款金額；無待審核項目時顯示引導性空狀態
+
+**Checkpoint**: US4、US5、US7 三者構成完整的送出—審核—反映閉環
+
+---
+
+## Phase 10: User Story 8 - 後台輔助：報表匯出與內容編輯 (Priority: P8)
+
+**Goal**: 七個模組的匯出（含 CSV fallback）與首頁內容編輯
+
+**Independent Test**: 於後台匯出訂單報表並開啟確認欄位正確；修改首頁標題後回到前台確認已更新
+
+### Tests for User Story 8
+
+- [ ] T136 [P] [US8] 單元測試匯出於 `backend/tests/unit/test_export.py`：0 筆時 MUST NOT 產生檔案且提示無資料；用戶匯出 MUST NOT 包含電子郵件與密碼欄位；匯出日誌 MUST NOT 含任何一列的實際內容（FR-058、FR-058a、FR-060、FR-118）
+
+### Implementation for User Story 8
+
+- [ ] T137 [US8] 建立 `backend/src/sunny/services/export.py`：涵蓋七個模組（房源、訂單、用戶、評論、退款、渠道比價、操作日誌）的資料組裝
+- [ ] T138 [US8] 於 `backend/src/sunny/services/export.py` 實作匯出的稽核紀錄：每次成功匯出寫入模組、筆數與檔案格式；**匯出操作日誌本身同樣 MUST 被記錄**；零筆而未產生檔案時 MUST NOT 記錄（FR-058a）
+- [ ] T139 [US8] 建立 `backend/src/sunny/routers/admin_content.py`：`GET`／`PUT /admin/site-content` 與主圖上傳；上傳後尚未儲存就離開或改選其他圖片時該檔案 MUST 被清除（FR-061）
+- [ ] T140 [US8] 建立 `frontend/src/components/ExportButton.tsx` 並嵌入七個資料頁面；**匯出範圍 MUST 為該頁當前的篩選結果**，MUST NOT 另設獨立的「報表匯出」分頁（FR-058、SC-033）
+- [ ] T141 [US8] 於 `frontend/src/components/ExportButton.tsx` 實作 xlsx 函式庫無法載入或離線時**自動退回 CSV 並顯示「目前離線，已改用 CSV 格式」**，MUST NOT 中斷或無回應（FR-059、SC-010）
+- [ ] T142 [US8] 建立 `frontend/src/pages/admin/Content.tsx`，並於 `frontend/src/pages/Home.tsx` 實作滿版主視覺：隨視窗寬度連續縮放、MUST NOT 產生橫向捲動、標題 MUST 與頁面其餘內容對齊同一條量測線（FR-061、FR-061a）
+
+**Checkpoint**: 後台輔助模組完成
+
+---
+
+## Phase 11: User Story 9 - 拍照風險預測 (Priority: P9)
+
+**Goal**: 兩條刻意分離的照片路徑——前台留在瀏覽器，管理端可公開存檔
+
+**Independent Test**: 分別上傳一張過暗、一張雜亂、一張正常的照片，確認三者得到明顯不同的評分與對應建議
+
+**⚠️ 本階段承載憲章原則 VI 不可放寬的一條**：前台使用者的照片 MUST NOT 離開瀏覽器。
+
+### Tests for User Story 9
+
+- [ ] T143 [P] [US9] 單元測試風險公式於 `frontend/src/lib/riskScore.test.ts`：`100 − (0.4×亮度 + 0.35×雜亂度 + 0.25×對比)`；等級切分 0–34 低／35–59 中／60–100 高；過暗、雜亂、正常三類樣本 MUST NOT 全部落在同一等級（FR-068、SC-016）
+- [ ] T144 [P] [US9] 相依圖檢查於 `frontend/src/lib/__tests__/riskCheckIsolation.test.ts`：斷言 `frontend/src/pages/RiskCheck.tsx` 的相依圖中**不存在任何上傳模組或圖片端點呼叫**；此測試失敗即代表 SC-030 已失守（research R8、plan.md）
+- [ ] T144a [P] [US9] **執行期**網路驗證於 `frontend/src/pages/__tests__/riskCheckNetwork.test.tsx`：以攔截器包住 `fetch` 與 `XMLHttpRequest`，於安全檢測頁完成一次完整分析後斷言**夾帶照片內容的請求數為 0**。與 T144 是不同的驗證面——T144 驗靜態相依（SC-030：不出現在儲存或資料表），本項驗執行期流量（SC-015）
+
+### Implementation for User Story 9
+
+- [ ] T145 [US9] 建立 `frontend/src/lib/riskScore.ts`：純函式，以 Canvas 計算亮度、雜亂度、對比三項指標；兩條路徑共用「計算」
+- [ ] T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`：**只 import `riskScore.ts`**；顯示預覽與亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級（FR-064）、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；照片僅於瀏覽器內處理、MUST NOT 送往任何外部服務或長期儲存（FR-066、FR-086）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；前台與後台皆提供此功能（FR-062）
+- [ ] T147 [US9] 於 `backend/src/sunny/routers/admin_rooms.py` 實作 `POST /admin/rooms/{id}/risk-checks`（需管理員）：**這是系統中唯一接收檢測圖片的端點**；MUST 檢查檔案大小與 MIME 類型（FR-104、FR-107）
+- [ ] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
+- [ ] T149 [US9] 於 `backend/src/sunny/services/room_photos.py` 實作重新檢測後**舊圖片不再對外可讀取**；房源詳情頁僅顯示最新一筆（FR-106、FR-107）
+
+**Checkpoint**: 差異化功能完成，且前台照片的禁令由結構而非紀律保證
+
+---
+
+## Phase 12: User Story 10 - 收藏房源 (Priority: P10)
+
+**Goal**: 會員收藏與收藏清單
+
+**Independent Test**: 以會員身分收藏兩個房源、於收藏清單確認、取消其中一個、重新整理後確認狀態維持
+
+### Tests for User Story 10
+
+- [ ] T150 [P] [US10] 契約測試於 `backend/tests/contract/test_favorites.py`：會員 A 讀取會員 B 的收藏清單 MUST 被拒；三案例授權皆需覆蓋（FR-094）
+
+### Implementation for User Story 10
+
+- [ ] T151 [US10] 建立 `backend/src/sunny/routers/favorites.py`：`GET`／`POST`／`DELETE /favorites`（需登入）；複合主鍵 `(user_id, room_id)`，依 `created_at` 由新到舊排序（FR-091、FR-092）
+- [ ] T152 [US10] 建立 `frontend/src/components/FavoriteButton.tsx`：未登入時導向登入頁，**登入後 MUST 回到原本的房源並完成收藏**（FR-093）
+- [ ] T153 [US10] 建立 `frontend/src/pages/Favorites.tsx`：已下架或被刪除的房源 MUST 自動消失或標示為已下架，MUST NOT 顯示錯誤或空白卡片；尚無收藏時顯示引導性空狀態（FR-095）
+
+**Checkpoint**: 收藏可獨立驗收
+
+---
+
+## Phase 13: User Story 11 - 渠道比價與控價預警（模擬） (Priority: P11)
+
+**Goal**: 以種子資料呈現的比價、預警與申訴郵件範本
+
+**Independent Test**: 檢視比價表，確認低於官網的項目被標示為預警，並產生郵件範本
+
+**⚠️ 本模組 MUST NOT 實作爬蟲、MUST NOT 呼叫任何 OTA API。理由是服務條款，不是技術限制**——後端的存在不改變這一點（research B1-a）。
+
+### Tests for User Story 11
+
+- [ ] T154 [P] [US11] 測試於 `backend/tests/unit/test_channel_prices.py`：模組運作期間**連向外部訂房平台的網路請求數為 0**；回應 MUST 帶有標示其為模擬資料的欄位（FR-109、FR-110、SC-028）
+
+### Implementation for User Story 11
+
+- [ ] T155 [US11] 建立 `backend/src/sunny/routers/admin_channel.py`：`GET /admin/channel-prices`（需管理員）依房源列出官網價與各平台售價、價差金額與價差百分比；資料來自 `channel_prices` 種子表（FR-108）
+- [ ] T156 [US11] 建立 `backend/src/sunny/services/channel.py`：預警判定（外部售價低於官網價）並將未處理筆數併入儀表板（FR-111）
+- [ ] T157 [US11] 於 `backend/src/sunny/services/channel.py` 實作申訴郵件範本組裝（房源、平台、官網價、對方售價、價差）；**MUST NOT 發送任何郵件**（FR-112）
+- [ ] T158 [US11] 於 `backend/src/sunny/routers/admin_channel.py` 實作標記已處理，並寫入 `admin_logs`（FR-113）
+- [ ] T159 [US11] 建立 `frontend/src/pages/admin/Channel.tsx` 與 `frontend/src/components/SimulatedBadge.tsx`：頁面頂端**常駐**「模擬資料：此模組不連線至任何外部平台」；郵件範本畫面 MUST 明確告知系統不會代為寄送；尚無資料時顯示引導性空狀態（FR-110、FR-112）
+
+**Checkpoint**: 營運輔助模組完成，模擬性質已明確標示
+
+---
+
+## Phase 14: User Story 12 - 管理員操作日誌與系統參數設定 (Priority: P12)
+
+**Goal**: 不可竄改的稽核日誌與集中的營運參數
+
+**Independent Test**: 以管理員修改一項房源與一項系統參數，於操作日誌確認兩筆紀錄皆已產生且無法被竄改
+
+### Tests for User Story 12
+
+- [ ] T160 [P] [US12] 測試日誌不可竄改於 `backend/tests/unit/test_admin_logs_append_only.py`：以應用連線角色對 `admin_logs` 執行 UPDATE 與 DELETE **MUST 全數失敗**，含以管理員身分；此測試直接驗證 T019 的 `REVOKE`（FR-116、SC-027）
+- [ ] T161 [P] [US12] 契約測試於 `backend/tests/contract/test_admin_logs.py`：非管理員讀取操作日誌 MUST 取不到任何紀錄；日誌內容 MUST NOT 含密碼、金鑰或真實個資（FR-117、FR-118）
+- [ ] T161a [P] [US12] 完整性測試於 `backend/tests/contract/test_audit_completeness.py`：**列舉 FastAPI 路由表中所有 `/admin/*` 的寫入端點**（POST／PUT／PATCH／DELETE），逐一呼叫後斷言 `admin_logs` 筆數 +1。此測試驗證的是 SC-026 的 100% 宣稱，且會在**日後新增後台端點卻忘記寫日誌時失敗**——這正是稽核覆蓋率會靜默退化的方式（FR-114、SC-026）
+
+### Implementation for User Story 12
+
+- [ ] T162 [US12] 建立 `backend/src/sunny/routers/admin_logs.py`：`GET /admin/logs` 依時間由新到舊，支援依操作者、動作類型與日期區間篩選；**MUST NOT 提供任何 UPDATE 或 DELETE 端點**（FR-114、FR-115、contracts/README.md）
+- [ ] T163 [US12] 建立 `backend/src/sunny/routers/admin_settings.py`：系統參數的讀取與更新；MUST 有範圍檢查、超出範圍 MUST 被拒絕並顯示可接受範圍、變更 MUST 進稽核日誌、**MUST NOT 回溯影響既有訂單的 `expires_at`**（FR-098、FR-101、FR-119、FR-120）
+- [ ] T164 [P] [US12] 建立 `frontend/src/pages/admin/Logs.tsx`：篩選與唯讀呈現，畫面上 MUST NOT 出現編輯或刪除入口
+- [ ] T165 [P] [US12] 建立 `frontend/src/pages/admin/Settings.tsx`：未付款訂單保留分鐘數的調整與可接受範圍提示
+- [ ] T165a [US12] 於 `backend/src/sunny/routers/admin_settings.py` 實作 `POST /admin/reset-demo-data`（需管理員）並於 `frontend/src/pages/admin/Settings.tsx` 提供入口：呼叫 `sunny.seed` 將所有資料還原為初始種子狀態，需二次確認且 MUST 寫入 `admin_logs`。FR-072（可重複執行的種子機制，T036）與 FR-073（**還原入口**）是兩條需求——只有 CLI 腳本不構成使用者可及的入口（FR-073）
+
+**Checkpoint**: 十二個使用者故事全數完成
+
+---
+
+## Phase 15: 會員訊息（FR-123–FR-128）
+
+**Purpose**: 後台十二個模組中的「會員訊息」。此模組於 2026-08-03 加入 spec，
+**未被任何既有 user story 涵蓋**，故獨立成一個階段而非硬塞進 US6。
+
+- [ ] T166 [P] 契約測試於 `backend/tests/contract/test_messages.py`：會員 MUST NOT 能讀寫他人的討論串；**發話者身分與角色 MUST 由伺服器判定**，前端送出的 `sender_role` MUST 被忽略（FR-125、FR-126）
+- [ ] T167 建立 `backend/src/sunny/repositories/messages.py` 與 `backend/src/sunny/routers/messages.py`：`GET`／`POST /messages`（需登入）；討論串以 `thread_user_id`（會員）為單位、不存收件者；`sender_id` 與 `sender_role` 由後端寫入（改寫後的 `stamp_message_sender()`）；送出後 MUST NOT 可修改內容，僅已讀時間可更新（FR-123、FR-124）
+- [ ] T168 建立 `backend/src/sunny/routers/admin_messages.py`：**任一管理員皆可讀取並回覆所有討論串**；MUST NOT 提供「指派給特定客服」的機制；每次回覆 MUST 寫入 `admin_logs` 且**日誌 MUST NOT 含訊息內容**（FR-118、FR-127、FR-128）
+- [ ] T169 [P] 建立 `frontend/src/pages/Messages.tsx` 與 `frontend/src/components/MessageThread.tsx`：前台的會員 MUST 只看到「客服人員」，MUST NOT 顯示管理員姓名（FR-127）
+- [ ] T170 [P] 建立 `frontend/src/pages/admin/Messages.tsx`：管理員端 MUST 看得出每則回覆出自哪一位管理員（FR-127）
+
+---
+
+## Phase 16: Polish & Cross-Cutting Concerns
+
+**Purpose**: 跨故事的稽核、驗收與舊實作清除
+
+- [ ] T171 [P] 無障礙稽核 `frontend/src/` 全部元件與頁面：語意化標籤（MUST NOT 以 `div` + `onClick` 取代 `button`／`a`）、所有圖片有 `alt`、所有表單控制項有關聯 `<label>`、所有互動元素可鍵盤操作且有可見 focus 樣式（`outline-none` MUST NOT 被全域套用而不提供替代）；訂房流程 MUST 能純以鍵盤完成（憲章原則 V、SC-011）
+- [ ] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
+- [ ] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
+- [ ] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
+- [ ] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
+- [ ] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
+- [ ] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
+- [ ] T177 錯誤處理稽核 `backend/src/sunny/` 與 `frontend/src/`：後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑回傳給用戶端；前端所有失敗操作 MUST 顯示可理解訊息並保留使用者已填內容；後端未啟動時 MUST 顯示可理解訊息而非無限轉圈或空白（FR-074、FR-075、FR-083、FR-084）
+- [ ] T178 驗證版本控制與前端建置產物中的憑證與秘鑰數為 0：確認 `backend/.env` 未進版控、`frontend/dist/` 不含 `JWT_SECRET`／`DATABASE_URL`／Google client secret，且 `VITE_` 前綴變數僅承載公開資訊（FR-085、SC-022）
+- [ ] T179 重寫 `specs/001-booking-site/checklists/browser-acceptance.md`：舊清單的 15 項係為「開啟 index.html／示範模式橫幅」等已作廢的架構而寫；新清單 MUST 覆蓋前後端各自啟動、需人眼判斷的版面與對比，以及**需要真實 Google 帳密的登入往返**（FR-088、SC-025）
+- [ ] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
+- [ ] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
+- [ ] T182 重寫根目錄 `README.md`：前後端各自的啟動指令與必要環境變數；新進者 MUST 能只依 README 完成本機啟動（憲章「啟動說明」條）
+- [ ] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
 
 ---
 
@@ -446,47 +503,111 @@ trigger 引用的函式是否都有定義），但它們只是輔助——`schem
 
 ### Phase Dependencies
 
-- **Phase 1**: Setup，無依賴
-- **Phase 2**: Supabase 專案與資料庫，依賴 Setup；可與 Phase 3 的示範模式部分並行
-- **Phase 3**: Foundational 雙軌資料層，依賴 Phase 1，且阻擋所有故事
-- **Phase 4–15**: User Story 1–12，皆依賴 Phase 3
-- **Phase 16–17**: 依賴所有目標故事完成
+- **Phase 1（Setup）**：無依賴，可立即開始
+- **Phase 2（Foundational）**：依賴 Setup，**阻擋所有使用者故事**
+  - 內部順序為資料庫（T011–T020）→ 後端核心（T021–T037）→ 前端核心（T038–T045）
+  - 依 research R10：資料庫是唯一在新舊架構間共用的資產，先確認 gist 約束與各項 CHECK
+    在新環境下行為一致，後端才有可信基礎；OpenAPI 契約穩定後前端才有可對接的目標
+- **Phase 3–14（US1–US12）**：皆依賴 Phase 2；彼此可平行
+- **Phase 15（會員訊息）**：依賴 Phase 2 與 T034（稽核寫入層）
+- **Phase 16（Polish）**：依賴所有目標故事完成；T183 額外依賴 T179 與 T180 通過
 
 ### User Story Dependencies
 
-- **US1 (P1)**: 可在 Phase 3 完成後開始，不依賴其他故事
-- **US2 (P2)**: 可在 Phase 3 完成後開始；Google 登入另需 T009
-- **US3 (P3)**: 依賴 US1 與 US2
-- **US4 (P4)**: 依賴 US3 的訂單資料結構
-- **US5 (P5)**: 依賴 US3 與 US4 的已完成訂單
-- **US6 (P6)**: 依賴管理員角色與後台基礎
-- **US7 (P7)**: 依賴 US4–US6
-- **US8 (P8)**: 依賴 US6
-- **US9 (P9)**: 前台部分僅依賴 Phase 3；房源檢測部分依賴 US6 的後台骨架
-- **US10 (P10)**: 依賴 US1（房源卡片）與 US2（登入）
-- **US11 (P11)**: 依賴 US6 的後台骨架與 T014 的模擬價格種子資料
-- **US12 (P12)**: 依賴 T028 的稽核寫入層，以及所有會產生日誌的模組
+- **US1 (P1)**：Phase 2 完成後即可開始，不依賴其他故事
+- **US2 (P2)**：Phase 2 完成後即可開始；Google 登入另需 T066 的 OAuth client
+- **US3 (P3)**：依賴 US1（房源與日期）與 US2（登入身分）
+- **US4 (P4)**：依賴 US3 的訂單資料
+- **US5 (P5)**：依賴 US3 與 US4 的已完成訂單；T110 另需 US1 的 `routers/rooms.py`（T052）
+- **US6 (P6)**：依賴 T032 的 `require_admin`；T121 另需 US1 的 `repositories/rooms.py`（T048）
+- **US7 (P7)**：依賴 US4（退款申請）、US5（評論送出）與 US6 的後台骨架
+- **US8 (P8)**：依賴 US6 的後台骨架（匯出按鈕嵌於各資料頁面內）
+- **US9 (P9)**：前台部分僅依賴 Phase 2；房源檢測部分依賴 US6 的後台骨架
+- **US10 (P10)**：依賴 US1（房源卡片）與 US2（登入）
+- **US11 (P11)**：依賴 US6 的後台骨架與 T036 的種子價格資料
+- **US12 (P12)**：依賴 T034 的稽核寫入層，以及所有會產生日誌的模組
+
+### Within Each User Story
+
+- 測試先寫並確認**失敗**後才實作
+- 模型 → repository → service → router → 前端頁面
+- 後端契約穩定後前端才對接
 
 ### Parallel Opportunities
 
-- Phase 1 與 Phase 2 的多數任務可同時處理
-- T021（local adapter）與 T022（supabase adapter）可平行開發，只要先確定 T019 的介面
-- US1、US2、US9 前台部分可在 Phase 3 完成後平行開發
-- US10、US11、US12 彼此獨立，可平行進行
-- 各故事內的資料層、服務層、頁面層可並行建立
+- Phase 1 的前端側（T005–T008、T010）與後端側（T002–T004、T009）可完全平行
+- Phase 2 的 12 個 ORM 模型（T023–T027）可平行；前端核心（T039、T041–T045）可平行
+- Phase 2 完成後，US1、US2、US9 前台部分可平行開發
+- US10、US11、US12 彼此獨立，可平行
+- 各故事內標 [P] 的測試可同時撰寫
+- Phase 16 的 T171–T176、T178 皆為獨立稽核，可平行
+
+---
+
+## Parallel Example: User Story 3
+
+```bash
+# 先平行寫完全部測試（憲章原則 IV 的每一條規則）：
+Task: "單元測試日期規則 in backend/tests/unit/test_booking_dates.py"
+Task: "單元測試半開區間重疊 in backend/tests/unit/test_overlap.py"
+Task: "單元測試四個約束的分派 in backend/tests/unit/test_constraint_dispatch.py"
+Task: "並行測試 orders_no_overlap in backend/tests/unit/test_concurrent_booking.py"
+Task: "單元測試逾期釋出 in backend/tests/unit/test_expiry.py"
+Task: "契約測試 POST /orders in backend/tests/contract/test_orders.py"
+
+# 確認全部失敗後，才進入實作（T083 起）
+```
+
+## Parallel Example: Phase 2 的 ORM 模型
+
+```bash
+Task: "profile.py 與 room.py in backend/src/sunny/models/"
+Task: "order.py（含 ExcludeConstraint 宣告） in backend/src/sunny/models/"
+Task: "review.py 與 refund.py in backend/src/sunny/models/"
+Task: "favorite.py、risk_check.py、channel_price.py in backend/src/sunny/models/"
+Task: "admin_log.py、message.py、system_setting.py、site_content.py in backend/src/sunny/models/"
+```
+
+---
 
 ## Implementation Strategy
 
 ### MVP First
 
-1. Phase 1 Setup → 2. Phase 2 資料庫 → 3. Phase 3 雙軌資料層（關鍵阻塞）
-4. Phase 4 User Story 1 → 5. 在兩種模式下驗證未登入的瀏覽、搜尋、篩選與詳情頁
-6. 達標後依序交付 US2 ~ US12
+1. Phase 1 Setup → 2. Phase 2 Foundational（**關鍵阻塞**）→ 3. Phase 3 US1
+4. **STOP and VALIDATE**：不登入即可搜尋、篩選、排序、進詳情頁，且 console 無錯誤
+5. 此時已是一個可展示的公開站台
 
 ### Incremental Delivery
 
-- 第一階段：房源瀏覽與預訂入口（US1 → US2 → US3）
-- 第二階段：會員資料生命週期與訂單退款（US4 → US5）
-- 第三階段：後台管理與審核（US6 → US7 → US8）
-- 第四階段：差異化與營運輔助（US9 → US10 → US11 → US12）
-- 最後完成法律頁面、跨功能驗證與可用性優化
+- 第一階段：可瀏覽的公開站台（Phase 1–2 + US1）
+- 第二階段：身分與核心交易（US2 → US3）——完成後房況保證已由資料庫實測驗證
+- 第三階段：訂單生命週期與內容（US4 → US5 → US7）
+- 第四階段：後台維運（US6 → US8 → US12 → 會員訊息）
+- 第五階段：差異化與營運輔助（US9 → US10 → US11）
+- 最後：Polish、驗收清單重寫、quickstart 驗證，通過後才移除舊實作（T183）
+
+### Parallel Team Strategy
+
+Phase 2 完成後：
+
+- 開發者 A：US1 → US3（前台交易主線）
+- 開發者 B：US2 → US4 → US5（身分與訂單生命週期）
+- 開發者 C：US6 → US7 → US8（後台）
+- 三線於 US7 交會（審核端需要 US4／US5 產生的資料）
+
+---
+
+## Notes
+
+- [P] 任務 = 不同檔案、無相依
+- [Story] 標籤僅用於使用者故事階段；Setup、Foundational、會員訊息與 Polish 不帶此標籤
+- 每個故事皆應可獨立完成與驗收
+- 實作前先確認測試失敗
+- 每完成一項任務或一組邏輯相關任務即提交
+- **舊實作於過渡期保留為行為比對來源**（錯誤訊息措辭、排序穩定性、空狀態文案等
+  寫在 JS 裡但沒寫進 spec 的細節）。保留期間 MUST NOT 加入任何新功能，
+  新舊 MUST NOT 同時部署，通過驗收後 MUST 由 T183 移除
+- 自動化測試 MUST NOT 取代 `checklists/browser-acceptance.md` 的手動驗收：
+  版面、對比、照片是否好看這類需要人眼判斷的項目，以及需要真實 Google 帳密的
+  登入往返，仍以手動驗收把關

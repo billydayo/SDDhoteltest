@@ -1,28 +1,37 @@
 # Sunny 訂房平台
 
-一個以原生 HTML／CSS／JavaScript 打造、不使用框架與建置工具的飯店訂房展示型專案。
-資料層採用 **Supabase**（託管 Postgres + Auth）；未設定憑證時自動退回瀏覽器
-`localStorage` 示範模式。專案模擬會員註冊／登入、房源瀏覽與搜尋、訂房流程、退款審核、
-評論審核、後台管理，以及照片風險評估等功能。
+一個飯店訂房展示型專案，由 **React 前端 + FastAPI 後端 + PostgreSQL** 三層構成。
+專案模擬會員註冊／登入、房源瀏覽與搜尋、訂房流程、退款審核、評論審核、後台管理，
+以及照片風險評估等功能。
+
+## 架構
+
+```
+瀏覽器
+  │  HTTP + JSON（唯一介面，完整描述於 OpenAPI）
+  ▼
+React SPA（Vite + TypeScript + Tailwind）        frontend/  :5173
+  │
+  ▼
+FastAPI（SQLAlchemy 2.0 + asyncpg + Alembic）    backend/   :8000
+  │  以非擁有者角色 sunny_app 連線
+  ▼
+PostgreSQL（託管於 Supabase）
+```
+
+**資料庫只有一個存取者：FastAPI 後端**（憲章原則 III）。這條路徑沒有替代方案，
+也沒有降級模式——瀏覽器不持有任何資料庫憑證，也不會直接連線資料庫。
 
 ## 專案特點
 
-- **零建置**：不使用框架與打包工具，不需要 `npm install`，直接開啟 `index.html` 即可
-- **雲端資料**：預設以 Supabase 保存資料，同一帳號可跨裝置取得相同的訂單與個人資料
-- **真實權限**：存取控制由 Postgres Row Level Security 強制執行，而非只靠前端隱藏畫面
-- **示範模式**：未填寫 Supabase 憑證時自動進入示範模式，資料保存在瀏覽器
-  `localStorage`，功能完整且**不發出任何網路請求**
-- **模擬交易**：付款與退款在任何模式下都是展示用模擬，不涉及真實金流
+- **前後端分離**：兩層各自獨立建置、啟動與測試，之間只以 HTTP JSON API 溝通
+- **真實認證**：密碼以 argon2id 雜湊保管於 `profiles`，登入後發 JWT；含 Google 第三方登入
+- **伺服器端授權**：權限判定在後端，前端的畫面隱藏只是體驗，不是防線
+- **訂房正確性由資料庫保證**：`orders_no_overlap` 排除約束（`EXCLUDE USING gist`）
+  讓同房同日重複成立的訂單在資料庫層就寫不進去，而不是靠應用層先查再寫
+- **稽核日誌不可竄改**：`admin_logs` 已對應用角色 `REVOKE UPDATE, DELETE`
+- **模擬交易**：付款與退款是展示用模擬，不涉及真實金流
 - **雙平台體驗**：支援桌機與行動裝置瀏覽
-
-## 兩種執行模式
-
-| 模式 | 條件 | 資料位置 | 認證 | 權限 |
-|---|---|---|---|---|
-| **資料庫模式**（預設） | `src/config.js` 已填憑證 | Supabase Postgres | Supabase Auth（真實） | RLS + 前端 |
-| **示範模式** | `src/config.js` 留空 | 瀏覽器 `localStorage` | 模擬登入 | 僅前端 |
-
-兩種模式的使用者可見行為一致，差異僅在跨裝置同步、認證真偽與連線失敗處理。
 
 ## 功能範圍
 
@@ -55,201 +64,204 @@
 | 功能 | 實際做法 | 為什麼 |
 |---|---|---|
 | 付款與退款 | 純模擬，不涉及任何金流 | 展示專案不應處理真實交易 |
-| 渠道比價與控價 | 外部平台價格為種子資料 | 瀏覽器無法定時跨網域爬取；伺服器端爬取需自建後端，且可能違反對方服務條款 |
-| 評論「AI 審核」 | 瀏覽器內的規則式引擎，標示為「自動審核（規則式）」 | 呼叫 AI 服務需要金鑰，前端無處可安全存放 |
+| 渠道比價與控價 | 外部平台價格為種子資料 | 定時跨站爬取可能違反對方服務條款 |
+| 評論「AI 審核」 | 規則式引擎，標示為「自動審核（規則式）」 | 呼叫 AI 服務需要金鑰與外部相依 |
 
-反之，**登入與權限在資料庫模式下是真實的**：密碼由 Supabase Auth 雜湊保管，
-存取邊界由 Postgres Row Level Security 強制執行。
+反之，**登入與權限是真實的**：密碼以 argon2id 雜湊，存取邊界由後端強制執行。
 
 ## 專案結構
 
 ```text
 SDDhoteltest/
 ├── README.md
-├── index.html
-├── styles/
-├── assets/                  # 圖片載入失敗時的 SVG 後備圖（房源照片為 Unsplash 網址）
-├── src/
-│   ├── config.js            # 憑證設定，預設留空 = 示範模式
-│   ├── lib/supabase.js      # client 建立與模式偵測
-│   ├── data/
-│   │   ├── repository.js    # 唯一的資料存取入口
-│   │   ├── adapters/        # supabase.js / local.js（簽章相同）
-│   │   └── *.js             # 各實體的資料模組
-│   ├── services/
-│   │   ├── auth.js booking.js search.js refunds.js reviews.js
-│   │   ├── moderation.js    # 規則式評論審核（非 AI）
-│   │   ├── risk-score.js    # 照片指標計算（只算不存）
-│   │   ├── risk-upload.js   # 房源檢測圖上傳（唯一會存圖的模組）
-│   │   ├── channel.js       # 渠道比價（模擬資料）
-│   │   ├── audit.js         # 稽核日誌寫入
-│   │   └── export.js        # Excel / CSV 匯出
-│   ├── pages/               # 前台 11 頁（含 404）+ 後台 12 模組
-│   ├── components/ state/ utils/
-│   └── main.js
-├── supabase/
-│   ├── schema.sql           # 十二張表、約束、trigger、RLS 政策、Storage
-│   ├── seed.sql             # 示範房源、網站內容與模擬渠道價格
-│   └── migrations.sql       # 既有資料庫的升級；全新安裝不需要
-├── tests/                   # 自動化測試；依憲章，刪掉整個目錄應用仍完整可用
-│   ├── index.html runner.js unit.js   # 第一層：零依賴，開瀏覽器就跑
-│   └── e2e/                 # 第二層：Node + 無頭瀏覽器的端對端測試
-├── specs/
-│   └── 001-booking-site/
-│       ├── spec.md
-│       ├── plan.md
-│       ├── research.md
-│       ├── data-model.md
-│       ├── quickstart.md
-│       ├── tasks.md
-│       ├── contracts/
-│       └── checklists/
-├── .specify/
-└── .claude/
+├── backend/                     # FastAPI 應用（uv 管理）
+│   ├── .env                     # ⚠️ 憑證只存在於此。不進版控
+│   ├── .env.example             # 範本，列出所有必要變數
+│   ├── pyproject.toml uv.lock
+│   ├── alembic/
+│   │   ├── env.py               # autogenerate 刻意停用（見下方「資料庫遷移」）
+│   │   └── versions/            # 0001_initial.py、0002_...py
+│   └── src/sunny/
+│       ├── config.py            # 設定；連線資訊為元件而非整條 URL
+│       ├── db.py deps.py errors.py main.py
+│       ├── models/              # SQLAlchemy 宣告式模型（12 張表）
+│       ├── schemas/             # Pydantic 進出 API 的形狀
+│       ├── repositories/        # 資料存取集中於此，SQL 不散落於路由
+│       ├── services/            # 業務規則：booking、search、risk、audit、export…
+│       ├── routers/             # 前台 8 支 + 後台 12 支
+│       └── seed.py              # 可重複執行的種子資料
+├── frontend/                    # React SPA（Vite + TS + Tailwind）
+│   ├── vite.config.ts           # /api proxy → 127.0.0.1:8000
+│   └── src/
+│       ├── api/client.ts        # ⚠️ 唯一的網路出口，元件不得自行 fetch
+│       ├── pages/               # 前台各頁 + admin/ 十二模組
+│       ├── components/ hooks/ state/ lib/
+│       └── router.tsx           # 路由與守衛
+├── supabase/                    # SQL 腳本（舊架構遺留，見「舊架構殘留」）
+├── specs/001-booking-site/      # spec / plan / research / data-model / tasks / contracts
+├── .specify/memory/constitution.md
+└── index.html src/ styles/ assets/ tests/    # 舊架構遺留
 ```
 
 ## 啟動方式
 
-### 示範模式（零設定）
+### 1. 資料庫
 
-直接雙擊開啟 `index.html`，或在專案根目錄執行：
+需要一個 PostgreSQL。本專案使用 Supabase 託管，也可用本機 Postgres。
+
+**用 Supabase 時有三個會卡住的細節**（都不會給出指向真正原因的錯誤訊息）：
+
+- **用 Session pooler（5432），不要用直連。** 直連位址 `db.<ref>.supabase.co`
+  現在只有 IPv6 記錄，本機若無 IPv6 連通性會直接 `getaddrinfo failed`
+- **不要用 Transaction pooler（6543）。** 它不支援 prepared statements，
+  asyncpg 會在執行查詢時出錯，而不是在連線時
+- **pooler 的使用者名稱必須帶專案 ref**（`postgres.<專案ref>`），
+  否則 pooler 不知道要路由到哪個租戶，回 `tenant/user not found`
+
+⚠️ **Dashboard → Settings → API 的 Exposed schemas MUST NOT 包含 `public`。**
+這不是疏漏，是刻意的第二道門：程式面由初始 revision 對 `anon` / `authenticated`
+執行 REVOKE，設定面由這裡關上。兩道一起，才真的只有後端能碰資料庫。
+
+### 2. 後端
 
 ```bash
-python -m http.server 8000
+cd backend
+cp .env.example .env      # 填入資料庫連線與 JWT_SECRET
+uv sync                   # 依 uv.lock 建立環境
+uv run alembic upgrade head
+uv run python -m sunny.seed          # 種子資料（可重複執行）
+uv run uvicorn sunny.main:app --reload --port 8000
 ```
 
-然後開啟 `http://localhost:8000/`。介面會顯示「示範模式」標示。
+驗證：開啟 <http://localhost:8000/docs>，應看到互動式 OpenAPI 文件。
 
-### 資料庫模式（Supabase）
+**環境變數 MUST 齊全才會啟動。** 缺少必要變數時應用會在啟動時明確失敗，
+不會以預設值靜默啟動。`JWT_SECRET` 尤其沒有 fallback——「沒設就用預設值」
+等同於公開秘鑰。
 
-1. 建立 Supabase 專案，並於 Authentication → Providers → Email 關閉 "Confirm email"
-2. （選用）於 Authentication → Providers → Google 啟用第三方登入
-3. 於 SQL Editor 依序執行 `supabase/schema.sql` 與 `supabase/seed.sql`
-   - 既有專案升級時，另需執行 `supabase/migrations.sql`（見下方「資料庫遷移」）
-   - 若專案曾裝過舊版 schema（`public` 底下看得到 `users`、或看不到 `profiles`），
-     必須先執行 `supabase/reset-legacy.sql`。直接重跑 schema.sql 無效——
-     `create table if not exists` 會靜默跳過既有的舊表，留下結構錯誤的資料庫。
-4. 於 Authentication → Users 建立示範帳號，並執行 `schema.sql` 末端的 UPDATE 指定管理員
-5. 將 Project URL 與 **anon** key 填入 `src/config.js`
-6. 以上述任一方式開啟 `index.html`
+### 3. 前端
 
-完整步驟見 [快速上手指南](specs/001-booking-site/quickstart.md)。
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+開啟 <http://localhost:5173/>。`/api` 由 Vite proxy 轉發至後端，
+因此開發時不需要處理 CORS。
 
 ## 資料庫遷移
 
-**全新安裝不需要這一節**——`schema.sql` 已包含全部內容。
+由 **Alembic** 管理，位於 `backend/alembic/versions/`。
 
-既有的資料庫要跟上新功能，執行 `supabase/migrations.sql` 一支即可。
-重跑 `schema.sql` 是沒有用的：`create table if not exists` 對已存在的表是靜默
-跳過，補不到後來新增的欄位、政策與 trigger，卻會讓人以為已經更新了。
+```bash
+cd backend
+uv run alembic current        # 目前版本
+uv run alembic upgrade head   # 升到最新
+```
 
-| `migrations.sql` 的四段 | 沒執行的症狀 |
-|---|---|
-| rooms.status 移除 `booked` | 房態可被設成永久賣不出去的值 |
-| 設施／特色改存 `system_settings` | 後台無法增刪設施與特色 |
-| 會員可取消待付款訂單（FR-035a） | 按下取消回「不允許的訂單狀態變更」 |
-| 評論回覆與私訊（FR-103d、FR-123~128） | 客服訊息頁顯示「資料表尚未建立」 |
+**Alembic 的 autogenerate 在本專案是刻意停用的**（`alembic/env.py` 的
+`target_metadata = None`）。它偵測不到 RLS 政策、trigger、函式與
+`EXCLUDE USING gist` 約束，**且可能產生刪除它們的敘述**——而 `orders_no_overlap`
+一旦被靜默移除，超賣不會報錯，只會安靜地發生。所有 revision 以原生 SQL 撰寫。
 
-四段依相依順序排列且可重複執行，整份貼上即可，不需要判斷自己缺哪幾段。
-未執行時畫面會直接說出該跑什麼，而不是丟一個看不懂的錯誤。
-
-### `supabase/` 各檔用途
-
-| 檔案 | 什麼時候跑 |
-|---|---|
-| `schema.sql` | **必要**。十二張表、約束、trigger、RLS 政策與 Storage |
-| `seed.sql` | **必要**。示範房源、網站內容與模擬渠道價格 |
-| `bootstrap-admin.sql` | 建立第一個管理員。應用程式內沒有任何路徑能自我升權，只能在這裡做 |
-| `migrations.sql` | 既有資料庫升級用。全新安裝不需要 |
-| `seed-demo-data.sql` | 選用。大量示範訂單與評論，只清理自己上次產生的資料 |
-| `seed-past-stay.sql` | 選用。補一筆「已入住完畢」的訂單——正常流程做不出可評論的訂單 |
-| `reset-legacy.sql` | ⚠️ 會刪資料。僅用於曾裝過 2026-07-31 改版前 schema 的專案 |
+> `alembic current` 若報 `Can't locate revision identified by 'XXXX'`，
+> 先確認你所在的分支有沒有那支 revision 檔案，再懷疑資料庫。
+> `git log -- <path>` 預設只走當前分支，查「這個檔案存在過嗎」要加 `--all`。
 
 ## 測試帳號
 
 - 會員：`guest@sunny.com` / `guest123`
 - 管理員：`admin@sunny.com` / `admin123`
 
+由 `backend/src/sunny/seed.py` 建立。應用程式內沒有任何路徑能自我升權為管理員。
+
 > 這些帳號僅為展示用途。本站為展示專案，請勿使用你在其他網站的真實密碼，
 > 也請勿輸入真實金融資訊。
 
 ## 測試
 
-兩層，依憲章都只存在於 `tests/` 之下——應用程式不 import 任何一支，
-刪掉整個目錄，應用仍完整可用。
-
-**第一層・單元測試**（零依賴）：起一個靜態伺服器後開
-`http://127.0.0.1:8000/tests/index.html`，全綠即通過。純函式與判定規則，
-不需要 Node 也不需要 `npm install`。
-
-**第二層・端對端測試**（Node + 無頭 Chrome）：真的開瀏覽器、真的點按鈕、
-真的比對畫面與資料庫。
+兩層各自獨立，對應兩層架構：
 
 ```bash
-cd tests
-npm install        # 只裝 puppeteer-core，不下載 Chromium
-npm run serve      # 另開一個終端機
-npm test
+cd backend  && uv run pytest      # 單元測試 + 契約測試
+cd frontend && npm test           # Vitest + Testing Library
 ```
 
-| 指令 | 內容 |
-|---|---|
-| `npm test` | 全部（端對端 161 項，另含單元測試 40 項斷言） |
-| `npm run test:unit` | 第一層，收進同一個出口 |
-| `npm run test:search` | 首頁搜尋與篩選（資料庫模式） |
-| `npm run test:orders` | 會員端訂單與取消 |
-| `npm run test:admin` | 逐日房態、匯出、設施／特色增刪 |
-| `npm run test:photos` | 房源照片管理與上傳邊界 |
-| `npm run test:messaging` | 私訊與評論回覆 |
-| `npm run test:google` | Google 第三方登入 |
-
-各支跑在哪個模式、為什麼，見 [`tests/README.md`](tests/README.md)。
+後端需要資料庫的測試會讀 `SUNNY_TEST_DATABASE_URL`；**未設定時那些測試會跳過**，
+而不是連上開發資料庫就地清空。⚠️ 該變數指向的資料庫會被 `truncate ... cascade`，
+多台機器同時開發時每台 MUST 指向不同的資料庫。
 
 **自動化不取代人工驗收。** 版面、對比、照片好不好看這類需要人眼判斷的項目，
-以及需要真實 Google 帳密的登入往返（FR-088／SC-025），仍以
+以及需要真實 Google 帳密的登入往返，仍以
 [瀏覽器驗收清單](specs/001-booking-site/checklists/browser-acceptance.md) 把關。
 
 ## 開發限制
 
-- 不使用 React、Vue、Angular 等前端框架
-- 不使用 npm install 或任何打包／建置工具
-- 不自建後端伺服器；Supabase 由瀏覽器直接呼叫
+摘自憲章（v3.1.1），完整條文見 [`.specify/memory/constitution.md`](.specify/memory/constitution.md)：
+
+- 前端 MUST 為 React SPA，樣式 MUST 用 Tailwind，建置工具 MUST 為 Vite
+- 後端 MUST 為 FastAPI；Python 套件管理 MUST 用 **uv**，MUST NOT 用 pip／Poetry／
+  requirements.txt
+- 兩層之間 MUST 只以 HTTP + JSON 溝通，且 MUST 完整描述於 OpenAPI
+- 前端 MUST NOT 直接連線資料庫、物件儲存或任何第三方資料服務
+- 後端 MUST NOT 產生 HTML；伺服器端渲染、Jinja、HTMX 皆不在範圍內
+- 後端所有設定 MUST 由環境變數讀取；憑證只存在於 `backend/.env`，一次都不得進版控
+- 前端 MUST 透過單一 API client 呼叫後端，MUST NOT 於元件內直接 `fetch` 拼網址
+- **MUST NOT 存在 localStorage 示範模式**——已於憲章 v3.0.0 移除。API 不可用時
+  前端 MUST 顯示可理解的錯誤並保留使用者已填內容，MUST NOT 退回本機假資料假裝成功
 - 不使用 Edge Function、Database Webhook、排程作業或爬蟲
-- 前端只使用 anon key；`service_role` key 不得出現於程式碼或版本控制
-- `public` schema 下每張資料表都必須啟用 RLS 並具備明確政策
 - 操作日誌僅可新增，任何角色（含管理員）都不得修改或刪除
-- 憑證只從 `src/config.js` 讀取，不讀 `.env`（無建置步驟的瀏覽器讀不到環境變數）
-- 未配置憑證時自動進入示範模式，不連接任何伺服器
 - 不串接真實付款、真實金流，也不呼叫任何 OTA 平台或 AI 服務
 - 前台使用者上傳的檢測照片只在瀏覽器內處理，不上傳至任何服務或資料表；
   僅管理員對自家房源的檢測圖會存入雲端並公開顯示
 
+## 舊架構殘留
+
+根目錄的 `index.html`、`src/`、`styles/`、`assets/`、`tests/` 與 `supabase/`
+屬於**改版前的零建置架構**（瀏覽器以 anon key 直連 Supabase，靠 RLS 防護）。
+該架構已於憲章 v3.0.0 由現行的三層架構取代。
+
+保留它們是為了保有改版前的參考與遷移腳本，但**它們不是現行系統的一部分**：
+
+| 目錄／檔案 | 現況 |
+|---|---|
+| `index.html` `src/` `styles/` `assets/` | 舊前端。`src/config.js` 的 anon key 已無作用——`public` schema 未曝露且權限已 REVOKE |
+| `tests/` | 舊前端的 puppeteer 測試，對應憲章 2.6.0 |
+| `supabase/schema.sql` `seed.sql` `migrations.sql` | 舊架構的建表腳本，含 RLS 政策。現行 schema 由 Alembic 管理 |
+| `supabase/reset-legacy.sql` | ⚠️ 會刪資料。僅用於從舊 schema 遷移到新架構 |
+
+⚠️ **不要對現行資料庫執行 `supabase/*.sql`。** 它們會重新 GRANT
+`anon` / `authenticated` 的權限，正好拆掉原則 III 的那道防線。
+
 ## 參考文件
 
-- 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v2.6.0）
+- 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v3.1.1）
 - 規格文件：[`specs/001-booking-site/spec.md`](specs/001-booking-site/spec.md)
 - 實作計畫：[`specs/001-booking-site/plan.md`](specs/001-booking-site/plan.md)
 - 研究紀錄：[`specs/001-booking-site/research.md`](specs/001-booking-site/research.md)
 - 資料模型：[`specs/001-booking-site/data-model.md`](specs/001-booking-site/data-model.md)
 - 介面契約：[`specs/001-booking-site/contracts/README.md`](specs/001-booking-site/contracts/README.md)
 - 任務清單：[`specs/001-booking-site/tasks.md`](specs/001-booking-site/tasks.md)
-- 快速驗收：[`specs/001-booking-site/quickstart.md`](specs/001-booking-site/quickstart.md)
+- 快速上手：[`specs/001-booking-site/quickstart.md`](specs/001-booking-site/quickstart.md)
 - 瀏覽器驗收清單：[`specs/001-booking-site/checklists/browser-acceptance.md`](specs/001-booking-site/checklists/browser-acceptance.md)
-- 自動化測試：[`tests/README.md`](tests/README.md)
 
 ## 三條不可跨越的界線
 
 這三件事在程式碼結構上被強制隔離，不是靠註解或旗標約束：
 
-1. **頁面與元件不得直接碰資料。** 所有存取都走 `src/data/repository.js`。
-   切換示範模式與資料庫模式不需要改動任何頁面。
-2. **前台安全檢測的照片沒有上傳路徑。** `src/pages/risk-check.js` 完全不引用
-   `services/risk-upload.js`——那是使用者的私人照片，程式碼裡根本沒有能上傳它的函式。
-   只有管理員的房源檢測會存圖，且該圖明示會公開。
-3. **操作日誌只能新增。** `src/data/admin-logs.js` 沒有 update 或 delete 函式，
-   資料庫端也沒有對應的 RLS 政策且已 REVOKE。任何角色都改不了，包含管理員本人。
+1. **瀏覽器沒有通往資料庫的路。** 前端的網路存取全數走
+   `frontend/src/api/client.ts` 這個唯一出口，元件內不得自行 `fetch` 拼網址。
+   前端不持有任何資料庫憑證——不是「不該用」，是根本沒有。
+2. **前台安全檢測的照片沒有上傳路徑。** `frontend/src/pages/RiskCheck.tsx`
+   只 import `lib/riskScore.ts` 與 React，不引用 API client——那是使用者的私人照片，
+   程式碼裡根本沒有能上傳它的函式。只有管理員的房源檢測會存圖，且該圖明示會公開。
+3. **操作日誌只能新增。** `backend/src/sunny/repositories/admin_logs.py` 沒有
+   update 或 delete 函式，資料庫端也已對應用角色 `REVOKE UPDATE, DELETE`。
+   應用連線 MUST 為非擁有者（`sunny_app`）——REVOKE 只對非擁有者生效，
+   若以擁有者連線，那道 REVOKE 是一句不報錯也不生效的 SQL。
 
 ## 注意事項
 
 此專案屬於展示型原型，主要目標是驗證使用者流程、互動邏輯與 RWD 體驗，而不是正式商業
-系統部署方案。登入與權限在資料庫模式下是真實的，但付款與退款始終是模擬的。
+系統部署方案。登入與權限是真實的，但付款與退款始終是模擬的。

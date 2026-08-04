@@ -27,6 +27,7 @@ import * as dates from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
 import { useAuth } from '../state/AuthContext'
+import { insetClass, primaryButtonClass } from '../lib/surfaces'
 
 const ROLE_LABEL: Record<string, string> = { member: '會員', admin: '管理員' }
 
@@ -88,7 +89,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
     <div className="mx-auto max-w-2xl py-gap-6">
       <h1 className="font-display text-h1 text-ink">帳戶設定</h1>
 
-      <section className="mt-gap-5 rounded-lg border border-line-soft bg-surface-alt p-gap-5">
+      <section className={`mt-gap-5 ${insetClass} p-gap-5`}>
         <h2 className="font-display text-h3 text-ink">帳號資訊</h2>
         <dl className="mt-gap-3 grid gap-gap-3 sm:grid-cols-2">
           <ReadOnly label="電子郵件" value={user.email} />
@@ -175,7 +176,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {busy ? '儲存中…' : '儲存變更'}
           </button>

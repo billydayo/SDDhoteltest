@@ -25,6 +25,7 @@ import { LoadingState, SkeletonCard } from '../components/LoadingState'
 import { RoomCard } from '../components/RoomCard'
 import { EMPTY_FILTERS, toSearchParams, type FilterValues } from '../lib/filters'
 import { useAsync } from '../lib/useAsync'
+import { primaryButtonClass } from '../lib/surfaces'
 
 const SORT_OPTIONS: { value: RoomSort | ''; label: string }[] = [
   { value: '', label: '預設' },
@@ -267,7 +268,7 @@ function RoomResults({
           <button
             type="button"
             onClick={onClear}
-            className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+            className={primaryButtonClass}
           >
             清除全部條件
           </button>

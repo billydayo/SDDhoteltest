@@ -29,6 +29,7 @@ import { inputClass, useFieldFocus } from '../lib/form'
 import { redirectTargetOf } from '../lib/redirect'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
+import { primaryButtonClass } from '../lib/surfaces'
 
 /** 兩次密碼不一致——這一項後端收不到，只能在前端擋。 */
 const PASSWORD_MISMATCH = new ApiError(400, {
@@ -190,7 +191,7 @@ export function Register() {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {busy ? '註冊中…' : '建立帳號'}
           </button>

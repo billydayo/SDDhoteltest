@@ -27,6 +27,7 @@ import { ErrorState } from '../../components/ErrorState'
 import { LoadingState } from '../../components/LoadingState'
 import { useAsync } from '../../hooks/useAsync'
 import { messageFor } from '../../lib/errors'
+import { panelClass } from '../../lib/surfaces'
 import {
   buttonClass,
   dangerButtonClass,
@@ -117,7 +118,7 @@ export function Settings() {
     <div>
       <ModuleHeading title="系統參數" />
 
-      <section className="mt-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
+      <section className={`mt-gap-4 ${panelClass} p-gap-4`}>
         <h3 className="text-md text-ink">未付款訂單保留時間</h3>
 
         <div className="mt-gap-3 max-w-sm">

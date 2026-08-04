@@ -28,7 +28,7 @@ import * as dates from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { orderStatusLabel, paymentMethodLabel } from '../lib/labels'
 import { formatTWD } from '../lib/money'
-import { insetClass } from '../lib/surfaces'
+import { insetClass, panelClass, primaryButtonClass } from '../lib/surfaces'
 
 /** `Booking` 送過來的內容。房源一併帶著，才不必為了一個名字再查一次。 */
 export interface OrderConfirmState {
@@ -114,7 +114,7 @@ export function OrderConfirm() {
       )}
 
       {/* FR-031 的七項。⚠️ 少任何一項都是這一條沒做完 */}
-      <dl className="mt-gap-5 grid gap-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-5 sm:grid-cols-2">
+      <dl className={`mt-gap-5 grid gap-gap-4 ${panelClass} p-gap-5 sm:grid-cols-2`}>
         <Row label="房源" value={room?.name ?? '—'} />
         <Row label="住宿期間" value={dates.formatStay(order.checkIn, order.checkOut)} />
         <Row label="夜數" value={`${String(order.nights)} 晚`} />
@@ -151,7 +151,7 @@ export function OrderConfirm() {
             onClick={() => {
               void pay(order)
             }}
-            className="rounded-pill bg-brand px-gap-6 py-gap-3 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {/*
               ⚠️ FR-028／FR-029：按下去不會要求任何真實支付資料。
@@ -196,7 +196,7 @@ function MissingState({ orderId }: { orderId: string }) {
       {orderId && <p className="mt-gap-3 text-tiny text-ink-muted">訂單識別碼 {orderId}</p>}
       <Link
         to="/orders"
-        className="mt-gap-5 inline-block rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong"
+        className={`mt-gap-5 inline-block ${primaryButtonClass}`}
       >
         前往我的訂單
       </Link>

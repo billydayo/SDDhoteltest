@@ -48,6 +48,7 @@ import {
   type DisplayStatus,
 } from '../lib/orderView'
 import { useStaleOrderSweep } from '../state/useStaleOrderSweep'
+import { panelClass, primaryButtonClass } from '../lib/surfaces'
 
 /** 分頁。⚠️ 「退款已駁回」與其他七個不同——它不是資料庫裡的狀態值。 */
 const TABS: { key: DisplayStatus | 'all'; label: string }[] = [
@@ -153,7 +154,7 @@ export function Orders() {
             tab === 'all' ? (
               <Link
                 to="/"
-                className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+                className={primaryButtonClass}
               >
                 去找房源
               </Link>
@@ -203,7 +204,7 @@ function OrderRow({
   }
 
   return (
-    <li className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-5">
+    <li className={`${panelClass} p-gap-5`}>
       <div className="flex flex-wrap items-start justify-between gap-gap-3">
         <div>
           <p className="font-display text-md text-ink">{order.orderNo}</p>
@@ -237,7 +238,7 @@ function OrderRow({
                 onClick={() => {
                   void pay()
                 }}
-                className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+                className={primaryButtonClass}
               >
                 {paying ? '處理中…' : '完成模擬付款'}
               </button>

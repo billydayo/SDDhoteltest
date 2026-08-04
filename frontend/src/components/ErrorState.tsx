@@ -11,6 +11,7 @@
  * 也才不會為了測一句文案而去渲染一個元件。
  */
 import { messageFor } from '../lib/errors'
+import { primaryButtonClass } from '../lib/surfaces'
 
 interface ErrorStateProps {
   error: unknown
@@ -36,7 +37,7 @@ export function ErrorState({ error, onRetry, title }: ErrorStateProps) {
         <button
           type="button"
           onClick={onRetry}
-          className="mt-gap-4 rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+          className={`mt-gap-4 ${primaryButtonClass}`}
         >
           重新載入
         </button>

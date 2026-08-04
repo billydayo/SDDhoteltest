@@ -19,12 +19,13 @@ import { Link } from 'react-router-dom'
 import type { Room } from '../api/types'
 import { formatTWD } from '../lib/money'
 import { Rating } from './Rating'
+import { panelClass } from '../lib/surfaces'
 
 export function RoomCard({ room }: { room: Room }) {
   const cover = room.images[0]
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line-soft bg-surface shadow-soft transition-shadow hover:shadow-card">
+    <article className={`group relative flex flex-col overflow-hidden ${panelClass} transition-shadow hover:shadow-card`}>
       <div className="arch overflow-hidden bg-surface-alt">
         {cover ? (
           <img

@@ -35,7 +35,7 @@ import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
 import { refundStatusLabel } from '../lib/labels'
 import { formatTWD } from '../lib/money'
-import { insetClass } from '../lib/surfaces'
+import { insetClass, primaryButtonClass } from '../lib/surfaces'
 import {
   MAX_REFUNDS_PER_USER,
   canRequestRefund,
@@ -258,7 +258,7 @@ export function RefundForm() {
             // ⚠️ 只擋「完全沒填」。是否只有空白由後端判定並回 `field: reason`，
             // 前端再多做一次判斷，兩邊的規則遲早會不一致。
             disabled={busy || reason.trim() === ''}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {busy ? '送出中…' : '送出退款申請'}
           </button>
@@ -305,7 +305,7 @@ function Blocked({
         <div className="mt-gap-3">{body}</div>
         <Link
           to={`/orders/${orderId}`}
-          className="mt-gap-5 inline-block rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+          className={`mt-gap-5 inline-block ${primaryButtonClass}`}
         >
           查看訂單詳情
         </Link>

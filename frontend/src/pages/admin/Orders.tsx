@@ -35,6 +35,7 @@ import {
   orderStatusTone,
 } from '../../lib/labels'
 import { formatTWD } from '../../lib/money'
+import { panelClass } from '../../lib/surfaces'
 import {
   Badge,
   buttonClass,
@@ -57,7 +58,7 @@ function formatRate(rate: number | null): string {
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-3">
+    <div className={`${panelClass} p-gap-3`}>
       <p className="text-tiny text-ink-muted">{label}</p>
       <p className="mt-gap-1 font-display text-h3 tabular-nums text-ink">{value}</p>
       {hint && <p className="mt-gap-1 text-tiny text-ink-muted">{hint}</p>}

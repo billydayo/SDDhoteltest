@@ -11,6 +11,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../state/AuthContext'
+import { primaryButtonClass } from '../lib/surfaces'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -86,7 +87,7 @@ export function Header() {
         ) : (
           <NavLink
             to="/login"
-            className="rounded-pill bg-brand px-gap-4 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+            className={primaryButtonClass}
           >
             登入
           </NavLink>

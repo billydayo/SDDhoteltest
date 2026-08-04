@@ -26,6 +26,7 @@ import { LoadingState } from '../components/LoadingState'
 import { MessageThread, SUPPORT_DISPLAY_NAME, type ThreadBubble } from '../components/MessageThread'
 import { useAsync } from '../hooks/useAsync'
 import { messageFor } from '../lib/errors'
+import { primaryButtonClass } from '../lib/surfaces'
 
 const MAX_LENGTH = 2000
 
@@ -117,7 +118,7 @@ export function Messages() {
             onClick={() => {
               void send()
             }}
-            className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+            className={primaryButtonClass}
           >
             {sending ? '送出中…' : '送出'}
           </button>

@@ -40,7 +40,7 @@ import {
   refundStatusLabel,
 } from '../lib/labels'
 import { formatTWD } from '../lib/money'
-import { insetClass } from '../lib/surfaces'
+import { insetClass, panelClass, primaryButtonClass } from '../lib/surfaces'
 import {
   MAX_REFUNDS_PER_USER,
   REFUND_REJECTED_TAB,
@@ -142,7 +142,7 @@ export function OrderDetail() {
         </div>
       )}
 
-      <dl className="mt-gap-5 grid gap-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-5 sm:grid-cols-2">
+      <dl className={`mt-gap-5 grid gap-gap-4 ${panelClass} p-gap-5 sm:grid-cols-2`}>
         <Row label="住宿期間" value={dates.formatStay(data.checkIn, data.checkOut)} />
         <Row label="夜數" value={`${String(data.nights)} 晚`} />
         <Row label="入住人數" value={`${String(data.guestCount)} 人`} />
@@ -189,7 +189,7 @@ export function OrderDetail() {
         {refundable && !quotaFull && (
           <Link
             to={`/orders/${data.id}/refund`}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+            className={primaryButtonClass}
           >
             申請退款
           </Link>
@@ -210,7 +210,7 @@ export function OrderDetail() {
         {data.status === 'completed' && (
           <Link
             to={`/orders/${data.id}/review`}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+            className={primaryButtonClass}
           >
             撰寫評論
           </Link>
@@ -294,7 +294,7 @@ function CancelConfirm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+          className={primaryButtonClass}
         >
           保留訂單
         </button>
@@ -317,7 +317,7 @@ function RefundHistory({ rows }: { rows: MyRefund[] }) {
       <h2 className="font-display text-h3 text-ink">退款申請紀錄</h2>
       <ul className="mt-gap-3 grid gap-gap-3">
         {rows.map((refund) => (
-          <li key={refund.id} className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
+          <li key={refund.id} className={`${panelClass} p-gap-4`}>
             <div className="flex flex-wrap items-center justify-between gap-gap-2">
               <span className="text-small text-ink">
                 {dates.formatTimestamp(refund.createdAt)} 申請

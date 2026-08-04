@@ -34,6 +34,7 @@ import { inputClass } from '../lib/form'
 import { redirectTargetOf } from '../lib/redirect'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
+import { insetClass, primaryButtonClass } from '../lib/surfaces'
 
 /** FR-005：公開列出的測試帳號。**與 `backend/src/sunny/seed.py` 一致。** */
 const DEMO_ACCOUNTS = [
@@ -139,7 +140,7 @@ export function Login() {
           <button
             type="submit"
             disabled={busy}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {busy ? '登入中…' : '登入'}
           </button>
@@ -186,7 +187,7 @@ export function Login() {
 /** FR-005：公開列出測試帳號。 */
 function DemoAccounts({ onUse }: { onUse: (account: DemoAccount) => void }) {
   return (
-    <section className="rounded-lg border border-line-soft bg-surface-alt p-gap-5">
+    <section className={`${insetClass} p-gap-5`}>
       <h2 className="font-display text-h3 text-ink">測試帳號</h2>
       <p className="mt-gap-2 text-small text-ink-muted">
         這是展示用專案，直接使用以下任一組帳號即可，不需要註冊。

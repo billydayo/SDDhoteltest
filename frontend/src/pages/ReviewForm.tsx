@@ -33,6 +33,7 @@ import { useAsync } from '../hooks/useAsync'
 import * as dates from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
+import { primaryButtonClass } from '../lib/surfaces'
 
 /** 1–5（FR-044）。 */
 const RATINGS = [1, 2, 3, 4, 5] as const
@@ -233,7 +234,7 @@ export function ReviewForm() {
             // 前端再擋一次的話，兩邊的門檻遲早不一致，而使用者會遇到一顆
             // 按得下去卻被退件、或按不下去卻不知道為什麼的按鈕。
             disabled={busy || comment.trim() === ''}
-            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+            className={primaryButtonClass}
           >
             {busy ? '送出中…' : '送出評論'}
           </button>
@@ -336,7 +337,7 @@ function ExtraLinks({ orderId, roomId }: { orderId: string; roomId: string }) {
     <div className="mt-gap-5 flex flex-wrap gap-gap-3">
       <Link
         to={`/orders/${orderId}`}
-        className="rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+        className={primaryButtonClass}
       >
         回到訂單詳情
       </Link>

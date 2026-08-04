@@ -25,6 +25,7 @@ import { FavoriteButton } from '../components/FavoriteButton'
 import { LoadingState } from '../components/LoadingState'
 import { useAsync } from '../hooks/useAsync'
 import { formatTWD } from '../lib/money'
+import { panelClass, primaryButtonClass } from '../lib/surfaces'
 
 /** ⚠️ `null` 代表尚無評分，MUST NOT 當成 0 顯示（FR-047）。 */
 function ratingText(value: number | string | null): string {
@@ -57,7 +58,7 @@ export function Favorites() {
           action={
             <Link
               to="/"
-              className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+              className={primaryButtonClass}
             >
               去看看房源
             </Link>
@@ -68,7 +69,7 @@ export function Favorites() {
           {rooms.map((room) => (
             <li
               key={room.id}
-              className="overflow-hidden rounded-lg border border-line-soft bg-surface shadow-soft"
+              className={`overflow-hidden ${panelClass}`}
             >
               <div className="relative">
                 <img
@@ -103,7 +104,7 @@ export function Favorites() {
                 {room.listed ? (
                   <Link
                     to={`/rooms/${room.id}`}
-                    className="mt-gap-3 inline-block rounded-pill bg-brand px-gap-4 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+                    className={`mt-gap-3 inline-block ${primaryButtonClass}`}
                   >
                     查看詳情
                   </Link>

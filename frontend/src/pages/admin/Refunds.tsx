@@ -27,6 +27,7 @@ import { formatTimestamp } from '../../lib/dates'
 import { messageFor } from '../../lib/errors'
 import { moderationTone, refundStatusLabel } from '../../lib/labels'
 import { formatTWD } from '../../lib/money'
+import { panelClass } from '../../lib/surfaces'
 import {
   Badge,
   buttonClass,
@@ -74,7 +75,7 @@ function RefundCard({
   }
 
   return (
-    <article className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
+    <article className={`${panelClass} p-gap-4`}>
       <div className="flex flex-wrap items-baseline justify-between gap-gap-2">
         <div>
           <h3 className="text-md text-ink">

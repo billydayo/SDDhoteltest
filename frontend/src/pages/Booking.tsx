@@ -43,6 +43,7 @@ import { useAuth } from '../state/AuthContext'
 import { useStaleOrderSweep } from '../state/useStaleOrderSweep'
 
 import type { OrderConfirmState } from './OrderConfirm'
+import { insetClass, primaryButtonClass } from '../lib/surfaces'
 
 const STEPS = ['填寫資訊', '選擇付款方式', '確認送出'] as const
 type StepIndex = 0 | 1 | 2
@@ -401,7 +402,7 @@ function BookingFlow({ room, user }: { room: RoomDetail; user: Profile | null })
                 setError(null)
                 setStep((s) => (s + 1) as StepIndex)
               }}
-              className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+              className={primaryButtonClass}
             >
               下一步
             </button>
@@ -409,7 +410,7 @@ function BookingFlow({ room, user }: { room: RoomDetail; user: Profile | null })
             <button
               type="submit"
               disabled={busy}
-              className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:bg-line-strong"
+              className={primaryButtonClass}
             >
               {busy ? '送出中…' : '確認送出'}
             </button>
@@ -543,7 +544,7 @@ function ConfirmStep({
     <section className="grid gap-gap-4">
       <h2 className="font-display text-h3 text-ink">確認訂房內容</h2>
 
-      <dl className="grid gap-gap-3 rounded-lg border border-line-soft bg-surface-alt p-gap-5 sm:grid-cols-2">
+      <dl className={`grid gap-gap-3 ${insetClass} p-gap-5 sm:grid-cols-2`}>
         <Row label="房源" value={room.name} />
         <Row label="住宿期間" value={dates.formatStay(draft.checkIn, draft.checkOut)} />
         <Row label="夜數" value={`${String(nights)} 晚`} />

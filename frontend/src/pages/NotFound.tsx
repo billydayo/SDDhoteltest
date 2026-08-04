@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { primaryButtonClass } from '../lib/surfaces'
 
 /**
  * 找不到頁面。
@@ -13,7 +14,7 @@ export function NotFound() {
       <p className="mt-gap-3 text-ink-muted">網址可能有誤，或這個頁面已經移除。</p>
       <Link
         to="/"
-        className="mt-gap-5 inline-block rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+        className={`mt-gap-5 inline-block ${primaryButtonClass}`}
       >
         回到房源列表
       </Link>
@@ -34,7 +35,7 @@ export function Forbidden() {
       <p className="mt-gap-3 text-ink-muted">此功能僅限管理員使用。</p>
       <Link
         to="/"
-        className="mt-gap-5 inline-block rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+        className={`mt-gap-5 inline-block ${primaryButtonClass}`}
       >
         回到房源列表
       </Link>

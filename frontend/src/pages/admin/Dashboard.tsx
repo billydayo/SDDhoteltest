@@ -26,6 +26,7 @@ import { LoadingState } from '../../components/LoadingState'
 import { SimulatedBadge } from '../../components/SimulatedBadge'
 import { useAsync } from '../../hooks/useAsync'
 import { formatTWD } from '../../lib/money'
+import { panelClass } from '../../lib/surfaces'
 
 interface StatProps {
   label: string
@@ -56,7 +57,7 @@ function Stat({ label, value, hint, to, attention = false, badge }: StatProps) {
     </>
   )
 
-  const shell = 'rounded-lg border border-line-soft bg-surface p-gap-4 shadow-soft'
+  const shell = `${panelClass} p-gap-4`
 
   // 可點的卡片做成真的 `a`（`Link`），不是加了 `onClick` 的 `div`——後者對
   // 鍵盤與讀屏使用者等同於不存在（憲章原則 V、T171）。

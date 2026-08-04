@@ -27,6 +27,7 @@ import { LoadingState } from '../../components/LoadingState'
 import { useAsync } from '../../hooks/useAsync'
 import { messageFor } from '../../lib/errors'
 import { ACCEPT_ATTRIBUTE, shrinkForUpload, validateImageFile } from '../../lib/image'
+import { panelClass } from '../../lib/surfaces'
 import {
   buttonClass,
   Field,
@@ -118,7 +119,7 @@ export function Content() {
     <div>
       <ModuleHeading title="內容編輯" />
 
-      <section className="mt-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
+      <section className={`mt-gap-4 ${panelClass} p-gap-4`}>
         <div className="grid gap-gap-3">
           <Field label="主標題" htmlFor={`${ids}-title`} className="w-full">
             <input

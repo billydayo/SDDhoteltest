@@ -29,7 +29,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 
 import * as dates from '../lib/dates'
 import { fieldOf } from '../lib/errors'
+import { inputClass } from '../lib/form'
 import { activeSummary, type FilterValues } from '../lib/filters'
+import { panelClass, primaryButtonClass } from '../lib/surfaces'
 
 interface FilterBarProps {
   values: FilterValues
@@ -83,7 +85,7 @@ export function FilterBar({
     <form
       ref={formRef}
       aria-label="房源篩選"
-      className="rounded-lg border border-line-soft bg-surface p-gap-4 shadow-soft"
+      className={`${panelClass} p-gap-4`}
       onSubmit={(e) => {
         e.preventDefault()
         onSearch()
@@ -244,7 +246,7 @@ export function FilterBar({
       <div className="mt-gap-4 flex justify-end">
         <button
           type="submit"
-          className="rounded-pill bg-brand px-gap-6 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong"
+          className={primaryButtonClass}
         >
           搜尋
         </button>
@@ -254,9 +256,6 @@ export function FilterBar({
 }
 
 // ---------------------------------------------------------------------------
-const inputClass =
-  'w-full rounded-xs border border-line-strong bg-surface px-gap-3 py-gap-2 text-body text-ink'
-
 function Field({
   label,
   htmlFor,

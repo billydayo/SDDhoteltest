@@ -34,7 +34,7 @@ import { LoadingState } from '../components/LoadingState'
 import { Rating } from '../components/Rating'
 import * as dates from '../lib/dates'
 import { formatTWD, previewTotal } from '../lib/money'
-import { tagClass } from '../lib/surfaces'
+import { panelClass, primaryButtonClass, tagClass } from '../lib/surfaces'
 import { useAsync } from '../lib/useAsync'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
@@ -138,7 +138,7 @@ export function RoomDetail() {
         </div>
 
         {/* 訂房側欄 */}
-        <aside className="h-fit rounded-lg border border-line-soft bg-surface p-gap-5 shadow-soft lg:sticky lg:top-24">
+        <aside className={`h-fit ${panelClass} p-gap-5 lg:sticky lg:top-24`}>
           <p className="text-ink">
             <span className="font-display text-h2">{formatTWD(data.nightlyPrice)}</span>
             <span className="text-small text-ink-muted"> / 晚</span>
@@ -209,7 +209,7 @@ export function RoomDetail() {
             type="button"
             onClick={handleBook}
             disabled={!validRange || data.status === 'maintenance'}
-            className="mt-gap-4 w-full rounded-pill bg-brand px-gap-5 py-gap-2 text-ink-invert transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-line-strong"
+            className={`mt-gap-4 w-full ${primaryButtonClass}`}
           >
             立即訂房
           </button>

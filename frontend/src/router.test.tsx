@@ -117,13 +117,16 @@ describe('僅管理員的路由', () => {
     expect(screen.queryByRole('heading', { level: 1, name: '登入' })).not.toBeInTheDocument()
   })
 
-  it('管理員正常進入，落在儀表板', async () => {
+  it('管理員正常進入，落在營運總覽', async () => {
     setToken('fake-token')
     mockMe(ADMIN)
     renderAt('/admin')
+    // 標題層級是「後台（h1）＞ 模組（h2）」——後台是一個主控台的十二個區塊，
+    // 不是十二份彼此無關的文件（`pages/admin/AdminLayout.tsx`）。
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: '儀表板' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: '後台' })).toBeInTheDocument()
     })
+    expect(await screen.findByRole('heading', { level: 2, name: '營運總覽' })).toBeInTheDocument()
   })
 })
 

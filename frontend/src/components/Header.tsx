@@ -39,9 +39,26 @@ export function Header() {
           <NavLink to="/" className={linkClass} end>
             房源
           </NavLink>
+          {/* T146：照片安全檢測。公開——照片全程留在瀏覽器內，不需要登入。 */}
+          <NavLink to="/risk-check" className={linkClass}>
+            安全檢測
+          </NavLink>
           {user && (
             <NavLink to="/orders" className={linkClass}>
               我的訂單
+            </NavLink>
+          )}
+          {/* T153：我的收藏。收藏綁定身分，未登入時沒有東西可看。 */}
+          {user && (
+            <NavLink to="/favorites" className={linkClass}>
+              我的收藏
+            </NavLink>
+          )}
+          {/* T169：客服訊息的入口。⚠️ 只在登入後出現——未登入的人沒有討論串，
+              給他一個點了會被導去登入的連結只是多一次挫折。 */}
+          {user && (
+            <NavLink to="/messages" className={linkClass}>
+              聯絡客服
             </NavLink>
           )}
           {user?.role === 'admin' && (

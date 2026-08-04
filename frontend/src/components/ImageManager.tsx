@@ -1,179 +1,189 @@
 /**
  * T127：房源照片管理（FR-050a ~ FR-050f）。
  *
- * ## 五條規則
- *
- * 1. **上限 8 張**（FR-050a）。達上限時新增入口停用並說明，而不是讓他選完
- *    八張以外的第九張、上傳完才被拒絕。
- * 2. **第一張是封面**（FR-050a）。因此順序不是排版偏好，是有語意的——
- *    調整順序的按鈕不可省。
- * 3. **本地上傳與圖片網址可混用**（FR-050b）。同一間房源裡兩種來源並存是
- *    正常狀態，不是要被正規化掉的東西。
- * 4. **上傳前於瀏覽器內縮圖轉檔**（FR-050c），見 `lib/image.ts`。
- * 5. **取消編輯時，本次已上傳但未保存的檔案 MUST 被清除**（FR-050f）。
- *    因此本元件回報 `uploadedPaths`——呼叫端在使用者按取消時據此呼叫
- *    `api.admin.photos.discard`。反過來，**移除既有照片不在這裡刪檔**：
- *    那要等表單真的送出後由後端執行，否則使用者按下取消、照片卻已經沒了。
+ * - 上限 **8** 張，**第一張為封面**（FR-050a）
+ * - 順序調整與逐張移除（FR-050d）
+ * - 本地上傳與圖片網址**可混用**（FR-050b）
+ * - ⚠️ **上傳前於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050c）
  *
  * ## 為什麼順序調整是按鈕而不是拖曳
  *
- * 拖曳排序對只用鍵盤的人等同於不存在，對讀屏使用者也沒有可操作的對應
- * （憲章原則 V、T171）。「上移／下移」兩顆按鈕看起來土，但每個人都用得了。
+ * 拖曳排序對只用鍵盤的人等同於不存在，對讀屏使用者則完全沒有回饋
+ * （憲章原則 V）。「上一個／下一個」兩顆按鈕能做到同一件事，而且每一次移動
+ * 都能被宣讀。真正需要拖曳時再加上去，但**MUST NOT 只有拖曳**。
+ *
+ * ## 上傳與掛載是兩件事
+ *
+ * 上傳只回傳一個路徑，**沒有寫進任何房源**（`services/room_photos.py`）。
+ * 要生效必須由父層送出表單。因此本元件把每一次上傳的路徑回報給父層
+ * （`onUploaded`），父層才有辦法在使用者按取消時清掉那些檔案（FR-050f）。
+ *
+ * 反過來做（上傳即掛載）會讓「按取消」變成不可逆——照片已經上去了。
  */
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 
 import { api } from '../api/client'
+import { ACCEPT_ATTRIBUTE, shrinkForUpload, validateImageFile } from '../lib/image'
 import { messageFor } from '../lib/errors'
-import { inputClass } from '../lib/form'
-import { resizeImageFile } from '../lib/image'
 
-/** FR-050a。與後端 `RoomWriteIn.images` 的 `max_length=8` 對齊。 */
+/** FR-050a。⚠️ 與後端 `RoomWriteIn.images` 的 `max_length=8` 一致。 */
 export const MAX_IMAGES = 8
 
 interface ImageManagerProps {
   images: string[]
   onChange: (next: string[]) => void
-  /**
-   * 本次編輯期間上傳到伺服器的路徑。
-   *
-   * ⚠️ 呼叫端 MUST 在「取消」時把這些路徑交給 `api.admin.photos.discard`，
-   * 否則每一次「上傳完又反悔」都會在儲存空間留下一個沒有人引用的檔案，
-   * 而那種垃圾不會有任何症狀——直到磁碟滿了為止（FR-050f）。
-   */
-  onUploaded: (path: string) => void
+  /** 每上傳成功一張就回報一次，供父層在取消時清除未保存的檔案（FR-050f）。 */
+  onUploaded?: (path: string) => void
+  /** 表單送出中時停用，避免一邊儲存一邊改動清單。 */
+  disabled?: boolean
 }
 
-export function ImageManager({ images, onChange, onUploaded }: ImageManagerProps) {
+function move(images: string[], from: number, to: number): string[] {
+  if (to < 0 || to >= images.length) return images
+  const next = [...images]
+  const [item] = next.splice(from, 1)
+  if (item === undefined) return images
+  next.splice(to, 0, item)
+  return next
+}
+
+export function ImageManager({ images, onChange, onUploaded, disabled = false }: ImageManagerProps) {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const fileInputId = useId()
-  const urlInputId = useId()
+  const [notice, setNotice] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const urlFieldId = useId()
 
   const full = images.length >= MAX_IMAGES
   const remaining = MAX_IMAGES - images.length
 
-  function move(index: number, delta: number) {
-    const target = index + delta
-    if (target < 0 || target >= images.length) return
-    const next = [...images]
-    const [item] = next.splice(index, 1)
-    // `splice` 的回傳一定有一個元素（index 已檢查過），但型別是 `T | undefined`
-    if (item !== undefined) next.splice(target, 0, item)
-    onChange(next)
-  }
-
-  function remove(index: number) {
-    onChange(images.filter((_, i) => i !== index))
-  }
-
   function addUrl() {
-    const trimmed = url.trim()
-    if (!trimmed) return
-    if (full) return
-    if (images.includes(trimmed)) {
-      setError('這張圖片已經在清單中了。')
+    const value = url.trim()
+    if (!value) return
+    if (full) {
+      setNotice(`最多 ${String(MAX_IMAGES)} 張，請先移除一張再新增。`)
       return
     }
-    setError(null)
-    onChange([...images, trimmed])
+    if (images.includes(value)) {
+      setNotice('這張圖片已經在清單中了。')
+      return
+    }
+    setNotice(null)
+    onChange([...images, value])
     setUrl('')
   }
 
-  /**
-   * 逐張處理選取的檔案。
-   *
-   * 刻意**序列**而非 `Promise.all`：八張手機照片同時解碼會讓低階裝置的分頁
-   * 直接失去回應。逐張處理慢一點，但每一張完成就立刻出現在清單上，
-   * 使用者看得到進度。
-   */
   async function addFiles(files: FileList) {
-    setBusy(true)
-    setError(null)
-    const accepted: string[] = []
-
-    try {
-      for (const file of Array.from(files)) {
-        if (images.length + accepted.length >= MAX_IMAGES) {
-          setError(`最多 ${String(MAX_IMAGES)} 張，其餘檔案未加入。`)
-          break
-        }
-        // ⚠️ MUST NOT 上傳原始檔（FR-050c）
-        const resized = await resizeImageFile(file)
-        const uploaded = await api.admin.photos.upload(resized)
-        accepted.push(uploaded.path)
-        onUploaded(uploaded.path)
-      }
-    } catch (cause) {
-      // 已經成功的那幾張留著——把它們一起丟掉，使用者得重選一次全部
-      setError(cause instanceof Error ? cause.message : messageFor(cause).detail)
-    } finally {
-      if (accepted.length > 0) onChange([...images, ...accepted])
-      setBusy(false)
+    // 超過上限的部分**不靜默丟掉**。使用者一次挑了十張而只進來三張時，
+    // 沒有訊息的話他會以為系統壞了（FR-084）。
+    const picked = Array.from(files)
+    const accepted = picked.slice(0, remaining)
+    const messages: string[] = []
+    if (picked.length > accepted.length) {
+      messages.push(`最多 ${String(MAX_IMAGES)} 張，已略過後面 ${String(picked.length - accepted.length)} 張。`)
     }
+
+    setBusy(true)
+    const added: string[] = []
+    for (const file of accepted) {
+      const invalid = validateImageFile(file)
+      if (invalid) {
+        messages.push(invalid)
+        continue
+      }
+      try {
+        // ⚠️ 先縮圖再上傳。送出去的是 `shrunk`，不是 `file`。
+        const shrunk = await shrinkForUpload(file)
+        const uploaded = await api.admin.roomPhotos.upload(shrunk)
+        added.push(uploaded.path)
+        onUploaded?.(uploaded.path)
+      } catch (error) {
+        messages.push(
+          error instanceof Error && !('status' in error)
+            ? error.message
+            : `「${file.name}」上傳失敗：${messageFor(error).detail}`,
+        )
+      }
+    }
+    setBusy(false)
+    setNotice(messages.length > 0 ? messages.join('\n') : null)
+    if (added.length > 0) onChange([...images, ...added])
   }
 
   return (
     <div>
-      <div className="mb-gap-2 flex flex-wrap items-baseline justify-between gap-gap-2">
-        <span className="text-small text-ink-muted">
-          照片（{images.length}/{MAX_IMAGES}）
-        </span>
-        <span className="text-tiny text-ink-muted">第一張為封面，會用於房源列表與卡片。</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-gap-2">
+        <p className="text-small font-medium text-ink">
+          房源照片
+          <span className="ml-gap-2 font-normal text-ink-muted">
+            {images.length} / {MAX_IMAGES} 張
+          </span>
+        </p>
+        <p className="text-tiny text-ink-muted">第一張為封面；上傳前會自動縮圖，不會送出原始檔。</p>
       </div>
 
       {images.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-line-strong p-gap-4 text-center text-small text-ink-muted">
-          尚未加入照片。可上傳本機檔案或填入圖片網址，兩種來源可以混用。
+        <p className="mt-gap-3 rounded-base border border-dashed border-line-strong px-gap-4 py-gap-5 text-center text-small text-ink-muted">
+          尚未加入任何照片。可以上傳本機圖片，也可以直接貼上圖片網址，兩者能混用。
         </p>
       ) : (
-        <ul className="grid gap-gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {images.map((src, index) => (
+        <ul className="mt-gap-3 grid grid-cols-2 gap-gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {images.map((image, index) => (
             <li
-              key={src}
-              className="overflow-hidden rounded-lg border border-line-soft bg-surface"
+              key={image}
+              className="overflow-hidden rounded-base border border-line-soft bg-surface"
             >
               <div className="relative">
+                {/*
+                  `alt` 描述用途而非「圖片」。這些圖之後會出現在房源詳情頁，
+                  而編輯畫面是唯一有人會注意到 alt 的地方（憲章原則 V）。
+                */}
                 <img
-                  src={src}
-                  // 照片本身是裝飾以外的內容，但它沒有可靠的描述來源。
-                  // 以位置命名至少讓讀屏使用者知道自己在操作第幾張。
-                  alt={`房源照片 ${String(index + 1)}`}
-                  className="h-32 w-full bg-surface-alt object-cover"
+                  src={image}
+                  alt={index === 0 ? '封面照片預覽' : `第 ${String(index + 1)} 張照片預覽`}
+                  className="aspect-4/3 w-full object-cover"
+                  loading="lazy"
                 />
                 {index === 0 && (
-                  <span className="absolute top-gap-1 left-gap-1 rounded-pill bg-brand px-gap-2 py-gap-1 text-tiny text-ink-invert">
+                  <span className="absolute top-gap-1 left-gap-1 rounded-pill bg-brand px-gap-2 py-px text-tiny text-ink-invert">
                     封面
                   </span>
                 )}
               </div>
-              <div className="flex items-center justify-between gap-gap-1 p-gap-2">
+              <div className="flex items-center justify-between gap-gap-1 px-gap-2 py-gap-1">
                 <div className="flex gap-gap-1">
-                  <IconButton
-                    label={`將第 ${String(index + 1)} 張往前移`}
-                    disabled={index === 0}
+                  <button
+                    type="button"
+                    disabled={disabled || index === 0}
                     onClick={() => {
-                      move(index, -1)
+                      onChange(move(images, index, index - 1))
                     }}
+                    className="rounded-xs px-gap-2 py-gap-1 text-tiny text-ink-muted hover:bg-surface-alt disabled:opacity-40"
+                    aria-label={`把第 ${String(index + 1)} 張往前移`}
                   >
                     ←
-                  </IconButton>
-                  <IconButton
-                    label={`將第 ${String(index + 1)} 張往後移`}
-                    disabled={index === images.length - 1}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={disabled || index === images.length - 1}
                     onClick={() => {
-                      move(index, 1)
+                      onChange(move(images, index, index + 1))
                     }}
+                    className="rounded-xs px-gap-2 py-gap-1 text-tiny text-ink-muted hover:bg-surface-alt disabled:opacity-40"
+                    aria-label={`把第 ${String(index + 1)} 張往後移`}
                   >
                     →
-                  </IconButton>
+                  </button>
                 </div>
                 <button
                   type="button"
+                  disabled={disabled}
                   onClick={() => {
-                    remove(index)
+                    // ⚠️ 只從清單移除，**不刪檔**。實際刪除要等表單送出
+                    // （FR-050f）——這裡就刪的話，使用者按取消也救不回來。
+                    onChange(images.filter((_, i) => i !== index))
                   }}
-                  className="rounded-xs px-gap-2 py-gap-1 text-tiny text-danger transition-colors hover:bg-danger-soft"
+                  className="rounded-xs px-gap-2 py-gap-1 text-tiny text-danger hover:bg-danger-soft disabled:opacity-40"
                 >
                   移除
                 </button>
@@ -183,54 +193,65 @@ export function ImageManager({ images, onChange, onUploaded }: ImageManagerProps
         </ul>
       )}
 
-      <div className="mt-gap-4 grid gap-gap-3 sm:grid-cols-2">
+      <div className="mt-gap-4 flex flex-wrap items-end gap-gap-3">
         <div>
-          <label htmlFor={fileInputId} className="mb-gap-1 block text-tiny text-ink-muted">
-            從本機上傳
-          </label>
           <input
-            id={fileInputId}
+            ref={fileInput}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={ACCEPT_ATTRIBUTE}
             multiple
-            disabled={full || busy}
-            onChange={(e) => {
-              const files = e.target.files
+            disabled={disabled || full || busy}
+            className="sr-only"
+            onChange={(event) => {
+              const files = event.target.files
               if (files && files.length > 0) void addFiles(files)
-              // 清空 value：不清的話，移除照片後再選同一個檔案不會觸發 change
-              e.target.value = ''
+              // 同一個檔案連續挑兩次時 `change` 不會再觸發，除非清空。
+              event.target.value = ''
             }}
-            className="w-full text-small text-ink-muted file:mr-gap-3 file:rounded-pill file:border-0 file:bg-surface-alt file:px-gap-3 file:py-gap-1 file:text-small file:text-ink"
+            id={`${urlFieldId}-file`}
           />
-          <p className="mt-gap-1 text-tiny text-ink-muted">
-            {busy
-              ? '處理中…上傳前會先在瀏覽器內縮圖。'
-              : full
-                ? `已達 ${String(MAX_IMAGES)} 張上限。`
-                : `還可加入 ${String(remaining)} 張。上傳前會先在瀏覽器內縮圖。`}
-          </p>
+          <label
+            htmlFor={`${urlFieldId}-file`}
+            aria-disabled={disabled || full || busy}
+            className={[
+              'inline-block rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small',
+              disabled || full || busy
+                ? 'cursor-not-allowed opacity-50'
+                : 'cursor-pointer text-ink-muted hover:border-brand hover:text-brand-strong',
+            ].join(' ')}
+          >
+            {busy ? '處理中…' : '上傳圖片'}
+          </label>
         </div>
 
-        <div>
-          <label htmlFor={urlInputId} className="mb-gap-1 block text-tiny text-ink-muted">
-            或填入圖片網址
+        <div className="min-w-56 flex-1">
+          <label htmlFor={urlFieldId} className="block text-tiny text-ink-muted">
+            或貼上圖片網址
           </label>
-          <div className="flex gap-gap-2">
+          <div className="mt-gap-1 flex gap-gap-2">
             <input
-              id={urlInputId}
+              id={urlFieldId}
+              type="url"
               value={url}
-              onChange={(e) => {
-                setUrl(e.target.value)
+              disabled={disabled || full}
+              placeholder="https://…"
+              onChange={(event) => {
+                setUrl(event.target.value)
               }}
-              disabled={full}
-              placeholder="https://example.com/room.jpg"
-              className={inputClass}
+              onKeyDown={(event) => {
+                // 表單裡按 Enter 預設會送出整張表單。這裡只該加一張圖。
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addUrl()
+                }
+              }}
+              className="min-w-0 flex-1 rounded-xs border border-line-strong bg-surface px-gap-3 py-gap-2 text-small"
             />
             <button
               type="button"
               onClick={addUrl}
-              disabled={full || url.trim() === ''}
-              className="rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small whitespace-nowrap text-ink-muted transition-colors hover:border-brand hover:text-brand-strong disabled:opacity-50"
+              disabled={disabled || full || url.trim() === ''}
+              className="rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small text-ink-muted hover:border-brand hover:text-brand-strong disabled:opacity-50"
             >
               加入
             </button>
@@ -238,36 +259,18 @@ export function ImageManager({ images, onChange, onUploaded }: ImageManagerProps
         </div>
       </div>
 
-      {error !== null && (
-        <p role="alert" className="mt-gap-2 text-small text-danger">
-          {error}
+      {full && (
+        <p className="mt-gap-2 text-tiny text-ink-muted">
+          已達 {MAX_IMAGES} 張上限。要換一張的話請先移除其中一張。
+        </p>
+      )}
+
+      {/* `role="status"`：訊息在使用者操作之後才出現，讀屏要能知道發生了什麼。 */}
+      {notice && (
+        <p role="status" className="mt-gap-2 whitespace-pre-line text-small text-danger">
+          {notice}
         </p>
       )}
     </div>
-  )
-}
-
-function IconButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string
-  disabled: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      // 箭頭符號對讀屏使用者念不出意義，實際的說明放在 aria-label
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="rounded-xs border border-line-strong px-gap-2 py-gap-1 text-tiny text-ink-muted transition-colors hover:border-brand hover:text-brand-strong disabled:opacity-30"
-    >
-      <span aria-hidden="true">{children}</span>
-    </button>
   )
 }

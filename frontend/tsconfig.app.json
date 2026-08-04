@@ -7,7 +7,11 @@
     "jsx": "react-jsx",
     /* `vite/client` 提供 `.css`／`.png` 等資源匯入與 `import.meta.env` 的型別。
        少了它，`import './styles/index.css'` 會是 TS2307「找不到模組」。 */
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    /* `node`：T144 的相依圖測試（`lib/__tests__/riskCheckIsolation.test.ts`）是
+       逐檔讀原始碼來驗證，需要 `node:fs`／`node:path`／`node:url` 的型別。
+       瀏覽器程式碼匯入 node 內建模組會在 build 時就爆，因此這裡放寬的只是
+       型別檢查，不是實際可用的執行環境。 */
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"],
 
     /* T007：嚴格模式。憲章前端約束「TypeScript MUST 啟用 strict」。
        `any` 會讓型別系統在該處完全失效，而失效的地方通常正是最需要它的地方

@@ -36,7 +36,7 @@ import { LoadingState } from '../components/LoadingState'
 import * as dates from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
-import { PAYMENT_METHOD_LABELS } from '../lib/labels'
+import { paymentMethodLabel } from '../lib/labels'
 import { formatTWD, previewTotal } from '../lib/money'
 import { useAsync } from '../lib/useAsync'
 import { useAuth } from '../state/AuthContext'
@@ -507,7 +507,7 @@ function PaymentStep({
               className="mt-1"
             />
             <span>
-              <span className="block text-ink">{PAYMENT_METHOD_LABELS[method.value]}</span>
+              <span className="block text-ink">{paymentMethodLabel(method.value)}</span>
               <span className="mt-gap-1 block text-small text-ink-muted">{method.note}</span>
             </span>
           </label>
@@ -537,7 +537,7 @@ function ConfirmStep({
   onEdit: (step: StepIndex) => void
 }) {
   const methodLabel =
-    draft.paymentMethod === '' ? '—' : PAYMENT_METHOD_LABELS[draft.paymentMethod]
+    draft.paymentMethod === '' ? '—' : paymentMethodLabel(draft.paymentMethod)
 
   return (
     <section className="grid gap-gap-4">

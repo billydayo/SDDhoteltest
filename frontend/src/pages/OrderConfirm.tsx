@@ -26,7 +26,7 @@ import type { Order, RoomDetail } from '../api/types'
 import { PaymentCountdown } from '../components/PaymentCountdown'
 import * as dates from '../lib/dates'
 import { messageFor } from '../lib/errors'
-import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS } from '../lib/labels'
+import { orderStatusLabel, paymentMethodLabel } from '../lib/labels'
 import { formatTWD } from '../lib/money'
 
 /** `Booking` 送過來的內容。房源一併帶著，才不必為了一個名字再查一次。 */
@@ -118,8 +118,8 @@ export function OrderConfirm() {
         <Row label="住宿期間" value={dates.formatStay(order.checkIn, order.checkOut)} />
         <Row label="夜數" value={`${String(order.nights)} 晚`} />
         <Row label="入住人數" value={`${String(order.guestCount)} 人`} />
-        <Row label="付款方式" value={PAYMENT_METHOD_LABELS[order.paymentMethod]} />
-        <Row label="訂單狀態" value={ORDER_STATUS_LABELS[order.status]} />
+        <Row label="付款方式" value={paymentMethodLabel(order.paymentMethod)} />
+        <Row label="訂單狀態" value={orderStatusLabel(order.status)} />
         <Row label="聯絡人" value={`${order.contactName}／${order.phone}`} />
         <Row label="電子郵件" value={order.email} />
       </dl>

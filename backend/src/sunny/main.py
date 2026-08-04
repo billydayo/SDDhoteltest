@@ -114,8 +114,9 @@ def _register_routers(app: FastAPI) -> None:
 
     移除 RLS 後這是唯一的存取邊界。
     """
-    # 路由於 US1 起逐一加入（T052、T069…）。
-    _ = app
+    from sunny.routers import rooms
+
+    app.include_router(rooms.router)
 
 
 app: Any = create_app()

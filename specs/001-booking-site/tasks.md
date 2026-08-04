@@ -149,17 +149,17 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 1
 
-- [ ] T046 [P] [US1] 契約測試 `GET /rooms` 為公開端點且條件式必填規則正確於 `backend/tests/contract/test_rooms_public.py`：三者皆空放行、只填單邊日期被拒、只填人數放行、人數非正整數被拒（FR-010）
-- [ ] T047 [P] [US1] 單元測試設施 AND 篩選與逐日房態推導於 `backend/tests/unit/test_search.py`：勾選兩項設施僅回傳同時具備者；同一房源 8/1 已預訂 MUST NOT 使 8/2 也顯示已預訂（FR-015）
+- [X] T046 [P] [US1] 契約測試 `GET /rooms` 為公開端點且條件式必填規則正確於 `backend/tests/contract/test_rooms_public.py`：三者皆空放行、只填單邊日期被拒、只填人數放行、人數非正整數被拒（FR-010）
+- [X] T047 [P] [US1] 單元測試設施 AND 篩選與逐日房態推導於 `backend/tests/unit/test_search.py`：勾選兩項設施僅回傳同時具備者；同一房源 8/1 已預訂 MUST NOT 使 8/2 也顯示已預訂（FR-015）
 
 ### Implementation for User Story 1
 
-- [ ] T048 [US1] 建立 `backend/src/sunny/repositories/rooms.py`：房源查詢與房態推導；**MUST 於查詢前呼叫 `expire_stale_orders()`**（contracts/README.md）
-- [ ] T049 [US1] 建立 `backend/src/sunny/services/search.py`：FR-010 的條件式必填檢查、設施／特色以 jsonb 包含運算子做 AND 篩選、價格與評分排序
-- [ ] T050 [US1] 於 `backend/src/sunny/repositories/rooms.py` 實作逐日房態推導：「已預訂」由該日期的有效訂單即時推導，**MUST NOT 寫入 `rooms.status` 欄位**；`status = 'maintenance'` 與已預訂等同排除（FR-015、FR-016、FR-051a）
-- [ ] T051 [P] [US1] 建立 `backend/src/sunny/schemas/room.py`：`RoomOut` 明列輸出欄位；`average_rating` 為 null 時 MUST 保持 null，**MUST NOT 以 0 表示**（FR-047）
-- [ ] T052 [US1] 建立 `backend/src/sunny/routers/rooms.py`：`GET /rooms`、`GET /rooms/{id}`，**MUST 明確標註為公開端點**
-- [ ] T053 [US1] 建立 `backend/src/sunny/routers/vocabulary.py`：設施與房型特色可選項目的公開讀取端點；尚未設定過時 MUST 退回程式內建預設值（FR-010a）
+- [X] T048 [US1] 建立 `backend/src/sunny/repositories/rooms.py`：房源查詢與房態推導；**MUST 於查詢前呼叫 `expire_stale_orders()`**（contracts/README.md）
+- [X] T049 [US1] 建立 `backend/src/sunny/services/search.py`：FR-010 的條件式必填檢查、設施／特色以 jsonb 包含運算子做 AND 篩選、價格與評分排序
+- [X] T050 [US1] 於 `backend/src/sunny/repositories/rooms.py` 實作逐日房態推導：「已預訂」由該日期的有效訂單即時推導，**MUST NOT 寫入 `rooms.status` 欄位**；`status = 'maintenance'` 與已預訂等同排除（FR-015、FR-016、FR-051a）
+- [X] T051 [P] [US1] 建立 `backend/src/sunny/schemas/room.py`：`RoomOut` 明列輸出欄位；`average_rating` 為 null 時 MUST 保持 null，**MUST NOT 以 0 表示**（FR-047）
+- [X] T052 [US1] 建立 `backend/src/sunny/routers/rooms.py`：`GET /rooms`、`GET /rooms/{id}`，**MUST 明確標註為公開端點**
+- [X] T053 [US1] 建立 `backend/src/sunny/routers/vocabulary.py`：設施與房型特色可選項目的公開讀取端點；尚未設定過時 MUST 退回程式內建預設值（FR-010a）
 - [ ] T054 [P] [US1] 建立 `frontend/src/components/RoomCard.tsx`：直向拱形卡片，拱形 MUST 以 `border-radius` 雙值語法實作（水平半徑遠大於垂直半徑），顯示照片、房名、房型、每晚價格、人數上限與平均評分（FR-013）
 - [ ] T055 [P] [US1] 建立 `frontend/src/components/FilterBar.tsx`：七項篩選條件、目前生效條件的顯示與一鍵清除；欄位標籤 MUST NOT 標示「必填」，改以說明文字交代三者連動；缺漏 MUST 逐欄顯示訊息並將焦點移至第一個有問題的欄位；清單為空時 MUST 隱藏該組篩選（FR-010、FR-010a）
 - [ ] T056 [US1] 建立 `frontend/src/pages/Home.tsx`：房型頁籤（切換 MUST NOT 清除其他篩選條件）、排序切換、滿版主視覺；條件檢查 MUST 只在按下「搜尋」時執行，首次載入 MUST 顯示全部房源（FR-010、FR-012）

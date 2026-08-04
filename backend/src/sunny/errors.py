@@ -26,13 +26,25 @@ class DomainError(Exception):
 
     `detail` 為給使用者看的繁體中文訊息，`code` 供前端做程式判斷。
     MUST NOT 夾帶堆疊追蹤、SQL 語句或內部檔案路徑（憲章「錯誤處理」條）。
+
+    `field` 標明是哪一個欄位出問題。FR-010 要求「缺漏 MUST **逐欄**顯示訊息
+    並將焦點移至第一個有問題的欄位，MUST NOT 只丟一句籠統的錯誤」——
+    前端需要這個值才知道該把焦點放到哪裡。
     """
 
-    def __init__(self, detail: str, *, code: str, status_code: int = 400) -> None:
+    def __init__(
+        self,
+        detail: str,
+        *,
+        code: str,
+        status_code: int = 400,
+        field: str | None = None,
+    ) -> None:
         super().__init__(detail)
         self.detail = detail
         self.code = code
         self.status_code = status_code
+        self.field = field
 
 
 class InternalError(DomainError):

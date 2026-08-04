@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo-mark.png" />
+
+    <!--
+      Playfair Display 是專案唯一的外部字型依賴，只含拉丁字符。
+      preconnect 讓字型請求少一次來回；Google 的 CSS 預設帶 font-display: swap，
+      因此載入失敗或離線時文字不會消失，只會退回系統明體。
+
+      ⚠️ CJK webfont MUST NOT 引入（憲章「字型」條）——字型檔動輒數 MB。
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>Sunny 訂房平台</title>
+    <meta name="description" content="Sunny 訂房平台——舒適住宿，安心入住。" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -26,6 +26,8 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+# tsc -b 的增量建置快取。內容含本機絕對路徑，進版控只會製造無意義的衝突。
+*.tsbuildinfo
 
 # OS / editor
 .DS_Store

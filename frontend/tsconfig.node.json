@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  /* 三個設定檔都跑在 Node 上。全部列出，否則 typescript-eslint 的 projectService
+     會找不到它們所屬的 project，lint 直接是 parsing error。 */
+  "include": ["vite.config.ts", "vitest.config.ts", "eslint.config.js"]
+}

@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    /* `vite/client` 提供 `.css`／`.png` 等資源匯入與 `import.meta.env` 的型別。
+       少了它，`import './styles/index.css'` 會是 TS2307「找不到模組」。 */
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+
+    /* T007：嚴格模式。憲章前端約束「TypeScript MUST 啟用 strict」。
+       `any` 會讓型別系統在該處完全失效，而失效的地方通常正是最需要它的地方
+       ——後端回應的解析。 */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    /* 索引存取回傳 `T | undefined`。陣列越界與物件缺鍵在執行期是 undefined，
+       關掉這個選項等於讓型別系統對最常見的一種 runtime 錯誤視而不見。 */
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}

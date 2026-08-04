@@ -69,12 +69,17 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
   （2026-08-04 修訂：JWT 函式庫由原訂的 python-jose 改為 **PyJWT**。python-jose 已數年未有實質維護，而 plan.md 的相依表未指定 JWT 函式庫，此處無牴觸。實際鎖定 Python 3.12.13）
 - [X] T003 [P] 設定 ruff 於 `backend/pyproject.toml`（lint + format，含 `ASYNC` 規則以攔截 `async def` 中的阻塞式 I/O），確認 `uv run ruff check .` 可執行
 - [X] T004 [P] 建立 `backend/.env.example`，列出全部必要變數：`DATABASE_URL`、**`MIGRATION_DATABASE_URL`**、**`APP_DB_PASSWORD`**（後兩者為 T021a 的雙角色連線所需）、`JWT_SECRET`、`JWT_EXPIRE_MINUTES`、`CORS_ORIGINS`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REDIRECT_URI`、`UPLOAD_DIR`、`MAX_UPLOAD_BYTES`
-- [ ] T005 建立 `frontend/` 的 Vite + React 19 + TypeScript 專案（`package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`），以 `npm install` 產生 `frontend/package-lock.json` 並納入版控
-- [ ] T006 [P] 建立 `frontend/tailwind.config.ts`，將舊 `styles/` 的配色、字級與圓角移入 theme 具名 token；**品牌色 MUST 為 `#7A6132`（白字 5.9:1）而非既有的 `#96793F`（4.1:1）**，並於註解標註各色與背景的對比度
-- [ ] T007 [P] 設定 `frontend/eslint.config.js` 與 `frontend/tsconfig.json` 的 `strict: true`，禁止未說明理由的 `any`
+- [X] T005 建立 `frontend/` 的 Vite + React 19 + TypeScript 專案（`package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`），以 `npm install` 產生 `frontend/package-lock.json` 並納入版控
+  （2026-08-04 實作：Vite 8.2 / React 19.2 / TypeScript 5.9。**TypeScript 維持 5.x**——7.0 為 Go 版重寫，typescript-eslint 等週邊支援尚未齊備，而 plan.md 明訂「前端：TypeScript 5.x / ES2022」。`tsconfig.json` 拆為 app／node 兩個 project reference，設定檔與應用碼的 lib 與 globals 本就不同）
+- [X] T006 [P] 將舊 `styles/` 的配色、字級與圓角移入 theme 具名 token；**品牌色 MUST 為 `#7A6132`（白字 5.9:1）而非既有的 `#96793F`（4.1:1）**，並於註解標註各色與背景的對比度
+  （2026-08-04 修訂：token 落在 `frontend/src/styles/index.css` 的 `@theme` 區塊，**不建 `tailwind.config.ts`**。Tailwind v4 已將設定移入 CSS，JS 設定檔降為相容用途；兩份設定並存必然漂移，因此只留一份。同 T002 改用 PyJWT 的處理方式，plan.md 的相依表未指定 Tailwind 版本，此處無牴觸。
+  另：舊 `--c-text-faint`（#7C8883，對底色 3.4:1）**刻意未移植**——plan.md 明訂 MUST NOT 把已知不合規的色值原樣搬過來。拱形以 `@utility arch` 保留雙值 `border-radius` 語法，已驗證編譯結果為 `50% 50% 0 0 / 22% 22% 0 0`）
+- [X] T007 [P] 設定 `frontend/eslint.config.js` 與 `frontend/tsconfig.json` 的 `strict: true`，禁止未說明理由的 `any`
+  （實作：`no-explicit-any` 設為 **error 而非 warn**——warn 會累積到沒有人讀。另加 `strictTypeChecked` 以取得 `no-floating-promises`（忘記 await 的 fetch 不會報錯，只是資料沒進來），以及禁止 `localStorage` 承載業務資料的 `no-restricted-globals`）
 - [X] T008 [P] 更新根目錄 `.gitignore`：加入 `backend/.env`、`backend/.venv`、`__pycache__/`、`frontend/node_modules/`、`frontend/dist/`、`backend/uploads/`；一併移除舊有的「`src/config.js` 刻意不列入忽略」註記（該例外的前提是瀏覽器直連 Supabase 並以 RLS 防護，兩者皆已隨憲章 v3.0.0 移除）
 - [X] T009 建立 `backend/tests/conftest.py` 與 pytest 設定於 `backend/pyproject.toml`（`asyncio_mode = "auto"`），確認 `uv run pytest` 可執行。測試資料庫以 `SUNNY_TEST_DATABASE_URL` 指定，未設定時**跳過**而非連上 `DATABASE_URL` 就地破壞開發資料
-- [ ] T010 [P] 設定 `frontend/vitest.config.ts` 與 React Testing Library，確認 `npm run test` 可執行
+- [X] T010 [P] 設定 `frontend/vitest.config.ts` 與 React Testing Library，確認 `npm run test` 可執行
+  （已驗證：`npm run test` 2 passed、`npm run build` 通過、`npm run lint` 無錯）
 
 ---
 

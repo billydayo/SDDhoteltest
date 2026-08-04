@@ -1,0 +1,176 @@
+/*
+ * T006／T043：Tailwind 指令、設計 token 與極少數無法以 utility 表達的樣式。
+ *
+ * ⚠️ **Tailwind v4 的設定在 CSS 裡，不在 `tailwind.config.ts`。**
+ * tasks.md 的 T006 原訂建立 `frontend/tailwind.config.ts`。v4 改以 `@theme`
+ * 於 CSS 中宣告 token，JS 設定檔降為相容用途。兩份設定並存會漂移，因此只留
+ * 這一份（同 T002 改用 PyJWT 的處理方式，已於 tasks.md 記錄修訂理由）。
+ *
+ * `@theme` 裡的每個名稱都會產生對應的 utility：`--color-brand` → `bg-brand`、
+ * `text-brand`、`border-brand`。這正是「配色值集中於一處，其他地方一律引用」
+ * 的機制（憲章「視覺基調」）。
+ */
+@import 'tailwindcss';
+
+@theme {
+  /* ---- 色彩 ---------------------------------------------------------
+     每個用於文字的色都標註了與其背景的對比度（憲章原則 V：AA 4.5:1）。 */
+
+  --color-bg: #faf8f4; /* 頁面底：暖象牙 */
+  --color-surface: #ffffff; /* 卡片 */
+  --color-surface-alt: #efe9de; /* 區塊底：砂色 */
+  --color-surface-deep: #e2d9c9; /* 較深砂色，分隔用 */
+
+  --color-line: rgba(27, 42, 36, 0.1);
+  --color-line-soft: rgba(27, 42, 36, 0.055);
+  --color-line-strong: rgba(27, 42, 36, 0.22);
+
+  /* 文字 */
+  --color-ink: #1b2a24; /* 對 bg 15.8:1 ✅ */
+  --color-ink-muted: #4a5852; /* 對 bg  7.3:1 ✅ */
+  --color-ink-invert: #ffffff;
+
+  /* ⚠️ 舊 `--c-text-faint`（#7C8883，對 bg 3.4:1）**未移植**。
+     憲章原則 V 要求文字對比 MUST 至少 4.5:1，把已知不合規的色值原樣搬過來
+     等於讓債務跟著換一次技術堆疊繼續活下去（plan.md 明訂 MUST NOT）。
+     需要更淡的註解文字時用 `ink-muted`；真正次要到可以更淡的內容，
+     多半是根本不該顯示的內容。 */
+
+  /* ---- 黃銅 ---------------------------------------------------------
+     ⚠️ **品牌色為 #7A6132，不是舊的 #96793F。**
+
+     舊值配白字只有 4.1:1，低於 AA。它承載主要行動按鈕（「立即訂房」），
+     那是全站最需要看得清楚的一個元件。#7A6132 配白字 5.9:1，通過 AA。
+
+     色相與彩度幾乎沒動，只降了明度——並排看得出深一點，單獨看認不出差別。 */
+  --color-brand: #7a6132; /* 填色。白字於其上 5.9:1 ✅ */
+  --color-brand-strong: #634e28; /* hover／pressed。白字 8.2:1 ✅ */
+  --color-brand-soft: #f3ede0; /* 淡底，不承載文字 */
+  --color-brand-accent: #96793f; /* **裝飾專用**：圓點、分隔線。MUST NOT 承載文字。 */
+
+  /* 深林綠。次要按鈕與選取態。 */
+  --color-forest: #2c4a3c; /* 白字 9.6:1 ✅ */
+  --color-forest-strong: #223b2f;
+  --color-forest-soft: #e7ede9;
+
+  /* 語意色與品牌色分開，避免「成功」被誤讀為「品牌」。 */
+  --color-ok: #2f6b4f;
+  --color-ok-soft: #e6f0ea;
+  --color-warn: #8a6420;
+  --color-warn-soft: #faf0dc;
+  --color-danger: #8c3f35;
+  --color-danger-soft: #f8e9e6;
+  --color-info: #2d5c7f;
+  --color-info-soft: #e4eef5;
+
+  /* ---- 字體 ---------------------------------------------------------
+     Playfair Display 只含拉丁字符，中文會逐字退回系統明體——這正是想要的：
+     數字與英文標題有展示字型的個性，中文維持系統明體的可讀性。
+
+     ⚠️ **CJK webfont MUST NOT 引入**（憲章「字型」條）：字型檔動輒數 MB。 */
+  --font-display:
+    'Playfair Display', 'Hiragino Mincho ProN', 'Songti TC', 'Noto Serif TC', Georgia,
+    'Times New Roman', serif;
+  --font-body:
+    'Helvetica Neue', -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ---- 字級：1.25 倍級距 ---- */
+  --text-tiny: 0.72rem;
+  --text-small: 0.82rem;
+  --text-body: 0.95rem;
+  --text-md: 1.05rem;
+  --text-h3: 1.3rem;
+  --text-h2: 1.65rem;
+  --text-h1: 2.1rem;
+  --text-display: clamp(2.2rem, 5.5vw, 3.4rem);
+
+  /* ---- 間距：大氣留白 ---- */
+  --spacing-gap-1: 0.25rem;
+  --spacing-gap-2: 0.5rem;
+  --spacing-gap-3: 0.75rem;
+  --spacing-gap-4: 1rem;
+  --spacing-gap-5: 1.5rem;
+  --spacing-gap-6: 2rem;
+  --spacing-gap-7: 3rem;
+  --spacing-gap-8: clamp(3rem, 7vw, 5.5rem);
+
+  /* ---- 形狀 ---- */
+  --radius-xs: 3px;
+  --radius-base: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 1px 2px rgba(27, 42, 36, 0.04), 0 4px 16px rgba(27, 42, 36, 0.05);
+  --shadow-card: 0 2px 6px rgba(27, 42, 36, 0.05), 0 16px 44px rgba(27, 42, 36, 0.09);
+  --shadow-float: 0 28px 80px rgba(27, 42, 36, 0.18);
+
+  --ease-brand: cubic-bezier(0.32, 0.72, 0.28, 1);
+
+  /* 純文字段落的行長上限。超過約 70 字元後，眼睛換行時容易掉行。 */
+  --container-measure: 68ch;
+}
+
+/* ---------------------------------------------------------------------
+ * 無法以 utility 表達的樣式。**這裡 MUST 保持極短。**
+ * 憲章前端約束：Tailwind 為唯一樣式方案。每多一條自訂 CSS，就多一個
+ * 「這個樣式從哪來的」的搜尋成本。
+ * ------------------------------------------------------------------- */
+
+/*
+ * 拱形：精品度假村的招牌語彙，卡片頂端做成拱門。
+ * 必須用 border-radius 的**雙值語法**——水平半徑 50% 遠大於垂直半徑 22%，
+ * 才會是「拱」而不是單純的圓角。Tailwind 的 rounded-* 只吐單一半徑，
+ * 表達不了這個形狀。
+ */
+@utility arch {
+  border-radius: 50% 50% 0 0 / 22% 22% 0 0;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    /* 捲軸槽固定保留，浮窗開關時版面才不會左右跳一下 */
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    line-height: 1.25;
+  }
+
+  /*
+   * 鍵盤焦點環。**MUST NOT 以 `outline: none` 移除**（憲章原則 V）——
+   * 只用鍵盤的人會就此完全失去「我現在在哪裡」的資訊，而滑鼠使用者
+   * 完全察覺不到這件事，因此它幾乎不會被回報。
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  /* 使用者要求減少動態時一律照辦（憲章原則 V）。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

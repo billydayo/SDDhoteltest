@@ -91,6 +91,20 @@ class ReviewRepository(Repository):
         result = await self.session.scalars(select(Review.comment).where(Review.user_id == user_id))
         return list(result.all())
 
+    async def list_for_user(self, user_id: uuid.UUID) -> list[Review]:
+        """本人寫過的全部評論，含尚未通過審核的（FR-043、FR-045）。
+
+        ⚠️ **含 `pending` 與 `rejected` 是刻意的，與 `list_public()` 相反。**
+        作者要看得到自己送出的那一則還在審核中——只回 `approved` 的話，他會
+        以為評論送丟了而再寫一次，然後撞上 409。
+
+        依 `created_at` 由新到舊：最近寫的那一則是他最可能要找的。
+        """
+        result = await self.session.scalars(
+            select(Review).where(Review.user_id == user_id).order_by(Review.created_at.desc())
+        )
+        return list(result.all())
+
     async def list_public(
         self,
         room_id: uuid.UUID,

@@ -199,6 +199,22 @@ export function OrderDetail() {
           申請表單。因此這裡是一句話，不是一顆被停用的按鈕——停用的按鈕不會
           說明原因。
         */}
+        {/*
+          T112：已完成入住才出現撰寫評論的入口（FR-042）。
+          ⚠️ **無論評論過沒有都顯示這個連結**，文案不變。要改文案就得先知道
+          他評過了沒，而那要為了一顆按鈕多打一次 `GET /reviews`——那一頁進去
+          本來就會查，且會直接顯示既有的那一則（`ReviewForm.tsx`）。
+          在這裡藏起來的話，他反而找不到自己寫過什麼。
+        */}
+        {data.status === 'completed' && (
+          <Link
+            to={`/orders/${data.id}/review`}
+            className="rounded-pill bg-brand px-gap-6 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+          >
+            撰寫評論
+          </Link>
+        )}
+
         {refundable && quotaFull && (
           <p
             role="status"

@@ -97,6 +97,22 @@ async def create_review(
     return MyReviewOut.model_validate(review)
 
 
+@router.get("", response_model=list[MyReviewOut], summary="我的評論（需登入）")
+async def list_my_reviews(user: CurrentUser, session: SessionDep) -> list[MyReviewOut]:
+    """本人寫過的評論，含尚未通過審核的（FR-043、FR-045）。
+
+    ⚠️ **只回本人的。`user_id` 來自 token，不接受任何查詢參數指定會員**——
+    留一個 `?userId=` 就等於把全站的評論（含被駁回的）開放給任何登入者，
+    而回來的資料看起來完全正常（同 `routers/orders.py` 的同一條）。
+
+    前端用它回答「這筆訂單我評過了嗎」（FR-043）：已評論過的訂單 MUST NOT
+    再提供撰寫入口，而要導向既有的那一則。用 `orderId` 比對即可——一筆訂單
+    最多一則評論。
+    """
+    reviews = await ReviewRepository(session).list_for_user(user.id)
+    return [MyReviewOut.model_validate(review) for review in reviews]
+
+
 def _reviewable(order: Order | None, user_id: uuid.UUID) -> Order:
     """存在、屬於本人、且已完成入住，回傳該訂單（FR-042）。
 

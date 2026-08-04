@@ -415,6 +415,80 @@ export interface ReviewReplyInput {
 }
 
 // ---------------------------------------------------------------------------
+// 會員端與前台：評論
+// ---------------------------------------------------------------------------
+/**
+ * 評論類型（FR-048）。
+ *
+ * ⚠️ **封閉集合，與後端 `schemas/review.py` 的 `REVIEW_CATEGORIES` 逐字對應。**
+ * 送出不在此列的值後端回 422；`GET /rooms/{id}/reviews?category=` 帶不認得的
+ * 值則回 400，**不會**靜默回空陣列——空陣列與「這個類型還沒有人評論」在畫面
+ * 上完全一樣，那種錯不會有人回報。
+ */
+export const REVIEW_CATEGORIES = [
+  '住宿體驗',
+  '清潔與衛生',
+  '服務態度',
+  '設施與設備',
+  '地點與交通',
+  '性價比',
+] as const
+
+export type ReviewCategory = (typeof REVIEW_CATEGORIES)[number]
+
+/**
+ * 撰寫評論的輸入（FR-042 ~ FR-045）。
+ *
+ * ⚠️ **沒有 `roomId`，也沒有 `status`。** 房源由 `orderId` 推導——能指定房源
+ * 就能拿 A 房的訂單去評 B 房，而那則評分會計入 B 房的平均（FR-046）。
+ */
+export interface ReviewCreateInput {
+  orderId: string
+  /** 1–5（FR-044）。 */
+  rating: number
+  comment: string
+  category: ReviewCategory
+}
+
+/**
+ * 本人寫的一則評論。
+ *
+ * ⚠️ **不含 `autoVerdict` 與 `autoRules`**——後端刻意不回給作者。告訴他觸發了
+ * 哪條規則等於附上一份規避指南（`services/moderation.py`）。他需要知道的只有
+ * `status`：送出當下必為 `pending`（FR-045）。
+ */
+export interface MyReview {
+  id: string
+  orderId: string
+  roomId: string
+  rating: number
+  comment: string
+  category: string
+  status: ReviewStatus
+  createdAt: string
+}
+
+/**
+ * 房源詳情頁上的一則評論（FR-046、FR-103d）。
+ *
+ * ⚠️ **沒有 `status` 欄位。** 這個端點只回 `approved`，留一個欄位在這裡會讓人
+ * 以為也可能拿到待審核的（SC-007）。
+ *
+ * ⚠️ **業者回覆不帶回覆者姓名**——回覆代表店家而非某位管理員個人（FR-103d）。
+ */
+export interface PublicReview {
+  id: string
+  rating: number
+  comment: string
+  category: string
+  /** 會員自選的顯示名稱。`null` 時前端顯示預設稱謂，MUST NOT 印出空白。 */
+  authorName: string | null
+  createdAt: string
+  adminReply: string | null
+  adminReplyAt: string | null
+}
+
+// ---------------------------------------------------------------------------
 // 後台：退款審核
 // ---------------------------------------------------------------------------
 export type RefundStatus = 'pending' | 'approved' | 'rejected'

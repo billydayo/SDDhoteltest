@@ -50,6 +50,7 @@ import type {
   Message,
   MessageInput,
   MyRefund,
+  MyReview,
   Order,
   OrderCreateInput,
   OrderStats,
@@ -57,12 +58,14 @@ import type {
   PhotoUpload,
   Profile,
   ProfileUpdateInput,
+  PublicReview,
   Refund,
   RefundCreateInput,
   RefundDecisionInput,
   RefundFilters,
   RegisterInput,
   ResetResult,
+  ReviewCreateInput,
   ReviewDecisionInput,
   ReviewReplyInput,
   RiskCheck,
@@ -320,6 +323,32 @@ export const api = {
         ...(on ? { query: { on } } : {}),
         ...(signal ? { signal } : {}),
       }),
+    /**
+     * 該房源已公開的評論（FR-046、FR-048）。**公開，不需登入。**
+     *
+     * ⚠️ 後端只回 `approved` 的評論，且沒有可以放寬它的參數（SC-007）。
+     * 這裡也刻意不提供 `status` 參數——加了只會回 400，而那個 400 會被
+     * 誤讀成「這一頁壞了」。
+     */
+    reviews: (roomId: string, category?: string, signal?: AbortSignal) =>
+      request<PublicReview[]>(`/rooms/${roomId}/reviews`, {
+        ...(category ? { query: { category } } : {}),
+        ...(signal ? { signal } : {}),
+      }),
+  },
+
+  /**
+   * 評論（FR-042 ~ FR-045）。
+   *
+   * ⚠️ **`create` 的輸入沒有 `roomId`，也沒有 `status`。** 房源由訂單推導
+   * （送 roomId 就能拿 A 房的訂單去評 B 房），狀態一律由後端設為待審核
+   * ——自動審核只是初判，MUST NOT 因它通過就直接公開（FR-103）。
+   */
+  reviews: {
+    /** 本人寫過的全部評論，**含尚未通過審核的**——前端據此判斷該筆訂單評過了沒。 */
+    list: (signal?: AbortSignal) => request<MyReview[]>('/reviews', signal ? { signal } : {}),
+    create: (input: ReviewCreateInput) =>
+      request<MyReview>('/reviews', { method: 'POST', body: input }),
   },
 
   vocabulary: {

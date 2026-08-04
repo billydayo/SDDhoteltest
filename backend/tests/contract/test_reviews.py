@@ -206,6 +206,51 @@ async def test_the_author_is_not_told_which_rules_fired(
 
 
 # ---------------------------------------------------------------------------
+# 我的評論（FR-043 的前端入口所需）
+# ---------------------------------------------------------------------------
+async def test_my_reviews_requires_login(client) -> None:
+    res = await client.get("/reviews")
+    assert res.status_code == 401
+
+
+async def test_my_reviews_includes_my_pending_one(
+    client, member, member_token, room_factory, order_factory
+) -> None:
+    """⚠️ **待審核的那一則 MUST 出現在「我的評論」裡**（與公開端點相反）。
+
+    只回 `approved` 的話，作者會以為評論送丟了而再寫一次，然後撞上 409——
+    前端也就無從實作 FR-043 的「已評論過時導向既有評論」。
+    """
+    room = await room_factory()
+    order = await order_factory(user=member, room=room)
+    await client.post("/reviews", json=_body(order), headers=auth_header(member_token))
+
+    mine = await client.get("/reviews", headers=auth_header(member_token))
+    assert mine.status_code == 200
+    (entry,) = mine.json()
+    assert entry["orderId"] == str(order.id)
+    assert entry["status"] == "pending"
+
+
+async def test_a_member_never_sees_another_members_reviews(
+    client, member, member_token, other_member_token, room_factory, order_factory
+) -> None:
+    """A 寫的評論，B 讀「我的評論」時 MUST 什麼也看不到。
+
+    這道收斂沒有 URL 可以看：端點上根本沒有 `userId` 參數。若哪天
+    `list_for_user()` 的收斂被拿掉，不會有 404 也不會有 403——B 只是安靜地
+    看到 A 尚未公開的評論內容（同 `test_favorites.py` 的同一種問法）。
+    """
+    room = await room_factory()
+    order = await order_factory(user=member, room=room)
+    await client.post("/reviews", json=_body(order), headers=auth_header(member_token))
+
+    theirs = await client.get("/reviews", headers=auth_header(other_member_token))
+    assert theirs.status_code == 200
+    assert theirs.json() == []
+
+
+# ---------------------------------------------------------------------------
 # 一筆訂單一則評論（FR-043）
 # ---------------------------------------------------------------------------
 async def test_reviewing_the_same_order_twice_is_409(

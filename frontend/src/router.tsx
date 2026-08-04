@@ -41,6 +41,7 @@ import { OrderDetail } from './pages/OrderDetail'
 import { Orders } from './pages/Orders'
 import { RefundForm } from './pages/RefundForm'
 import { Register } from './pages/Register'
+import { ReviewForm } from './pages/ReviewForm'
 import { RiskCheck } from './pages/RiskCheck'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
@@ -214,6 +215,16 @@ export function AppRoutes() {
           element={
             <RequireAuth>
               <RefundForm />
+            </RequireAuth>
+          }
+        />
+        {/* T112：撰寫評論。⚠️ 網址上是**訂單** id 而非房源 id——評論的資格來自
+            「這筆訂單是你的且已完成入住」（FR-042），房源由後端從訂單推導。 */}
+        <Route
+          path="/orders/:orderId/review"
+          element={
+            <RequireAuth>
+              <ReviewForm />
             </RequireAuth>
           }
         />

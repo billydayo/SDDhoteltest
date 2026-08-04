@@ -11,10 +11,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setToken } from '../api/client'
+import { REVIEW_CATEGORIES } from '../api/types'
 import { addDays } from '../lib/dates'
 import { AppRoutes } from '../router'
 import { AuthProvider } from '../state/AuthContext'
-import { MEMBER, RISK_CHECK, makeRoomDetail, mockApi } from '../test/mockApi'
+import { MEMBER, RISK_CHECK, makePublicReview, makeRoomDetail, mockApi } from '../test/mockApi'
 import type { MockOptions } from '../test/mockApi'
 
 const ROOM_ID = 'aaaaaaaa-0000-0000-0000-000000000001'
@@ -131,10 +132,103 @@ describe('夜數與總金額試算（FR-017）', () => {
   })
 })
 
-describe('評論（FR-017 待 T110）', () => {
-  it('⚠️ MUST NOT 以假評論或空白區塊冒充尚未實作的功能', async () => {
-    renderDetail()
-    expect(await screen.findByText('評論功能即將開放。')).toBeInTheDocument()
+describe('評論（T113、FR-046 ~ FR-048）', () => {
+  it('⚠️ 沒有評論時顯示「尚無評論」，MUST NOT 留一塊空白', async () => {
+    // 空白區塊會被讀成壞掉，而這間房只是還沒有人評過（FR-047 的同一個原則）
+    renderDetail({ roomReviews: [] })
+    expect(await screen.findByText('尚無評論。')).toBeInTheDocument()
+  })
+
+  it('顯示已公開的評論', async () => {
+    renderDetail({
+      roomReviews: [makePublicReview({ comment: '陽台的海景比照片還好。', authorName: '王小明' })],
+    })
+    expect(await screen.findByText('陽台的海景比照片還好。')).toBeInTheDocument()
+    expect(screen.getByText('王小明')).toBeInTheDocument()
+  })
+
+  it('依類型篩選（FR-048）', async () => {
+    const user = userEvent.setup()
+    renderDetail({
+      roomReviews: [
+        makePublicReview({ id: 'r1', category: '住宿體驗', comment: '整體很滿意。' }),
+        makePublicReview({ id: 'r2', category: '清潔與衛生', comment: '浴室非常乾淨。' }),
+      ],
+    })
+
+    expect(await screen.findByText('整體很滿意。')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '清潔與衛生' }))
+
+    expect(await screen.findByText('浴室非常乾淨。')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('整體很滿意。')).not.toBeInTheDocument()
+    })
+  })
+
+  it('⚠️ 篩到空的時候說的是另一句話，且指得出回去的路', async () => {
+    // 「尚無評論」會讓人以為這間房從來沒人評過，而他只是選了一個沒人寫的類型
+    const user = userEvent.setup()
+    renderDetail({ roomReviews: [makePublicReview({ category: '住宿體驗' })] })
+
+    await screen.findByRole('button', { name: '性價比' })
+    await user.click(screen.getByRole('button', { name: '性價比' }))
+
+    expect(await screen.findByText(/「性價比」類型還沒有評論/)).toBeInTheDocument()
+    expect(screen.queryByText('尚無評論。')).not.toBeInTheDocument()
+  })
+
+  it('⚠️ 類型頁籤是固定清單，MUST NOT 由結果推導', async () => {
+    // 由結果推導的話，選了某個類型之後其他頁籤會消失，人就回不去了
+    renderDetail({ roomReviews: [makePublicReview({ category: '住宿體驗' })] })
+    await screen.findByRole('button', { name: '全部' })
+    for (const name of REVIEW_CATEGORIES) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+  })
+})
+
+describe('業者回覆（T115、FR-103d）', () => {
+  it('顯示於該則評論下方', async () => {
+    renderDetail({
+      roomReviews: [
+        makePublicReview({
+          comment: '床墊有點軟。',
+          adminReply: '感謝反映，我們已安排更換。',
+          adminReplyAt: '2026-08-02T00:00:00Z',
+        }),
+      ],
+    })
+
+    expect(await screen.findByText('業者回覆')).toBeInTheDocument()
+    expect(screen.getByText('感謝反映，我們已安排更換。')).toBeInTheDocument()
+  })
+
+  it('⚠️ MUST NOT 顯示回覆者姓名', async () => {
+    /*
+     * 回覆代表店家而非某位管理員個人（FR-103d）。後端的 `PublicReviewOut`
+     * 根本沒有那個欄位，所以這裡驗的是「畫面沒有從別處生出一個名字來」——
+     * 例如把評論作者的名字誤植成回覆者。
+     */
+    renderDetail({
+      roomReviews: [
+        makePublicReview({
+          authorName: '王小明',
+          adminReply: '感謝您的回饋。',
+          adminReplyAt: '2026-08-02T00:00:00Z',
+        }),
+      ],
+    })
+
+    const reply = (await screen.findByText('業者回覆')).closest('div')
+    expect(reply).not.toBeNull()
+    expect(reply?.textContent).not.toContain('王小明')
+  })
+
+  it('沒有回覆時不留一塊空的回覆區', async () => {
+    renderDetail({ roomReviews: [makePublicReview({ adminReply: null })] })
+    await screen.findByText('房間乾淨，陽台的海景比照片還好。')
+    expect(screen.queryByText('業者回覆')).not.toBeInTheDocument()
   })
 })
 

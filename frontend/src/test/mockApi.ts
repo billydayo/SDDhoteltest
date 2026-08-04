@@ -17,9 +17,11 @@ import type {
   AdminUser,
   DashboardStats,
   MyRefund,
+  MyReview,
   Order,
   OrderStats,
   Profile,
+  PublicReview,
   RiskCheck,
   Room,
   RoomDetail,
@@ -169,6 +171,41 @@ export function makeRefund(overrides: Partial<MyRefund> = {}): MyRefund {
   }
 }
 
+/**
+ * 本人寫的一則評論（`GET /reviews`、`POST /reviews`）。
+ *
+ * ⚠️ 預設 `status: 'pending'`——那是剛送出時**唯一**可能的狀態（FR-045）。
+ * 預設成 `approved` 的話，「送出後要說明還沒公開」那條就永遠測不到。
+ */
+export function makeMyReview(overrides: Partial<MyReview> = {}): MyReview {
+  return {
+    id: 'dddddddd-0000-0000-0000-000000000001',
+    orderId: 'bbbbbbbb-0000-0000-0000-000000000001',
+    roomId: 'aaaaaaaa-0000-0000-0000-000000000001',
+    rating: 5,
+    comment: '房間比想像中寬敞，早餐的選擇也多，下次來這一帶還會再訂一次。',
+    category: '住宿體驗',
+    status: 'pending',
+    createdAt: '2026-08-05T00:00:00Z',
+    ...overrides,
+  }
+}
+
+/** 房源詳情頁上的一則已公開評論。⚠️ 沒有 `status` 欄位——這裡只會有 approved 的。 */
+export function makePublicReview(overrides: Partial<PublicReview> = {}): PublicReview {
+  return {
+    id: 'eeeeeeee-0000-0000-0000-000000000001',
+    rating: 5,
+    comment: '房間乾淨，陽台的海景比照片還好。',
+    category: '住宿體驗',
+    authorName: '王小明',
+    createdAt: '2026-08-01T00:00:00Z',
+    adminReply: null,
+    adminReplyAt: null,
+    ...overrides,
+  }
+}
+
 /** 一則要回給前端的錯誤。`body` 的形狀與後端的 `DomainError` 一致。 */
 export interface MockError {
   status: number
@@ -231,6 +268,18 @@ export interface MockOptions {
   refunds?: MyRefund[]
   /** `POST /refunds`。 */
   onRefundCreate?: (body: unknown) => MockError | MyRefund
+  /**
+   * `GET /rooms/{id}/reviews`。**預設空陣列**——那是一間新房源的真實樣子，
+   * 而畫面上要顯示的是「尚無評論」，不是一塊空白（FR-047 的同一個原則）。
+   *
+   * 假後端會依 `?category=` 自行篩選，因此測 FR-048 時給一份混合類型的資料
+   * 即可，不必為每個頁籤各準備一組。
+   */
+  roomReviews?: PublicReview[]
+  /** `GET /reviews`（我的評論，含待審核）。 */
+  myReviews?: MyReview[]
+  /** `POST /reviews`。 */
+  onReviewCreate?: (body: unknown) => MockError | MyReview
 }
 
 function json(body: unknown, status = 200): Response {
@@ -351,6 +400,29 @@ export function mockApi(options: MockOptions = {}) {
           ? json(found)
           : json({ detail: '查無此訂單。', code: 'ORDER_NOT_FOUND' }, 404),
       )
+    }
+
+    /*
+     * 評論。⚠️ 這兩條 MUST 排在 `/rooms` 與 `/rooms/{id}` 之前。
+     * `/api/rooms/xxx/reviews` 不符合那兩條的形狀，但順序寫錯一次就會很難查，
+     * 而錯誤的樣子是「房源詳情回了一份評論陣列」。
+     */
+    if (path.endsWith('/reviews') && method === 'POST') {
+      const result = options.onReviewCreate?.(body)
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(json(result ?? makeMyReview(), 201))
+    }
+    const roomReviewsMatch = /\/rooms\/[^/]+\/reviews$/.test(path)
+    if (roomReviewsMatch) {
+      const category = new URLSearchParams(query).get('category')
+      const all = options.roomReviews ?? []
+      // 與後端一致：不帶 category 回全部，帶了就精確比對（FR-048）
+      return Promise.resolve(
+        json(category === null ? all : all.filter((r) => r.category === category)),
+      )
+    }
+    if (path.endsWith('/reviews') && method === 'GET') {
+      return Promise.resolve(json(options.myReviews ?? []))
     }
 
     if (path.endsWith('/vocabulary')) {

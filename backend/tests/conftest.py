@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from sunny.models import Base, Profile
 from sunny.models.profile import ROLE_ADMIN, ROLE_MEMBER
+from sunny.models.room import Room
 from sunny.services.auth import create_access_token, hash_password
 
 
@@ -131,6 +132,29 @@ def other_member_token(other_member: Profile) -> str:
 @pytest.fixture
 def admin_token(admin: Profile) -> str:
     return create_access_token(admin.id, admin.role)
+
+
+@pytest_asyncio.fixture
+async def room_factory(session: AsyncSession):
+    """建立測試房源。
+
+    每次都用新的名稱與 id——訂房測試會在同一個房源上製造衝突，共用一間房會讓
+    兩個測試互相干擾，而症狀是「單獨跑會過、一起跑會失敗」這種最難查的形態。
+    """
+
+    async def _make(*, nightly_price: int = 2500, max_guests: int = 4, **kwargs) -> Room:
+        room = Room(
+            name=kwargs.pop("name", f"測試房 {uuid.uuid4().hex[:6]}"),
+            type=kwargs.pop("type", "標準雙人房"),
+            max_guests=max_guests,
+            nightly_price=nightly_price,
+            **kwargs,
+        )
+        session.add(room)
+        await session.commit()
+        return room
+
+    return _make
 
 
 def auth_header(token: str) -> dict[str, str]:

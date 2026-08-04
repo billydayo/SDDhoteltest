@@ -28,9 +28,19 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 CALENDAR_DATE_FORMAT = "%Y-%m-%d"
 
 
+def now_taipei() -> datetime:
+    """帶時區的此刻。
+
+    **一定要帶時區。** `datetime.now()` 產出的無時區值與資料庫回來的
+    `timestamptz` 相比會直接拋 TypeError；更糟的是若兩邊都無時區，比較會靜默
+    地用錯的基準，逾期判定就會差八小時。
+    """
+    return datetime.now(TAIPEI)
+
+
 def today() -> date:
     """台北時區的今天。"""
-    return datetime.now(TAIPEI).date()
+    return now_taipei().date()
 
 
 def tomorrow() -> date:

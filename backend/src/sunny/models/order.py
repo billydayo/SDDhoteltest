@@ -88,7 +88,19 @@ class Order(Base):
     id: Mapped[uuid_pk]
 
     #: `SN` + 台北日期 + 序號。對使用者可見且唯一（FR-030）。
-    order_no: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    #:
+    #: 正常路徑由 `services.booking.next_order_no()` 產生；此處的 server_default
+    #: 是**直接以 SQL 插入時**（種子資料、資料修補）的後備。兩者取號自同一個
+    #: `order_no_seq`，因此不會互相碰撞。
+    order_no: Mapped[str] = mapped_column(
+        Text,
+        unique=True,
+        nullable=False,
+        server_default=text(
+            "'SN' || to_char(now() at time zone 'Asia/Taipei', 'YYYYMMDD')"
+            " || lpad(nextval('public.order_no_seq')::text, 4, '0')"
+        ),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
@@ -122,7 +134,16 @@ class Order(Base):
 
     #: 保留到期時間。預設由資料庫的 `pending_payment_minutes()` 決定。
     #: 建單時寫入後即固定——參數變更 MUST NOT 回溯影響既有訂單（FR-101）。
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #:
+    #: ⚠️ **應用層 MUST NOT 自行計算此值。** 建單時刻意不設定這個屬性，讓資料庫
+    #: 的 server_default 求值；`guard_order_transition` 另外禁止事後變更它。
+    #: 若在 Python 端算，管理員調整參數後就會出現「應用算的」與「資料庫算的」
+    #: 兩套到期時間，而差異只會在使用者的倒數計時器上顯現（FR-098、FR-101）。
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now() + make_interval(mins => public.pending_payment_minutes())"),
+    )
 
     cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[created_at]

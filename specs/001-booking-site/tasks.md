@@ -218,18 +218,18 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T077 [P] [US3] 單元測試日期規則於 `backend/tests/unit/test_booking_dates.py`：夜數 = 退房 − 入住、退房當日不計一晚、入住日至少為明日、退房日 MUST 晚於入住日；邊界含**單晚（8/01–8/02 = 1）、跨月（8/30–9/02 = 3）、跨年（12/30–01/02 = 3）、明日入住**（FR-022、FR-023、SC-004、SC-005）
 - [X] T078 [P] [US3] 單元測試半開區間重疊於 `backend/tests/unit/test_overlap.py`：**相鄰不重疊必須成功**（A 為 8/01–8/03、B 訂 8/03–8/05）、完全包含必須被拒（既有 8/01–8/10、新訂 8/03–8/05）（SC-003）
 - [X] T079 [P] [US3] 單元測試四個約束的分派於 `backend/tests/unit/test_constraint_dispatch.py`：`orders_no_overlap`→409「此房源於所選日期已無空房」、`valid_date_range`→400、`nights_matches_dates`→500、`order_no` 唯一→500；**每個約束名稱 MUST 有各自的案例**
-- [ ] T080 [P] [US3] 並行測試於 `backend/tests/unit/test_concurrent_booking.py`：兩個 session 同時送出同一房源同一區間的訂房，**成立筆數 MUST 恰為 1**，另一筆收到正確訊息；此測試 MUST 實際觸發資料庫約束，僅測前端檢查不算覆蓋（SC-020、research R9）
-- [ ] T081 [P] [US3] 單元測試逾期釋出於 `backend/tests/unit/test_expiry.py`：`expire_stale_orders()` 於查詢房況前、建立訂單前、讀取訂單列表前皆被呼叫；逾期後該區間立即可重新預訂；對已逾期訂單付款 MUST 被拒（FR-099、FR-100、SC-023、SC-024）
-- [ ] T082 [P] [US3] 契約測試 `POST /orders` 於 `backend/tests/contract/test_orders.py`：後端 MUST 重新計算夜數與總金額，**送出偽造的 `nights` 與 `total_amount` MUST NOT 被採信**；未認證回 401
+- [X] T080 [P] [US3] 並行測試於 `backend/tests/unit/test_concurrent_booking.py`：兩個 session 同時送出同一房源同一區間的訂房，**成立筆數 MUST 恰為 1**，另一筆收到正確訊息；此測試 MUST 實際觸發資料庫約束，僅測前端檢查不算覆蓋（SC-020、research R9）
+- [X] T081 [P] [US3] 單元測試逾期釋出於 `backend/tests/unit/test_expiry.py`：`expire_stale_orders()` 於查詢房況前、建立訂單前、讀取訂單列表前皆被呼叫；逾期後該區間立即可重新預訂；對已逾期訂單付款 MUST 被拒（FR-099、FR-100、SC-023、SC-024）
+- [X] T082 [P] [US3] 契約測試 `POST /orders` 於 `backend/tests/contract/test_orders.py`：後端 MUST 重新計算夜數與總金額，**送出偽造的 `nights` 與 `total_amount` MUST NOT 被採信**；未認證回 401
 
 ### Implementation for User Story 3
 
-- [ ] T083 [US3] 建立 `backend/src/sunny/repositories/orders.py`：訂單讀寫；**建立訂單前與讀取訂單列表前 MUST 呼叫 `expire_stale_orders()`**
-- [ ] T084 [US3] 建立 `backend/src/sunny/services/booking.py`：日期驗證、夜數計算、**總金額以 `int` 依當下房價計算並凍結於訂單上**（MUST NOT 用 `float`）、人數上限檢查（FR-024、FR-032）
-- [ ] T085 [P] [US3] 於 `backend/src/sunny/services/booking.py` 實作 `order_no` 產生器：`SN` + 台北日期 + 序號，對使用者可見且唯一（FR-030）
-- [ ] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；回應含 `expires_at` 供前端倒數
-- [ ] T087 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/pay`：MUST 為訂單擁有者（非本人回 **403 而非 404**）；已逾期回 409 並說明該區間可能已被他人預訂（contracts/README.md）
-- [ ] T088 [US3] 建立 `backend/src/sunny/repositories/settings.py`：讀取 `pending_payment_minutes()` 作為 `expires_at` 預設；**變更 MUST NOT 回溯影響既有訂單**（FR-098、FR-101）
+- [X] T083 [US3] 建立 `backend/src/sunny/repositories/orders.py`：訂單讀寫；**建立訂單前與讀取訂單列表前 MUST 呼叫 `expire_stale_orders()`**
+- [X] T084 [US3] 建立 `backend/src/sunny/services/booking.py`：日期驗證、夜數計算、**總金額以 `int` 依當下房價計算並凍結於訂單上**（MUST NOT 用 `float`）、人數上限檢查（FR-024、FR-032）
+- [X] T085 [P] [US3] 於 `backend/src/sunny/services/booking.py` 實作 `order_no` 產生器：`SN` + 台北日期 + 序號，對使用者可見且唯一（FR-030）
+- [X] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；回應含 `expires_at` 供前端倒數
+- [X] T087 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/pay`：MUST 為訂單擁有者（非本人回 **403 而非 404**）；已逾期回 409 並說明該區間可能已被他人預訂（contracts/README.md）
+- [X] T088 [US3] 建立 `backend/src/sunny/repositories/settings.py`：讀取 `pending_payment_minutes()` 作為 `expires_at` 預設；**變更 MUST NOT 回溯影響既有訂單**（FR-098、FR-101）
 - [ ] T089 [US3] 建立 `frontend/src/pages/Booking.tsx`：三步驟流程與步驟間往返，已填內容 MUST 被保留；重整行為 MUST 可預期（回到該步驟保留內容，或明確回到起點並告知），MUST NOT 呈現半殘狀態（FR-020、FR-021）
 - [ ] T090 [US3] 於 `frontend/src/pages/Booking.tsx` 實作付款方式選擇（LINE Pay／信用卡／銀行轉帳）與「虛擬支付，不會產生任何實際交易」的明顯標示；**畫面上 MUST NOT 有任何要求輸入真實卡號、有效期限、CVV 或銀行帳號的欄位**（FR-027、FR-028、FR-029）
 - [ ] T091 [US3] 建立 `frontend/src/pages/OrderConfirm.tsx`：訂單確認頁含訂單編號、房源、日期、夜數、人數、付款方式與總金額（FR-031）

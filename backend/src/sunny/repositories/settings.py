@@ -88,6 +88,36 @@ class SettingsRepository(Repository):
         except (TypeError, ValueError):
             return DEFAULT_PENDING_PAYMENT_MINUTES
 
+    async def all_settings(self) -> dict[str, Any]:
+        """全部參數，供後台設定頁顯示。缺漏者補上內建預設值。"""
+        rows = await self.session.execute(select(SystemSetting.key, SystemSetting.value))
+        stored = dict(rows.all())
+        return {
+            KEY_PENDING_PAYMENT_MINUTES: stored.get(
+                KEY_PENDING_PAYMENT_MINUTES, DEFAULT_PENDING_PAYMENT_MINUTES
+            ),
+            KEY_ROOM_AMENITIES: stored.get(KEY_ROOM_AMENITIES, list(DEFAULT_AMENITIES)),
+            KEY_ROOM_FEATURES: stored.get(KEY_ROOM_FEATURES, list(DEFAULT_FEATURES)),
+        }
+
+    async def set(self, key: str, value: Any) -> None:
+        """寫入一個參數。**不提交**——由呼叫端與稽核紀錄一併提交（FR-119）。
+
+        ⚠️ **MUST NOT 在此重算任何既有訂單的 `expires_at`**（FR-101）。
+        保留時間於建單當下寫入後即固定，參數變更只影響**之後**成立的訂單。
+        資料庫的 `guard_order_transition()` trigger 禁止變更 `expires_at`，
+        是這條規則的最後一道網——但先不要寫出需要它擋的程式碼。
+
+        範圍檢查由 `settings_valid_range` CHECK 約束把關；路由層先擋一次是
+        為了訊息品質（要說出可接受範圍），不是為了正確性（憲章原則 IV）。
+        """
+        existing = await self.session.get(SystemSetting, key)
+        if existing is None:
+            self.session.add(SystemSetting(key=key, value=value))
+        else:
+            existing.value = value
+        await self.session.flush()
+
 
 __all__ = [
     "DEFAULT_AMENITIES",

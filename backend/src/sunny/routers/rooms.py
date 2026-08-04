@@ -16,11 +16,10 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
 
 from sunny.deps import SessionDep
 from sunny.errors import DomainError
-from sunny.models.risk_check import RoomRiskCheck
+from sunny.repositories.risk_checks import RiskCheckRepository
 from sunny.repositories.rooms import RoomRepository
 from sunny.repositories.settings import SettingsRepository
 from sunny.schemas.room import RiskCheckOut, RoomDetailOut, RoomOut, VocabularyOut
@@ -87,12 +86,7 @@ async def get_room(
 
     # 最新一次的品質檢測。**尚未檢測時為 None**——前端顯示「尚未檢測」，
     # MUST NOT 顯示 0 分或空白區塊（FR-014）。
-    latest = await session.scalar(
-        select(RoomRiskCheck)
-        .where(RoomRiskCheck.room_id == room_id)
-        .order_by(RoomRiskCheck.created_at.desc())
-        .limit(1)
-    )
+    latest = await RiskCheckRepository(session).latest(room_id)
 
     return RoomDetailOut.from_room(
         room,

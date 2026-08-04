@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sunny.config import get_settings
 from sunny.db import dispose_engine
@@ -43,6 +44,19 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def _error_response(detail: str, code: str, status_code: int) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"detail": detail, "code": code})
+
+
+#: 框架層 HTTP 錯誤的繁體中文訊息與機器可讀代碼。
+#:
+#: ⚠️ 訊息 MUST NOT 透露路徑是否存在的細節。「找不到您要的頁面」對打錯網址的
+#: 使用者已經足夠；而對正在探測端點的人，它不提供任何額外資訊。
+_HTTP_ERRORS: dict[int, tuple[str, str]] = {
+    404: ("找不到您要的資源。", "NOT_FOUND"),
+    405: ("此操作不被支援。", "METHOD_NOT_ALLOWED"),
+    413: ("送出的內容過大。", "PAYLOAD_TOO_LARGE"),
+    415: ("不支援的檔案或內容類型。", "UNSUPPORTED_MEDIA_TYPE"),
+    429: ("操作過於頻繁，請稍候再試。", "TOO_MANY_REQUESTS"),
+}
 
 
 def create_app() -> FastAPI:
@@ -96,6 +110,19 @@ def create_app() -> FastAPI:
             "送出的資料格式不正確，請檢查各欄位後重試。", "VALIDATION_ERROR", 422
         )
 
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # 框架自己產生的 404／405 預設回 `{"detail": "Not Found"}`：**英文，
+        # 且沒有 `code`**。contracts/README.md 明訂所有錯誤回應為
+        # `{"detail": ..., "code": ...}`，FR-069 要求介面文字為繁體中文。
+        #
+        # 少了 `code`，前端只能比對 detail 字串來判斷錯誤種類——那會在任何
+        # 一次文案修改時無聲壞掉。而英文訊息會直接出現在使用者面前。
+        detail, code = _HTTP_ERRORS.get(
+            exc.status_code, ("操作無法完成，請稍後再試。", "HTTP_ERROR")
+        )
+        return _error_response(detail, code, exc.status_code)
+
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
         logger.exception("未處理的例外", exc_info=exc)
@@ -114,11 +141,49 @@ def _register_routers(app: FastAPI) -> None:
 
     移除 RLS 後這是唯一的存取邊界。
     """
-    from sunny.routers import auth, profiles, rooms
+    from sunny.routers import (
+        admin_channel,
+        admin_content,
+        admin_dashboard,
+        admin_exports,
+        admin_logs,
+        admin_messages,
+        admin_orders,
+        admin_refunds,
+        admin_reviews,
+        admin_rooms,
+        admin_settings,
+        admin_users,
+        auth,
+        favorites,
+        messages,
+        profiles,
+        rooms,
+    )
 
     app.include_router(rooms.router)  # 公開：瀏覽與搜尋
     app.include_router(auth.router)  # 公開：登入前沒有身分
+    app.include_router(admin_content.public_router)  # 公開：首頁標題與主圖
     app.include_router(profiles.router)  # 需登入
+    app.include_router(favorites.router)  # 需登入
+    app.include_router(messages.router)  # 需登入
+
+    # 後台。授權以 `dependencies=[Depends(require_admin)]` 掛在各 router 上，
+    # 而非逐一標註在函式——漏標一個函式就是一個公開的後台端點，
+    # 而那不會有任何測試失敗。T116 的契約測試逐一驗證這件事。
+    app.include_router(admin_dashboard.router)  # 需管理員
+    app.include_router(admin_rooms.router)  # 需管理員
+    app.include_router(admin_rooms.photos_router)  # 需管理員
+    app.include_router(admin_orders.router)  # 需管理員
+    app.include_router(admin_users.router)  # 需管理員
+    app.include_router(admin_reviews.router)  # 需管理員
+    app.include_router(admin_refunds.router)  # 需管理員
+    app.include_router(admin_content.router)  # 需管理員
+    app.include_router(admin_exports.router)  # 需管理員
+    app.include_router(admin_channel.router)  # 需管理員
+    app.include_router(admin_logs.router)  # 需管理員
+    app.include_router(admin_settings.router)  # 需管理員
+    app.include_router(admin_messages.router)  # 需管理員
 
 
 app: Any = create_app()

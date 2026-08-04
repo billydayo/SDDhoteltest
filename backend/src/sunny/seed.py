@@ -420,28 +420,43 @@ async def _reset_site_content(session: AsyncSession) -> None:
         session.add(SiteContent(id=SITE_CONTENT_ID))
 
 
+async def seed_into(session: AsyncSession) -> None:
+    """在**呼叫端提供的 session** 上重建種子資料。**不提交。**
+
+    抽出來是為了 FR-073 的「還原入口」（T165a）：後台的重置按鈕要能把重置
+    本身與其稽核紀錄寫在**同一個交易**內（FR-114）。若這裡自己開 session，
+    兩者會落在不同交易，而「重置成功但沒有紀錄」正是最不該發生的組合。
+
+    ⚠️ **呼叫端 MUST 在此之前先寫入稽核紀錄。** `_reset_business_data()` 會
+    刪除「沒有留下任何日誌」的帳號——先寫紀錄，執行重置的那位管理員才會被
+    同一個交易裡的 `not exists` 子查詢看見而保留下來。順序相反的話，一位
+    第一次操作的管理員會把自己刪掉。
+    """
+    await _reset_business_data(session)
+    guest, admin = await _seed_profiles(session)
+    rooms = await _seed_rooms(session)
+    orders = await _seed_orders(session, guest, rooms)
+    await _seed_reviews(session, guest, orders)
+    await _seed_refunds(session, guest, orders)
+    await _seed_channel_prices(session, rooms)
+    await _seed_messages(session, guest, admin)
+    await _reset_site_content(session)
+
+    # 訊息的 created_at 由 trigger 覆寫為 now()，此處還原為刻意錯開的時間，
+    # 好讓對話看起來像真的有先後。trigger 只在 INSERT 時蓋章。
+    await session.execute(
+        text(
+            "update public.messages set created_at = created_at - interval '2 days' "
+            "where sender_role = 'member'"
+        )
+    )
+
+
 async def seed() -> None:
-    """把資料庫還原為初始展示狀態。可重複執行。"""
+    """把資料庫還原為初始展示狀態。可重複執行。CLI 入口。"""
     factory = get_session_factory()
     async with factory() as session, session.begin():
-        await _reset_business_data(session)
-        guest, admin = await _seed_profiles(session)
-        rooms = await _seed_rooms(session)
-        orders = await _seed_orders(session, guest, rooms)
-        await _seed_reviews(session, guest, orders)
-        await _seed_refunds(session, guest, orders)
-        await _seed_channel_prices(session, rooms)
-        await _seed_messages(session, guest, admin)
-        await _reset_site_content(session)
-
-        # 訊息的 created_at 由 trigger 覆寫為 now()，此處還原為刻意錯開的時間，
-        # 好讓對話看起來像真的有先後。trigger 只在 INSERT 時蓋章。
-        await session.execute(
-            text(
-                "update public.messages set created_at = created_at - interval '2 days' "
-                "where sender_role = 'member'"
-            )
-        )
+        await seed_into(session)
 
 
 async def _main() -> None:

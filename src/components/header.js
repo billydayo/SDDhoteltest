@@ -35,10 +35,24 @@ export function renderHeader(container, currentPath = '#/') {
   const inner = document.createElement('div');
   inner.className = 'site-header__inner';
 
+  // 品牌：logo 圖示 + 字標。圖示載不到時（離線／檔案遺失）把它移除，
+  // 只留文字字標——頁首不能因為一張圖而變成空白（憲章「離線可用」條）。
   const brand = document.createElement('a');
   brand.className = 'site-header__brand';
   brand.href = '#/';
-  brand.textContent = 'Sunny 訂房平台';
+
+  const mark = document.createElement('img');
+  mark.className = 'site-header__logo';
+  mark.src = 'assets/logo-mark.png';
+  mark.alt = '';           // 裝飾性：品牌名稱已在後面的文字節點
+  mark.width = 256;
+  mark.height = 256;
+  mark.addEventListener('error', () => mark.remove(), { once: true });
+
+  const brandText = document.createElement('span');
+  brandText.textContent = 'Sunny 訂房平台';
+
+  brand.append(mark, brandText);
 
   const nav = document.createElement('nav');
   nav.className = 'site-nav';

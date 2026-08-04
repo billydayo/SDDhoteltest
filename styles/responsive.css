@@ -52,6 +52,8 @@
     gap: var(--sp-3);
   }
   .site-header__brand { width: 100%; margin-right: 0; font-size: 1.25rem; }
+  .site-header__logo { height: 1.85rem; }
+  .site-footer__logo { height: 3.5rem; }
   .site-header__account { width: 100%; justify-content: flex-start; }
 
   .site-main { padding: var(--sp-5) var(--sp-4) var(--sp-7); }

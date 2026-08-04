@@ -29,7 +29,12 @@ import { LoadingState } from '../../components/LoadingState'
 import { useAsync } from '../../hooks/useAsync'
 import { formatTimestamp } from '../../lib/dates'
 import { messageFor } from '../../lib/errors'
-import { autoVerdictLabel, moderationTone, reviewStatusLabel } from '../../lib/labels'
+import {
+  autoVerdictLabel,
+  moderationRuleLabel,
+  moderationTone,
+  reviewStatusLabel,
+} from '../../lib/labels'
 import {
   Badge,
   buttonClass,
@@ -124,7 +129,9 @@ function ReviewCard({
           </span>
         </p>
         {review.autoRules.length > 0 ? (
-          <p className="mt-gap-1 text-ink-muted">觸發規則：{review.autoRules.join('、')}</p>
+          <p className="mt-gap-1 text-ink-muted">
+            觸發規則：{review.autoRules.map(moderationRuleLabel).join('、')}
+          </p>
         ) : (
           <p className="mt-gap-1 text-ink-muted">未觸發任何規則。</p>
         )}

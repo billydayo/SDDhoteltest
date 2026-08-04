@@ -19,9 +19,11 @@ from fastapi import APIRouter, Query
 
 from sunny.deps import SessionDep
 from sunny.errors import DomainError
+from sunny.repositories.reviews import ReviewRepository
 from sunny.repositories.risk_checks import RiskCheckRepository
 from sunny.repositories.rooms import RoomRepository
 from sunny.repositories.settings import SettingsRepository
+from sunny.schemas.review import REVIEW_CATEGORIES, PublicReviewOut
 from sunny.schemas.room import RiskCheckOut, RoomDetailOut, RoomOut, VocabularyOut
 from sunny.services import search
 from sunny.utils import dates
@@ -93,6 +95,45 @@ async def get_room(
         availability=availability,
         latest_risk_check=RiskCheckOut.model_validate(latest) if latest else None,
     )
+
+
+@router.get(
+    "/rooms/{room_id}/reviews",
+    response_model=list[PublicReviewOut],
+    summary="房源評論（公開）",
+)
+async def list_room_reviews(
+    room_id: uuid.UUID,
+    session: SessionDep,
+    category: Annotated[
+        str | None, Query(description=f"評論類型，須為 {REVIEW_CATEGORIES} 之一")
+    ] = None,
+) -> list[PublicReviewOut]:
+    """公開端點。**不需登入**——訪客要看得到評價，那是 US1 的整個前提。
+
+    ⚠️ **只回傳通過審核的評論**（FR-045、FR-046、SC-007）。這個條件寫在
+    `repositories/reviews.py` 的 `list_public()` 裡且沒有開關：本端點連一個
+    可以放寬它的參數都不提供。未通過審核的評論在前台的出現次數 MUST 為 0。
+
+    ⚠️ **`category` 無法辨識時回 400，MUST NOT 靜默回空陣列。** 前端拼錯一個
+    類型名稱時，空陣列看起來與「這個類型還沒有人評論」完全一樣——那會變成
+    一個沒有人回報的 bug，因為畫面上什麼異常也沒有（FR-048）。
+
+    房源不存在回 404，而不是空陣列：那與「這間房還沒有評論」是不同的事。
+    """
+    if await RoomRepository(session).get(room_id) is None:
+        raise DomainError("查無此房源。", code="ROOM_NOT_FOUND", status_code=404)
+
+    if category is not None and category not in REVIEW_CATEGORIES:
+        raise DomainError(
+            "無法辨識的評論類型。",
+            code="UNKNOWN_REVIEW_CATEGORY",
+            status_code=400,
+            field="category",
+        )
+
+    rows = await ReviewRepository(session).list_public(room_id, category=category)
+    return [PublicReviewOut.from_row(review, author_name) for review, author_name in rows]
 
 
 @router.get("/vocabulary", response_model=VocabularyOut, summary="設施與房型特色（公開）")

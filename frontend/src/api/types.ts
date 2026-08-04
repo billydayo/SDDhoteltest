@@ -365,8 +365,16 @@ export interface AdminUserFilters {
 // ---------------------------------------------------------------------------
 export type ReviewStatus = 'pending' | 'approved' | 'rejected'
 
-/** 自動審核的判定。⚠️ 介面 MUST 標示為「自動審核（規則式）」，MUST NOT 稱為 AI（FR-103a）。 */
-export type AutoVerdict = 'pass' | 'reject' | 'review'
+/**
+ * 自動審核的判定。⚠️ 介面 MUST 標示為「自動審核（規則式）」，MUST NOT 稱為 AI（FR-103a）。
+ *
+ * ⚠️ **值帶著 `auto-` 前綴，且只有兩個。** 這是資料庫的 `reviews_auto_verdict_check`
+ * 寫死的（`models/review.py` 的 `VERDICT_PASS` / `VERDICT_REJECT`）。這裡曾經是
+ * `'pass' | 'reject' | 'review'`——型別上完全合理，卻沒有一個值對得上後端，
+ * 於是 `autoVerdictLabel()` 的查表全部落空，後台顯示的是原始的 `auto-pass`。
+ * 那不會有任何錯誤，只是畫面上多了一個英文字。
+ */
+export type AutoVerdict = 'auto-pass' | 'auto-reject'
 
 /** 後台的評論檢視（FR-056）。 */
 export interface AdminReview {

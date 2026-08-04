@@ -167,12 +167,31 @@ export const moderationTone = (value: string): Tone => MODERATION_TONE[value] ??
  * 最終決定在管理員手上（FR-103b）。
  */
 const AUTO_VERDICT: Record<AutoVerdict, string> = {
-  pass: '建議通過',
-  reject: '建議駁回',
-  review: '建議人工判斷',
+  'auto-pass': '建議通過',
+  'auto-reject': '建議駁回',
 }
 
 export const autoVerdictLabel = (value: string) => lookup(AUTO_VERDICT, value)
+
+/**
+ * 觸發的規則代碼（`backend/src/sunny/services/moderation.py` 的 `RULE_*`）。
+ *
+ * ⚠️ **代碼是後端的穩定識別字，這裡是它唯一的中文出口。** 少一條對照，
+ * 後台就會出現 `rating-mismatch`——管理員看不懂的初判，覆寫會變成憑感覺
+ * 推翻（FR-069、FR-103b）。
+ *
+ * `lookup` 查不到時原樣顯示代碼。那是刻意的：新增規則卻忘了補這裡，
+ * 會顯眼地出現在畫面上，比安靜地少一行好。
+ */
+const MODERATION_RULE: Record<string, string> = {
+  'banned-word': '內容含不當字詞',
+  'too-short': '內容過短，不足以構成評價',
+  'rating-mismatch': '評分與內容描述不一致',
+  'duplicate-content': '與同一位會員先前的評論重複',
+  clean: '未觸發任何退件規則',
+}
+
+export const moderationRuleLabel = (value: string) => lookup(MODERATION_RULE, value)
 
 // ---------------------------------------------------------------------------
 // 身分

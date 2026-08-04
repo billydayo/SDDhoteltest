@@ -182,7 +182,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T056 [US1] 建立 `frontend/src/pages/Home.tsx`：房型頁籤（切換 MUST NOT 清除其他篩選條件）、排序切換、滿版主視覺；條件檢查 MUST 只在按下「搜尋」時執行，首次載入 MUST 顯示全部房源（FR-010、FR-012）
   （`filters`（編輯中）與 `applied`（上次送出）分開兩份狀態，頁籤與排序獨立於表單即時生效；房型選項由另一次不帶篩選的查詢推導，否則頁籤會隨篩選結果消失。400 只交給篩選列，其餘錯誤才換成結果區的錯誤畫面——同一句話兩處都印會被當成兩個問題）
 - [X] T057 [US1] 建立 `frontend/src/pages/RoomDetail.tsx`：照片縮圖切換（僅一張時 MUST NOT 顯示單格縮圖列）、設施、特色、描述、平均評分、已公開評論、目前房態、依所選日期的夜數與總金額（FR-014、FR-017）
-  （⚠️ **「已公開評論」尚未實作**：需要 T110 的公開評論端點（US5 後端），目前後端沒有任何非後台的 reviews 路徑。此處明講「評論功能即將開放」，**MUST NOT 以假評論或空白區塊冒充**。T110 完成後回頭補上）
+  （⚠️ **「已公開評論」前端仍待補**：T110 的公開端點 `GET /rooms/{id}/reviews` 已完成（僅回 `approved`，支援 `category` 篩選），前端尚未接上，目前仍顯示「評論功能即將開放」。**MUST NOT 以假評論或空白區塊冒充**）
 - [X] T058 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 顯示最新一次房源品質檢測結果；尚未檢測 MUST 顯示「尚未檢測」而非 0 分或空白區塊（FR-014）
 - [X] T059 [P] [US1] 建立 `frontend/src/pages/Terms.tsx`：服務條款與隱私聲明，明確說明本站為展示用專案、不提供真實住宿服務與真實交易（FR-121、FR-122）
 - [X] T060 [P] [US1] 建立 `frontend/src/components/EmptyState.tsx` 並套用於房源列表：無結果時顯示「查無符合條件的房源」與調整建議，而非空白畫面（FR-018）
@@ -309,16 +309,16 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 5
 
-- [ ] T105 [P] [US5] 單元測試規則式審核於 `backend/tests/unit/test_moderation.py`：5 則樣本（含不當字詞、過短、評分與內容矛盾、重複送件、正常）**100% 產生可解釋且附觸發規則的判定**（SC-029）
-- [ ] T106 [P] [US5] 契約測試評論權限於 `backend/tests/contract/test_reviews.py`：無該房源已完成訂單者不可評論；同一訂單重複評論回 409；未通過審核的評論在公開端點的出現次數為 0（FR-042、FR-043、SC-007）
+- [X] T105 [P] [US5] 單元測試規則式審核於 `backend/tests/unit/test_moderation.py`：5 則樣本（含不當字詞、過短、評分與內容矛盾、重複送件、正常）**100% 產生可解釋且附觸發規則的判定**（SC-029）
+- [X] T106 [P] [US5] 契約測試評論權限於 `backend/tests/contract/test_reviews.py`：無該房源已完成訂單者不可評論；同一訂單重複評論回 409；未通過審核的評論在公開端點的出現次數為 0（FR-042、FR-043、SC-007）
 
 ### Implementation for User Story 5
 
-- [ ] T107 [US5] 建立 `backend/src/sunny/services/moderation.py`：規則式引擎，輸出 `auto_verdict`（`auto-pass`／`auto-reject`）與 `auto_rules`；**MUST 於後端執行**——留在前端等於讓使用者自行決定自己的評論過不過審（research B1-b）
-- [ ] T108 [US5] 建立 `backend/src/sunny/repositories/reviews.py`
-- [ ] T109 [US5] 於 `backend/src/sunny/routers/reviews.py` 實作 `POST /reviews`（需登入、訂單 MUST 屬本人且為 `completed`）：送出後 MUST 進入待審核，**MUST NOT 因自動審核結果而直接公開**（FR-045、FR-103）
-- [ ] T110 [US5] 於 `backend/src/sunny/routers/rooms.py` 實作 `GET /rooms/{id}/reviews`（公開）：僅回傳 `approved` 的評論，支援依評論類型篩選（FR-046、FR-048）
-- [ ] T111 [P] [US5] 於 `backend/tests/unit/test_rating.py` 驗證 `refresh_room_rating()` trigger：評論狀態變更時重算 `rooms.average_rating`；1 則評論時平均等於該則、0 則時為 null（FR-046、FR-047）
+- [X] T107 [US5] 建立 `backend/src/sunny/services/moderation.py`：規則式引擎，輸出 `auto_verdict`（`auto-pass`／`auto-reject`）與 `auto_rules`；**MUST 於後端執行**——留在前端等於讓使用者自行決定自己的評論過不過審（research B1-b）
+- [X] T108 [US5] 建立 `backend/src/sunny/repositories/reviews.py`
+- [X] T109 [US5] 於 `backend/src/sunny/routers/reviews.py` 實作 `POST /reviews`（需登入、訂單 MUST 屬本人且為 `completed`）：送出後 MUST 進入待審核，**MUST NOT 因自動審核結果而直接公開**（FR-045、FR-103）
+- [X] T110 [US5] 於 `backend/src/sunny/routers/rooms.py` 實作 `GET /rooms/{id}/reviews`（公開）：僅回傳 `approved` 的評論，支援依評論類型篩選（FR-046、FR-048）
+- [X] T111 [P] [US5] 於 `backend/tests/unit/test_rating.py` 驗證 `refresh_room_rating()` trigger：評論狀態變更時重算 `rooms.average_rating`；1 則評論時平均等於該則、0 則時為 null（FR-046、FR-047）
 - [ ] T112 [US5] 建立 `frontend/src/pages/ReviewForm.tsx`：自訂單進入，1–5 評分與文字內容；已評論過時該操作不可用並導向既有評論（FR-043、FR-044）
 - [ ] T113 [US5] 於 `frontend/src/pages/RoomDetail.tsx` 實作評論清單與類型篩選；無通過審核的評論時顯示「尚無評論」且平均評分顯示為**「尚無評分」而非 0 分**（FR-047、FR-048）
 - [ ] T114 [P] [US5] 於 `frontend/src/pages/ReviewForm.tsx` 與後台相關文案將機制標示為「**自動審核（規則式）**」；**MUST NOT 被描述為 AI 或人工智慧判讀**（FR-103a）

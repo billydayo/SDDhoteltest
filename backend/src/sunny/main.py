@@ -220,6 +220,7 @@ def _register_routers(app: FastAPI) -> None:
         orders,
         profiles,
         refunds,
+        reviews,
         rooms,
     )
 
@@ -231,6 +232,9 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(refunds.router)  # 需登入
     app.include_router(favorites.router)  # 需登入
     app.include_router(messages.router)  # 需登入
+    # 撰寫評論需登入。**閱讀評論的 `GET /rooms/{id}/reviews` 在 `rooms.router`
+    # 裡且為公開**——兩者授權層級不同，刻意分屬兩個檔案（routers/reviews.py）。
+    app.include_router(reviews.router)  # 需登入
 
     # 後台。授權以 `dependencies=[Depends(require_admin)]` 掛在各 router 上，
     # 而非逐一標註在函式——漏標一個函式就是一個公開的後台端點，

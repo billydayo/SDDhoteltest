@@ -17,10 +17,11 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { ApiError, api } from '../api/client'
-import type { RoomSearchParams, RoomSort } from '../api/types'
+import type { RoomSearchParams, RoomSort, SiteContent } from '../api/types'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { FilterBar } from '../components/FilterBar'
+import { HomeHero } from '../components/HomeHero'
 import { LoadingState, SkeletonCard } from '../components/LoadingState'
 import { RoomCard } from '../components/RoomCard'
 import { EMPTY_FILTERS, toSearchParams, type FilterValues } from '../lib/filters'
@@ -47,6 +48,24 @@ export function Home() {
 
   const content = useAsync((signal) => api.siteContent.get(signal), [])
   const vocabulary = useAsync((signal) => api.vocabulary.get(signal), [])
+
+  /**
+   * 主視覺內容。尚未載入時用預設值，**不留白也不顯示載入骨架**——主視覺是
+   * 首屏最大的一塊，骨架閃一下比直接顯示預設標題更像壞掉。
+   *
+   * ⚠️ 這裡組出完整的 `SiteContent` 而非傳三個欄位，是為了讓首頁與後台預覽
+   * （`pages/admin/Content.tsx`）吃同一個元件與同一份型別。兩邊各做一個「長得
+   * 差不多」的主視覺，遲早會不一樣，而發現的方式是管理員存檔後回到前台發現不對。
+   */
+  const heroContent = useMemo<SiteContent>(
+    () => ({
+      heroTitle: content.data?.heroTitle ?? 'Sunny 訂房平台',
+      heroSubtitle: content.data?.heroSubtitle ?? '舒適住宿，安心入住',
+      heroImage: content.data?.heroImage ?? '',
+      updatedAt: content.data?.updatedAt ?? '',
+    }),
+    [content.data],
+  )
 
   const query = useMemo<RoomSearchParams>(
     () => ({
@@ -99,11 +118,7 @@ export function Home() {
 
   return (
     <div className="flex flex-col gap-gap-6">
-      <Hero
-        title={content.data?.heroTitle ?? 'Sunny 訂房平台'}
-        subtitle={content.data?.heroSubtitle ?? '舒適住宿，安心入住'}
-        image={content.data?.heroImage ?? ''}
-      />
+      <HomeHero content={heroContent} />
 
       <FilterBar
         values={filters}
@@ -172,29 +187,6 @@ export function Home() {
 }
 
 // ---------------------------------------------------------------------------
-function Hero({ title, subtitle, image }: { title: string; subtitle: string; image: string }) {
-  return (
-    <section className="relative -mx-gap-5 overflow-hidden">
-      {image ? (
-        <img
-          src={image}
-          // 主視覺沒有 alt 是最常見的無障礙缺失。這裡用標題作為描述，
-          // 因為圖片承載的正是「這是什麼地方」這個訊息（憲章原則 V）。
-          alt={title}
-          className="h-[45vh] min-h-72 w-full object-cover"
-        />
-      ) : (
-        // 空字串代表「不使用主圖」——改以純色底渲染，不是錯誤狀態
-        <div className="h-[45vh] min-h-72 w-full bg-forest-soft" />
-      )}
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/35 px-gap-5 text-center">
-        <h1 className="font-display text-display text-ink-invert">{title}</h1>
-        <p className="mt-gap-3 max-w-prose text-md text-ink-invert">{subtitle}</p>
-      </div>
-    </section>
-  )
-}
-
 function TypeTab({
   label,
   active,

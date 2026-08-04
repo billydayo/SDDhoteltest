@@ -397,7 +397,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T139 [US8] 建立 `backend/src/sunny/routers/admin_content.py`：`GET`／`PUT /admin/site-content` 與主圖上傳；上傳後尚未儲存就離開或改選其他圖片時該檔案 MUST 被清除（FR-061）
 - [X] T140 [US8] 建立 `frontend/src/components/ExportButton.tsx` 並嵌入七個資料頁面；**匯出範圍 MUST 為該頁當前的篩選結果**，MUST NOT 另設獨立的「報表匯出」分頁（FR-058、SC-033）
 - [X] T141 [US8] 於 `frontend/src/components/ExportButton.tsx` 實作 xlsx 函式庫無法載入或離線時**自動退回 CSV 並顯示「目前離線，已改用 CSV 格式」**，MUST NOT 中斷或無回應（FR-059、SC-010）
-- [ ] T142 [US8] 建立 `frontend/src/pages/admin/Content.tsx`，並於 `frontend/src/pages/Home.tsx` 實作滿版主視覺：隨視窗寬度連續縮放、MUST NOT 產生橫向捲動、標題 MUST 與頁面其餘內容對齊同一條量測線（FR-061、FR-061a）
+- [X] T142 [US8] 建立 `frontend/src/pages/admin/Content.tsx`，並於 `frontend/src/pages/Home.tsx` 實作滿版主視覺：隨視窗寬度連續縮放、MUST NOT 產生橫向捲動、標題 MUST 與頁面其餘內容對齊同一條量測線（FR-061、FR-061a）
 
 **Checkpoint**: 後台輔助模組完成
 
@@ -515,7 +515,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 **Purpose**: 跨故事的稽核、驗收與舊實作清除
 
 - [X] T171 [P] 無障礙稽核 `frontend/src/` 全部元件與頁面：語意化標籤（MUST NOT 以 `div` + `onClick` 取代 `button`／`a`）、所有圖片有 `alt`、所有表單控制項有關聯 `<label>`、所有互動元素可鍵盤操作且有可見 focus 樣式（`outline-none` MUST NOT 被全域套用而不提供替代）；訂房流程 MUST 能純以鍵盤完成（憲章原則 V、SC-011）
-- [ ] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
+- [X] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
 - [X] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
 - [X] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
 - [X] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
@@ -525,7 +525,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T178 驗證版本控制與前端建置產物中的憑證與秘鑰數為 0：確認 `backend/.env` 未進版控、`frontend/dist/` 不含 `JWT_SECRET`／`DATABASE_URL`／Google client secret，且 `VITE_` 前綴變數僅承載公開資訊（FR-085、SC-022）
 - [X] T179 重寫 `specs/001-booking-site/checklists/browser-acceptance.md`：舊清單的 15 項係為「開啟 index.html／示範模式橫幅」等已作廢的架構而寫；新清單 MUST 覆蓋前後端各自啟動、需人眼判斷的版面與對比，以及**需要真實 Google 帳密的登入往返**（FR-088、SC-025）
 - [X] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
-- [ ] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
+- [X] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
 - [X] T182 重寫根目錄 `README.md`：前後端各自的啟動指令與必要環境變數；新進者 MUST 能只依 README 完成本機啟動（憲章「啟動說明」條）
 - [ ] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
 

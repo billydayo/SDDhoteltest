@@ -53,7 +53,23 @@ export function FilterBar({ children, onReset }: { children: ReactNode; onReset?
   )
 }
 
-/** 帶標籤的欄位。標籤一律是真的 `label`——`placeholder` 不是標籤（憲章原則 V）。 */
+/**
+ * 帶標籤的欄位。標籤一律是真的 `label`——`placeholder` 不是標籤（憲章原則 V）。
+ *
+ * ## ⚠️ `hint` 在輸入框**之上**，這是版面的必要條件而非偏好
+ *
+ * `FilterBar` 是 `flex flex-wrap items-end`：對齊的是每一格的**底邊**。
+ * 把 hint 放在輸入框之後，有 hint 的那一格底邊就變成 hint 的底邊，於是它的
+ * 輸入框被往上推一整行——同一列的輸入框與按鈕就全部對不齊了（實際發生過，
+ * 「入住起日／入住迄日」一高一低）。
+ *
+ * 放在上方之後，**輸入框是每一格的最後一個子元素**，底邊一致，因而必然對齊。
+ *
+ * 其他做法都更糟：
+ * - hint 絕對定位 → 篩選列換行時會蓋到下一列的標籤（T172 明訂內容不得重疊）
+ * - 每一格都保留一行 hint 空位 → 按鈕會比輸入框低一行
+ * - 改用 grid subgrid → 需要 grid 容器，而篩選列必須能 `flex-wrap`（320px）
+ */
 export function Field({
   label,
   htmlFor,
@@ -72,8 +88,8 @@ export function Field({
       <label htmlFor={htmlFor} className="block text-tiny text-ink-muted">
         {label}
       </label>
+      {hint && <p className="text-tiny text-ink-muted">{hint}</p>}
       <div className="mt-gap-1">{children}</div>
-      {hint && <p className="mt-gap-1 text-tiny text-ink-muted">{hint}</p>}
     </div>
   )
 }

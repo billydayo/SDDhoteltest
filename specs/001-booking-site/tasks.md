@@ -133,14 +133,24 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### 前端核心
 
-- [ ] T038 建立 `frontend/src/api/client.ts`：**前端唯一的網路出口**；統一附加 `Authorization: Bearer`、統一攔截 401 並導向登入頁且保留原目的地（FR-009d）
-- [ ] T039 [P] 建立 `frontend/src/api/types.ts`：對應後端 Pydantic 模型的 TypeScript 型別；日曆日為 `string`、金額為 `number`（整數）
-- [ ] T040 建立 `frontend/src/router.tsx` 與 `frontend/src/App.tsx`：路由表與角色守衛；守衛 MUST NOT 被描述為安全機制，它只改變畫面呈現
-- [ ] T041 [P] 建立 `frontend/src/components/Header.tsx` 與 `frontend/src/components/Footer.tsx`：語意化 `header`／`nav`／`footer`，頁尾含服務條款連結
-- [ ] T042 [P] 建立 `frontend/src/components/ErrorState.tsx` 與 `frontend/src/components/LoadingState.tsx`：API 不可用時顯示可理解訊息，MUST NOT 靜默失敗、MUST NOT 退回本機假資料（FR-084）
-- [ ] T043 [P] 建立 `frontend/src/styles/index.css`：Tailwind 指令與極少數無法以 utility 表達的樣式（拱形 `border-radius` 雙值語法、Playfair Display 的 `font-display: swap`）
-- [ ] T044 [P] 建立 `frontend/src/lib/dates.ts`：日曆日處理；**MUST NOT 使用 `new Date("YYYY-MM-DD")` 解析**——該建構式視字串為 UTC，在台北時區會退成前一天
-- [ ] T045 [P] 建立 `frontend/src/lib/money.ts`：整數新臺幣元運算與顯示格式化，MUST NOT 出現小數
+- [X] T038 建立 `frontend/src/api/client.ts`：**前端唯一的網路出口**；統一附加 `Authorization: Bearer`、統一攔截 401 並導向登入頁且保留原目的地（FR-009d）
+  （實作要點：**只有「原本帶著 token」的請求收到 401 才導向**。沒帶 token 的 401 是登入表單密碼錯誤，導向會讓使用者在登入頁上被反覆導向登入頁而永遠看不到錯誤訊息。以「有沒有帶 token」判斷比替每個呼叫加 `skipRedirect` 旗標可靠——旗標會忘記加，而忘記的那次剛好就是出問題的那次。
+  另：`NetworkError` 與 `ApiError` 刻意分開（FR-084），否則伺服器沒開時使用者會讀到一句莫名的業務錯誤）
+- [X] T039 [P] 建立 `frontend/src/api/types.ts`：對應後端 Pydantic 模型的 TypeScript 型別；日曆日為 `string`、金額為 `number`（整數）
+  （`OrderCreateInput` 刻意不含 `nights` 與 `totalAmount`，與後端的 `OrderCreateIn` 一致——型別裡加上去等於邀請人把畫面上的預覽值送出去當真）
+- [X] T040 建立 `frontend/src/router.tsx` 與 `frontend/src/App.tsx`：路由表與角色守衛；守衛 MUST NOT 被描述為安全機制，它只改變畫面呈現
+  （**已登入但非管理員回 403 頁而非導向登入頁**——已登入的人被叫去再登入一次會反覆嘗試自己明明正確的密碼。判定完成前顯示載入中，MUST NOT 閃過登入頁。已由 `router.test.tsx` 的三種身分驗證。
+  頁面本身分屬 US1–US12，此處先以 `Placeholder` 接通，各頁面任務只需替換 `element`）
+- [X] T041 [P] 建立 `frontend/src/components/Header.tsx` 與 `frontend/src/components/Footer.tsx`：語意化 `header`／`nav`／`footer`，頁尾含服務條款連結
+- [X] T042 [P] 建立 `frontend/src/components/ErrorState.tsx` 與 `frontend/src/components/LoadingState.tsx`：API 不可用時顯示可理解訊息，MUST NOT 靜默失敗、MUST NOT 退回本機假資料（FR-084）
+  （訊息轉換抽到 `lib/errors.ts` 的純函式 `messageFor`，才能單獨測試而不必渲染元件。`EmptyState` 一併於 `components/EmptyState.tsx` 建立，即 T060 所需）
+- [X] T043 [P] 建立 `frontend/src/styles/index.css`：Tailwind 指令與極少數無法以 utility 表達的樣式（拱形 `border-radius` 雙值語法、Playfair Display 的 `font-display: swap`）
+  （與 T006 同一份檔案。拱形以 `@utility arch` 實作，已驗證編譯輸出為 `50% 50% 0 0 / 22% 22% 0 0`）
+- [X] T044 [P] 建立 `frontend/src/lib/dates.ts`：日曆日處理；**MUST NOT 使用 `new Date("YYYY-MM-DD")` 解析**——該建構式視字串為 UTC，在台北時區會退成前一天
+  （以字串為主要表示，運算時轉 `Date.UTC` 時間戳——UTC 沒有日光節約時間，兩個午夜之間永遠是 86400000 的整數倍。測試含跨月、跨年、跨閏日，以及美國與歐洲的 DST 切換點）
+- [X] T045 [P] 建立 `frontend/src/lib/money.ts`：整數新臺幣元運算與顯示格式化，MUST NOT 出現小數
+  （壞掉的值顯示 `—` 而非 `NaN`——使用者看到 `NaN` 只會以為網站壞了）
+- [X] T075（提前）建立 `frontend/src/state/AuthContext.tsx`：原訂於 US2，但 T040 的守衛沒有它就無法存在。token 存 `localStorage`、`Profile` 只快取於記憶體（存本機副本會與伺服器不同步，症狀是使用者被降權後畫面上仍有後台入口）
 
 **Checkpoint**: 資料庫、後端骨架與前端 API client 就緒——使用者故事可開始，且可平行進行
 
@@ -203,7 +213,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
 - [ ] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
 - [ ] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
-- [ ] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除
+- [X] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除
 - [ ] T076 [US2] 建立 `frontend/src/pages/Account.tsx`：維護顯示名稱與聯絡電話，儲存後頁首與訂單資料中的顯示名稱同步更新（FR-007）
 
 **Checkpoint**: US1 與 US2 皆可獨立運作

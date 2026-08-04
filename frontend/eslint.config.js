@@ -55,15 +55,59 @@ export default tseslint.config(
       'no-empty': ['error', { allowEmptyCatch: false }],
 
       // 業務資料 MUST NOT 存進 localStorage（憲章原則 III：資料存取的單一路徑）。
-      // 認證 token 是唯一的例外，由 api/client.ts 統一處理。
+      // 認證 token 是唯一的例外，由 api/client.ts 統一處理（下方有 override）。
+      //
+      // 兩條規則都需要：`no-restricted-globals` 擋裸寫的 `localStorage`，
+      // `no-restricted-properties` 擋 `window.localStorage`。只擋一種等於留了
+      // 一個誰都會繞過的門。
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'localStorage',
+          message: '只有 api/client.ts 可以碰儲存空間，且僅限認證 token。',
+        },
+        {
+          object: 'window',
+          property: 'sessionStorage',
+          message: '只有 api/client.ts 可以碰儲存空間，且僅限認證 token。',
+        },
+      ],
+
+      // 元件內 MUST NOT 直接 fetch（憲章原則 III）。唯一出口是 api/client.ts。
       'no-restricted-globals': [
         'error',
         {
           name: 'localStorage',
           message: '業務資料 MUST NOT 存進 localStorage；一律經 api/client.ts 向後端取得。',
         },
+        {
+          name: 'sessionStorage',
+          message: '業務資料 MUST NOT 存進 sessionStorage；一律經 api/client.ts 向後端取得。',
+        },
+        {
+          name: 'fetch',
+          message: 'MUST NOT 在元件內直接 fetch；一律經 api/client.ts（憲章原則 III）。',
+        },
       ],
     },
+  },
+
+  // `api/client.ts` 是唯一被允許碰儲存空間與 fetch 的檔案——它就是那個出口。
+  {
+    files: ['src/api/client.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+      'no-restricted-properties': 'off',
+    },
+  },
+
+  // Context provider 與其 hook 放在同一個檔案是 React 的標準寫法，
+  // 拆開只會讓兩個檔案永遠一起改。這裡關掉 fast-refresh 的提醒，
+  // 代價是改動 AuthContext.tsx 時該分頁會整頁重載——開發期間可接受。
+  {
+    files: ['src/state/*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 
   // 測試檔：Vitest 全域，且允許非空斷言以簡化斷言寫法

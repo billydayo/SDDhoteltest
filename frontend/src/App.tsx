@@ -1,21 +1,26 @@
 /**
- * 應用外殼（骨架版）。
+ * T040：應用外殼。
  *
- * ⚠️ **這是 T005 的最小可跑版本，會被 T040 的路由表取代。**
- * 現在只確認堆疊（React + Tailwind token + TypeScript strict）真的能跑起來。
+ * 只負責把三層包起來，順序有意義：
+ *
+ *   BrowserRouter → AuthProvider → AppRoutes
+ *
+ * `AuthProvider` 在 Router **之內**，因為登出後要能導覽；`AppRoutes` 在
+ * `AuthProvider` 之內，因為守衛要讀登入狀態。反過來包會在執行期才炸，
+ * 而錯誤訊息（`useNavigate() may be used only in the context of a Router`）
+ * 看不出真正的原因是包裹順序。
  */
+import { BrowserRouter } from 'react-router-dom'
+
+import { AppRoutes } from './router'
+import { AuthProvider } from './state/AuthContext'
+
 export default function App() {
   return (
-    <main className="mx-auto max-w-(--container-measure) px-gap-5 py-gap-8">
-      <h1 className="font-display text-h1 text-ink">Sunny 訂房平台</h1>
-      <p className="mt-gap-3 text-ink-muted">
-        前端骨架已就緒。頁面與路由由後續任務建立。
-      </p>
-      <p className="mt-gap-5">
-        <span className="rounded-pill bg-brand px-gap-4 py-gap-2 text-ink-invert">
-          品牌色 #7A6132，白字對比 5.9:1
-        </span>
-      </p>
-    </main>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

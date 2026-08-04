@@ -1,0 +1,80 @@
+/**
+ * T041：頁首。
+ *
+ * 語意化 `header` + `nav`（憲章原則 V）。導覽連結用 `NavLink` 而非
+ * `div` + `onClick`——後者對鍵盤與讀屏使用者等同於不存在，而這是全站的
+ * 主要導覽（T171 的稽核項目）。
+ *
+ * ⚠️ 後台入口只在管理員登入時顯示，但**這只是畫面呈現**。
+ * 真正的存取邊界在 FastAPI（憲章原則 VI）。
+ */
+import { NavLink, useNavigate } from 'react-router-dom'
+
+import { useAuth } from '../state/AuthContext'
+
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  [
+    'rounded-xs px-gap-2 py-gap-1 text-small transition-colors',
+    isActive ? 'text-brand-strong underline underline-offset-4' : 'text-ink-muted hover:text-ink',
+  ].join(' ')
+
+export function Header() {
+  const { user, status, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    void navigate('/')
+  }
+
+  return (
+    <header className="sticky top-0 z-10 border-b border-line-soft bg-bg/90 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-gap-4 px-gap-5 py-gap-3">
+        <NavLink to="/" className="flex items-center gap-gap-2" aria-label="Sunny 訂房平台首頁">
+          <img src="/logo-mark.png" alt="" aria-hidden="true" className="size-8" />
+          <span className="font-display text-md text-ink">Sunny</span>
+        </NavLink>
+
+        <nav aria-label="主要導覽" className="flex flex-1 flex-wrap items-center gap-gap-1">
+          <NavLink to="/" className={linkClass} end>
+            房源
+          </NavLink>
+          {user && (
+            <NavLink to="/orders" className={linkClass}>
+              我的訂單
+            </NavLink>
+          )}
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className={linkClass}>
+              後台
+            </NavLink>
+          )}
+        </nav>
+
+        {/* 判定完成前不顯示登入／登出——先顯示「登入」再跳成使用者名稱，
+            會讓已登入的人以為自己被登出了 */}
+        {status === 'loading' ? null : user ? (
+          <div className="flex items-center gap-gap-3">
+            <NavLink to="/account" className={linkClass}>
+              {user.displayName || user.email}
+            </NavLink>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-pill border border-line-strong px-gap-3 py-gap-1 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
+            >
+              登出
+            </button>
+          </div>
+        ) : (
+          <NavLink
+            to="/login"
+            className="rounded-pill bg-brand px-gap-4 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
+          >
+            登入
+          </NavLink>
+        )}
+      </div>
+    </header>
+  )
+}

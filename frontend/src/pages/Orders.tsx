@@ -203,7 +203,7 @@ function OrderRow({
   }
 
   return (
-    <li className="rounded-lg border border-line-soft bg-surface p-gap-5">
+    <li className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-5">
       <div className="flex flex-wrap items-start justify-between gap-gap-3">
         <div>
           <p className="font-display text-md text-ink">{order.orderNo}</p>

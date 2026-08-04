@@ -151,7 +151,7 @@ export function RoomRisk() {
         <EmptyState title="還沒有任何房源" hint="請先到「房源管理」新增一間房源，再回來檢測。" />
       ) : (
         <>
-          <section className="mt-gap-4 rounded-base border border-line-soft bg-surface p-gap-4">
+          <section className="mt-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
             <div className="flex flex-wrap items-end gap-gap-3">
               <Field label="要檢測的房源" htmlFor={`${ids}-room`} className="min-w-56 flex-1">
                 <select

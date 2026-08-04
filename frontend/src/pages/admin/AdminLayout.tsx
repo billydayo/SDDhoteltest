@@ -22,6 +22,7 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
+import { panelClass } from '../../lib/surfaces'
 import { ADMIN_MODULES } from './modules'
 
 const BASE = '/admin'
@@ -58,15 +59,27 @@ export function AdminLayout() {
 
   return (
     <div className="grid gap-gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-      <div>
-        <h1 className="font-display text-h2 text-ink">後台</h1>
+      {/*
+        ⚠️ `min-w-0` 在這裡與在下方的 `<section>` 是**同一個理由，但更難發現**。
+
+        `lg` 以下是單欄格線，而格線子項的預設 `min-width: auto` 讓這一格無法縮到
+        比內容窄——內容是下面那排十二顆導覽膠囊，自然寬度約 490px。結果是
+        `overflow-x-auto` 完全不生效：該捲的是那排膠囊，實際卻變成整頁橫捲。
+
+        症狀只在 320px 與 375px 出現（T172 實測：後台十二個模組全中，前台 0），
+        而開發時沒有人把視窗縮到那麼窄。
+      */}
+      <div className="min-w-0">
+        {/* 標題層級與字級跟前台各頁一致（`text-h1`）——後台是同一個網站的
+            一部分，不是另一個系統。導覽收在與前台同款的白底面板裡。 */}
+        <h1 className="font-display text-h1 text-ink">後台</h1>
         <p className="mt-gap-1 text-small text-ink-muted">{current?.hint}</p>
 
         {/*
           `aria-label` 是必要的：頁首已經有一個 `nav`（主要導覽），
           兩個同名的地標對讀屏使用者等於沒有名字（憲章原則 V）。
         */}
-        <nav aria-label="後台模組" className="mt-gap-4">
+        <nav aria-label="後台模組" className={`mt-gap-4 ${panelClass} p-gap-3`}>
           <ul className="flex gap-gap-1 overflow-x-auto pb-gap-2 lg:flex-col lg:overflow-visible lg:pb-0">
             {ADMIN_MODULES.map((module) => (
               <li key={module.path} className="shrink-0 lg:shrink">

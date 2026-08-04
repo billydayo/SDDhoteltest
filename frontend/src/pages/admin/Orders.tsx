@@ -57,7 +57,7 @@ function formatRate(rate: number | null): string {
 
 function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-base border border-line-soft bg-surface p-gap-3">
+    <div className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-3">
       <p className="text-tiny text-ink-muted">{label}</p>
       <p className="mt-gap-1 font-display text-h3 tabular-nums text-ink">{value}</p>
       {hint && <p className="mt-gap-1 text-tiny text-ink-muted">{hint}</p>}
@@ -178,7 +178,7 @@ export function Orders() {
             ))}
           </select>
         </Field>
-        <Field label="入住起日" htmlFor={`${ids}-start`} className="w-40">
+        <Field label="入住起日" htmlFor={`${ids}-start`} className="w-44">
           <input
             id={`${ids}-start`}
             type="date"
@@ -189,7 +189,7 @@ export function Orders() {
             className={inputClass}
           />
         </Field>
-        <Field label="入住迄日" htmlFor={`${ids}-end`} className="w-40" hint="含頭含尾">
+        <Field label="入住迄日" htmlFor={`${ids}-end`} className="w-44">
           <input
             id={`${ids}-end`}
             type="date"

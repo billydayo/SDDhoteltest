@@ -34,6 +34,7 @@ import { LoadingState } from '../components/LoadingState'
 import { Rating } from '../components/Rating'
 import * as dates from '../lib/dates'
 import { formatTWD, previewTotal } from '../lib/money'
+import { tagClass } from '../lib/surfaces'
 import { useAsync } from '../lib/useAsync'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
@@ -428,7 +429,7 @@ function TagSection({ title, items }: { title: string; items: string[] }) {
         {items.map((item) => (
           <li
             key={item}
-            className="rounded-pill bg-surface-alt px-gap-3 py-gap-1 text-small text-ink-muted"
+            className={tagClass}
           >
             {item}
           </li>

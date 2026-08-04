@@ -40,6 +40,7 @@ import {
   refundStatusLabel,
 } from '../lib/labels'
 import { formatTWD } from '../lib/money'
+import { insetClass } from '../lib/surfaces'
 import {
   MAX_REFUNDS_PER_USER,
   REFUND_REJECTED_TAB,
@@ -136,12 +137,12 @@ export function OrderDetail() {
       )}
 
       {pending && !expired && (
-        <div className="mt-gap-4 rounded-lg border border-line-soft bg-surface-alt p-gap-4">
+        <div className={`mt-gap-4 ${insetClass} p-gap-4`}>
           <PaymentCountdown expiresAt={data.expiresAt} onExpire={order.reload} />
         </div>
       )}
 
-      <dl className="mt-gap-5 grid gap-gap-4 rounded-lg border border-line-soft bg-surface p-gap-5 sm:grid-cols-2">
+      <dl className="mt-gap-5 grid gap-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-5 sm:grid-cols-2">
         <Row label="住宿期間" value={dates.formatStay(data.checkIn, data.checkOut)} />
         <Row label="夜數" value={`${String(data.nights)} 晚`} />
         <Row label="入住人數" value={`${String(data.guestCount)} 人`} />
@@ -316,7 +317,7 @@ function RefundHistory({ rows }: { rows: MyRefund[] }) {
       <h2 className="font-display text-h3 text-ink">退款申請紀錄</h2>
       <ul className="mt-gap-3 grid gap-gap-3">
         {rows.map((refund) => (
-          <li key={refund.id} className="rounded-lg border border-line-soft bg-surface p-gap-4">
+          <li key={refund.id} className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
             <div className="flex flex-wrap items-center justify-between gap-gap-2">
               <span className="text-small text-ink">
                 {dates.formatTimestamp(refund.createdAt)} 申請

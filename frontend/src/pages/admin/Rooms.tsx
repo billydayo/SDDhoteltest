@@ -201,7 +201,7 @@ function RoomForm({ room, onDone, onCancel }: RoomFormProps) {
         <Field
           label="每晚房價"
           htmlFor={`${ids}-price`}
-          className="w-40"
+          className="w-44"
           hint="整數新臺幣元，不接受小數"
         >
           <input
@@ -221,7 +221,7 @@ function RoomForm({ room, onDone, onCancel }: RoomFormProps) {
         <Field
           label="營運狀態"
           htmlFor={`${ids}-status`}
-          className="w-40"
+          className="w-44"
           hint="「已預訂」由訂單推導，無法人工設定"
         >
           <select
@@ -512,7 +512,7 @@ export function Rooms() {
           />
         </Field>
         {/* 房態依**區間**推導，含頭含尾（FR-051b）。未指定時後端以今日計。 */}
-        <Field label="房態起日" htmlFor={`${ids}-start`} className="w-40">
+        <Field label="房態起日" htmlFor={`${ids}-start`} className="w-44">
           <input
             id={`${ids}-start`}
             type="date"
@@ -523,7 +523,7 @@ export function Rooms() {
             className={inputClass}
           />
         </Field>
-        <Field label="房態迄日" htmlFor={`${ids}-end`} className="w-40" hint="含頭含尾">
+        <Field label="房態迄日" htmlFor={`${ids}-end`} className="w-44" hint="含頭含尾">
           <input
             id={`${ids}-end`}
             type="date"

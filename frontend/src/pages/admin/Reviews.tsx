@@ -103,7 +103,7 @@ function ReviewCard({
   const replyChanged = trimmedReply !== (review.adminReply ?? '')
 
   return (
-    <article className="rounded-base border border-line-soft bg-surface p-gap-4">
+    <article className="rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-gap-2">
         <div>
           <h3 className="text-md text-ink">{review.roomName ?? '（房源已刪除）'}</h3>

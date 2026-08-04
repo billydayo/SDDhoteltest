@@ -118,7 +118,7 @@ export function Content() {
     <div>
       <ModuleHeading title="內容編輯" />
 
-      <section className="mt-gap-4 rounded-base border border-line-soft bg-surface p-gap-4">
+      <section className="mt-gap-4 rounded-lg border border-line-soft bg-surface shadow-soft p-gap-4">
         <div className="grid gap-gap-3">
           <Field label="主標題" htmlFor={`${ids}-title`} className="w-full">
             <input

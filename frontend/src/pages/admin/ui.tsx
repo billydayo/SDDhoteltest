@@ -8,19 +8,29 @@
  */
 import type { ReactNode } from 'react'
 
+import { inputClass as sharedInputClass } from '../../lib/form'
 import { TONE_CLASS, type Tone } from '../../lib/labels'
+import {
+  dangerButtonClass as sharedDangerButtonClass,
+  panelClass,
+  primaryButtonClass as sharedPrimaryButtonClass,
+  subtleButtonClass,
+} from '../../lib/surfaces'
 
-export const inputClass =
-  'w-full rounded-xs border border-line-strong bg-surface px-gap-3 py-gap-2 text-small text-ink'
-
-export const buttonClass =
-  'rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong disabled:cursor-not-allowed disabled:opacity-50'
-
-export const primaryButtonClass =
-  'rounded-pill bg-brand px-gap-4 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50'
-
-export const dangerButtonClass =
-  'rounded-pill border border-danger/40 px-gap-4 py-gap-2 text-small text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-50'
+/*
+ * ⚠️ **這四個一律轉發 `lib/surfaces.ts`／`lib/form.ts`，不在此處另寫一份。**
+ *
+ * 後台原本有自己的一套：圓角小一級、內距緊一級、字級小一級、面板沒有陰影。
+ * 每一項單獨看都像是「後台本來就該密一點」的合理選擇，合起來的結果是後台
+ * 看起來不像同一個網站的一部分。
+ *
+ * 保留這幾個名字而不是叫十二個模組改 import，是因為它們散在各頁的 className
+ * 裡；換來源只要改這一個檔案，而改 import 要動十二個檔案、每個都可能漏。
+ */
+export const inputClass = sharedInputClass
+export const buttonClass = subtleButtonClass
+export const primaryButtonClass = sharedPrimaryButtonClass
+export const dangerButtonClass = sharedDangerButtonClass
 
 /** 模組標題列。⚠️ `h2`——`h1` 是「後台」本身（`AdminLayout`）。 */
 export function ModuleHeading({ title, actions }: { title: string; actions?: ReactNode }) {
@@ -40,7 +50,7 @@ export function ModuleHeading({ title, actions }: { title: string; actions?: Rea
  */
 export function FilterBar({ children, onReset }: { children: ReactNode; onReset?: () => void }) {
   return (
-    <div className="mt-gap-4 rounded-base border border-line-soft bg-surface p-gap-3">
+    <div className={`mt-gap-5 ${panelClass} p-gap-4`}>
       <div className="flex flex-wrap items-end gap-gap-3">
         {children}
         {onReset && (
@@ -85,7 +95,7 @@ export function Field({
 }) {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className="block text-tiny text-ink-muted">
+      <label htmlFor={htmlFor} className="block text-small text-ink-muted">
         {label}
       </label>
       {hint && <p className="text-tiny text-ink-muted">{hint}</p>}
@@ -102,7 +112,7 @@ export function Field({
  */
 export function TableShell({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-gap-4 overflow-x-auto rounded-base border border-line-soft bg-surface">
+    <div className={`mt-gap-5 overflow-x-auto ${panelClass}`}>
       <table className="w-full min-w-3xl border-collapse text-small">{children}</table>
     </div>
   )
@@ -112,7 +122,7 @@ export function Th({ children, align = 'left' }: { children: ReactNode; align?: 
   return (
     <th
       scope="col"
-      className={`border-b border-line-soft px-gap-3 py-gap-2 font-medium text-ink-muted ${
+      className={`border-b border-line-soft px-gap-4 py-gap-3 font-medium text-ink-muted ${
         align === 'right' ? 'text-right' : 'text-left'
       }`}
     >
@@ -132,7 +142,7 @@ export function Td({
 }) {
   return (
     <td
-      className={`border-b border-line-soft px-gap-3 py-gap-2 align-middle ${
+      className={`border-b border-line-soft px-gap-4 py-gap-3 align-middle ${
         align === 'right' ? 'text-right tabular-nums' : ''
       } ${className}`}
     >
@@ -161,7 +171,7 @@ export function Notice({ tone, children }: { tone: 'ok' | 'danger'; children: Re
   return (
     <p
       role="status"
-      className={`mt-gap-3 rounded-base border px-gap-3 py-gap-2 text-small ${
+      className={`mt-gap-4 rounded-lg border px-gap-4 py-gap-3 text-small ${
         tone === 'ok' ? TONE_CLASS.ok : TONE_CLASS.danger
       }`}
     >

@@ -116,7 +116,7 @@ export function Logs() {
             className={inputClass}
           />
         </Field>
-        <Field label="起始日期" htmlFor={`${ids}-start`} className="w-40">
+        <Field label="起始日期" htmlFor={`${ids}-start`} className="w-44">
           <input
             id={`${ids}-start`}
             type="date"
@@ -127,7 +127,7 @@ export function Logs() {
             className={inputClass}
           />
         </Field>
-        <Field label="結束日期" htmlFor={`${ids}-end`} className="w-40" hint="含頭含尾，台北時區">
+        <Field label="結束日期" htmlFor={`${ids}-end`} className="w-44" hint="含頭含尾，台北時區">
           <input
             id={`${ids}-end`}
             type="date"

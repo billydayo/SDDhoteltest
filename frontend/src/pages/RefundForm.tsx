@@ -35,6 +35,7 @@ import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
 import { refundStatusLabel } from '../lib/labels'
 import { formatTWD } from '../lib/money'
+import { insetClass } from '../lib/surfaces'
 import {
   MAX_REFUNDS_PER_USER,
   canRequestRefund,
@@ -188,7 +189,7 @@ export function RefundForm() {
       </p>
 
       {/* 級距與預估金額。⚠️ 送出前就要知道能拿回多少（FR-041） */}
-      <section className="mt-gap-5 rounded-lg border border-line-soft bg-surface-alt p-gap-5">
+      <section className={`mt-gap-5 ${insetClass} p-gap-5`}>
         <h2 className="text-small text-ink-muted">預估可退金額</h2>
         <p className="mt-gap-1 font-display text-h2 text-ink">{formatTWD(preview.amount)}</p>
         <p className="mt-gap-2 text-small text-ink-muted">
@@ -298,7 +299,7 @@ function Blocked({
       </Link>
       <section
         role="status"
-        className="mt-gap-4 rounded-lg border border-line-soft bg-surface-alt p-gap-6"
+        className={`mt-gap-4 ${insetClass} p-gap-6`}
       >
         <h1 className="font-display text-h3 text-ink">{title}</h1>
         <div className="mt-gap-3">{body}</div>

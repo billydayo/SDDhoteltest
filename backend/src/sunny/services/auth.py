@@ -84,11 +84,17 @@ def needs_rehash(password_hash: str) -> bool:
 
 
 def validate_password_length(password: str) -> None:
-    """FR-009b：拒絕長度不足 6 個字元的密碼，並顯示明確原因。"""
+    """FR-009b：拒絕長度不足 6 個字元的密碼，並顯示明確原因。
+
+    ⚠️ **MUST 帶 `field`。** 註冊表單有四格，其中兩格是密碼。少了 `field`，
+    前端只能把訊息印在表單底部而無法把焦點移過去（FR-010）——使用者讀到
+    「密碼至少需 6 個字元」，卻得自己回頭找是哪一格。
+    """
     if len(password) < MIN_PASSWORD_LENGTH:
         raise DomainError(
             f"密碼至少需 {MIN_PASSWORD_LENGTH} 個字元。",
             code="PASSWORD_TOO_SHORT",
+            field="password",
         )
 
 

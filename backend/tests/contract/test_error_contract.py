@@ -176,6 +176,42 @@ async def test_a_human_label_never_escapes_as_a_field_name() -> None:
     assert "field" not in res.json(), res.json()
 
 
+async def test_a_short_password_names_the_password_field(client: httpx.AsyncClient) -> None:
+    """FR-009b + FR-010：密碼太短 MUST 帶 `field="password"`。
+
+    註冊表單有四格，其中兩格是密碼。少了 `field`，訊息只能印在表單底部而焦點
+    不動——使用者讀到「密碼至少需 6 個字元」，卻得自己回頭找是哪一格。
+
+    這條在觸及資料庫之前就返回（長度檢查是註冊的第一步），因此不需要測試庫。
+    """
+    res = await client.post(
+        "/auth/register",
+        json={"email": "someone@example.com", "password": "abc", "displayName": "短"},
+    )
+
+    assert res.status_code == 400, res.text
+    payload = res.json()
+    assert payload["code"] == "PASSWORD_TOO_SHORT"
+    assert payload.get("field") == "password", payload
+
+
+async def test_a_browser_navigation_never_lands_on_json(client: httpx.AsyncClient) -> None:
+    """⚠️ **瀏覽器導覽的端點 MUST 回導向，MUST NOT 回 JSON。**
+
+    `GET /auth/google` 是使用者按下「以 Google 登入」後的**頁面導覽**。尚未
+    設定 Google client 時（T066 未完成即是此狀態），回 503 JSON 會讓他的視窗
+    停在一頁 `{"detail": ...}` 上——沒有錯誤、沒有例外、沒有路可以回去。
+
+    這條規則只適用於導覽端點。其餘端點是前端發出的 fetch，JSON 才是對的。
+    """
+    res = await client.get("/auth/google", follow_redirects=False)
+
+    assert res.status_code == 303, f"應為導向而非 {res.status_code}：{res.text[:200]}"
+    location = res.headers["location"]
+    assert "/login" in location
+    assert "GOOGLE_NOT_CONFIGURED" in location
+
+
 async def test_an_unhandled_exception_reveals_nothing(client: httpx.AsyncClient) -> None:
     """未預期的例外 MUST 回一句固定的話，**成因只寫日誌**。
 

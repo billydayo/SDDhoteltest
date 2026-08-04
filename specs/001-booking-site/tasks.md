@@ -219,10 +219,19 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
 - [X] T071 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `GET /auth/google` 與 `GET /auth/google/callback`：Authorization Code Flow，**code 交換由後端執行**；以 email 比對既有 profile 並補上 `google_sub`；使用者取消時導回登入頁且 MUST NOT 建立任何帳號（FR-087、FR-088、FR-090）
 - [X] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
-- [ ] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
-- [ ] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
+- [X] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
+  （⚠️ 登入失敗一律顯示為**整體訊息**，MUST NOT 標到 email 或密碼任一欄——標到哪一欄就等於告訴對方另一欄是對的，那正是 FR-004 要防的帳號列舉。警語抽到 `components/PasswordWarning.tsx`，註冊頁一併使用：那裡才是使用者真的會輸入自己密碼的地方）
+- [X] T073a [US2] Google 登入的回程（FR-087、FR-090）：`components/GoogleButton.tsx`、`pages/AuthCallback.tsx`、`lib/googleErrors.ts`，並修正後端把回呼改為導向（見 T071a）
+  （按鈕 MUST 用 `window.location.assign` 而非 `navigate`——目的地是 Google 的網域，navigate 只會把它當成本站路徑而顯示「找不到這個頁面」。落點頁讀完片段 MUST 立刻 `history.replaceState` 抹掉：片段不進伺服器日誌，但會留在瀏覽器歷史。**MUST NOT 解 token 的 payload 當身分用**——那份 payload 未經驗證，且使用者可能在簽發後已被降權）
+- [X] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
+  （catch 區塊裡**只有 `setError`**，沒有任何 `setX('')`。email 撞號時他唯一要改的是 email，把顯示名稱與兩次密碼一併清掉會讓他直接放棄。「兩次密碼不一致」由前端擋——後端只收一個 `password`，它根本看不到這個問題；6 字元下限則不在前端重寫第二份規則）
 - [X] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除
-- [ ] T076 [US2] 建立 `frontend/src/pages/Account.tsx`：維護顯示名稱與聯絡電話，儲存後頁首與訂單資料中的顯示名稱同步更新（FR-007）
+- [X] T076 [US2] 建立 `frontend/src/pages/Account.tsx`：維護顯示名稱與聯絡電話，儲存後頁首與訂單資料中的顯示名稱同步更新（FR-007）
+  （存檔成功後灌回 `AuthContext` 的是**後端回傳的** profile，不是送出的值——後端可能修剪空白，以送出的值為準會讓畫面顯示一份資料庫裡並不存在的內容。表單以 `key={user.id}` 一次性初始化而非用 effect 同步：那個 effect 會在 context 每次更新時重跑，症狀是使用者打字打到一半字被吃掉）
+- [X] T071a [US2] 修正 `backend/src/sunny/routers/auth.py`：`GET /auth/google` 與 `/auth/google/callback` MUST 回導向，MUST NOT 回 JSON（FR-087、FR-090）
+  （**實跑才發現的缺陷**：兩條路徑都是**瀏覽器導覽**而非前端的 fetch。回 `{"accessToken": ...}` 的話，使用者的視窗裡就是那一行 JSON——沒有錯誤、沒有例外、測試全綠，只是登入流程停在一頁原始資料上，而他的 token 就攤在畫面上。改為 303 導回前端，token 放在 **URL 片段**而非查詢字串：片段不進 access log、不進 `Referer`、不被反向代理記錄。新增 `FRONTEND_BASE_URL` 設定）
+- [X] T071b [US2] 補上 `validate_password_length` 的 `field="password"`（FR-009b + FR-010）
+  （註冊表單有四格、其中兩格是密碼。少了 `field`，訊息只能印在表單底部而焦點不動，使用者讀到「密碼至少需 6 個字元」卻得自己回頭找是哪一格）
 
 **Checkpoint**: US1 與 US2 皆可獨立運作
 

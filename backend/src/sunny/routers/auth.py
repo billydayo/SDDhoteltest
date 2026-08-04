@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Annotated, Any
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Query
@@ -118,14 +119,41 @@ def _require_google_config() -> Any:
     return settings
 
 
+def _frontend_redirect(path: str, **fragment: str) -> RedirectResponse:
+    """把瀏覽器送回前端，資料放在 **URL 片段**（`#` 之後）。
+
+    ⚠️ **片段而非查詢字串，這個選擇是刻意的。**
+
+    片段不會被送到任何伺服器：它不進 access log、不進 `Referer` 標頭、不會
+    被反向代理或 CDN 記錄。access token 放在 `?accessToken=` 裡，等於把它
+    寫進沿途每一台機器的日誌，而日誌的保存期限通常比 token 長得多。
+
+    仍有一項殘留風險：網址列的內容會進瀏覽器歷史。前端的 `/auth/callback`
+    因此在讀完之後立刻 `history.replaceState` 把它抹掉。
+
+    這是 OAuth 把憑證交給單頁應用的標準作法，不是本專案的發明。
+    """
+    base = get_settings().frontend_base_url.rstrip("/")
+    encoded = "&".join(f"{k}={quote(v, safe='')}" for k, v in fragment.items() if v)
+    return RedirectResponse(f"{base}{path}" + (f"#{encoded}" if encoded else ""), status_code=303)
+
+
 @router.get("/google", summary="導向 Google 授權頁（公開）")
 async def google_start() -> RedirectResponse:
     """開始 Authorization Code Flow。
 
     前端只負責導向這裡並接回 code；**code 交換由後端執行**，
     client secret MUST 只存在於後端環境變數（research R7）。
+
+    ⚠️ 這條路徑是**瀏覽器的導覽**，不是 fetch。尚未設定 Google client 時
+    MUST NOT 回 503 JSON——使用者會看到一頁 `{"detail": ...}` 而不是一個
+    可以理解的登入畫面。改為送回登入頁並附上原因。
     """
-    settings = _require_google_config()
+    try:
+        settings = _require_google_config()
+    except DomainError as exc:
+        return _frontend_redirect("/login", error=exc.code)
+
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": settings.google_redirect_uri,
@@ -173,13 +201,20 @@ async def _exchange_code_for_userinfo(code: str) -> dict[str, Any]:
         return info_res.json()
 
 
-@router.get("/google/callback", response_model=TokenOut, summary="Google 回呼（公開）")
+@router.get("/google/callback", summary="Google 回呼（公開）")
 async def google_callback(
     session: SessionDep,
     code: Annotated[str | None, Query()] = None,
     error: Annotated[str | None, Query()] = None,
-) -> TokenOut:
-    """接回 Google 的授權碼並完成登入。
+) -> RedirectResponse:
+    """接回 Google 的授權碼並完成登入，然後把瀏覽器送回前端。
+
+    ⚠️ **這條路徑 MUST 回導向，MUST NOT 回 JSON。**
+
+    抵達這裡的是 Google 把使用者的瀏覽器導過來的一次**頁面導覽**，不是前端
+    發出的 fetch。回 `{"accessToken": "..."}` 的話，使用者的視窗裡就是那一行
+    JSON——沒有錯誤、沒有例外、測試也全綠，只是登入流程停在一頁原始資料上，
+    而且他的 token 就攤在畫面上。
 
     ⚠️ **FR-088 是這裡最容易失守的一條**：以既有電子郵件的 Google 帳號登入時
     MUST 進入既有帳號，MUST NOT 建立第二筆。失守的表現不是錯誤訊息，而是
@@ -187,17 +222,18 @@ async def google_callback(
     """
     if error or code is None:
         # 使用者於 Google 授權畫面取消。**MUST NOT 建立任何帳號**（FR-090）。
-        raise DomainError("已取消登入。", code="GOOGLE_CANCELLED", status_code=400)
+        return _frontend_redirect("/login", error="GOOGLE_CANCELLED")
 
-    info = await _exchange_code_for_userinfo(code)
+    try:
+        info = await _exchange_code_for_userinfo(code)
+    except DomainError as exc:
+        # 交換失敗（設定錯誤、Google 端故障）同樣是導覽中，MUST NOT 變成 JSON
+        return _frontend_redirect("/login", error=exc.code)
+
     email = (info.get("email") or "").strip().lower()
     google_sub = info.get("sub")
     if not email or not google_sub:
-        raise DomainError(
-            "Google 未提供電子郵件，無法完成登入。",
-            code="GOOGLE_NO_EMAIL",
-            status_code=400,
-        )
+        return _frontend_redirect("/login", error="GOOGLE_NO_EMAIL")
 
     repo = ProfileRepository(session)
 
@@ -218,4 +254,6 @@ async def google_callback(
             )
 
     await session.commit()
-    return _token_response(profile)
+    return _frontend_redirect(
+        "/auth/callback", accessToken=auth.create_access_token(profile.id, profile.role)
+    )

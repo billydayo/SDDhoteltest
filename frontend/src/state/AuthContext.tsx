@@ -36,6 +36,15 @@ interface AuthState {
   status: 'loading' | 'authenticated' | 'anonymous'
   login: (input: LoginInput) => Promise<Profile>
   register: (input: RegisterInput) => Promise<Profile>
+  /**
+   * 採用一個由後端交付、而非由本頁登入取得的 token（Google 回呼，FR-087）。
+   *
+   * 與 `login` 分開：那條路徑上前端從未見過帳密，也拿不到 `TokenOut.profile`
+   * ——後端是用一次 302 把瀏覽器送回來的。因此這裡 MUST 自己去問一次 `/me`，
+   * **MUST NOT 解碼 token 的 payload 來湊出使用者資料**：那份 payload 沒有經過
+   * 任何驗證，而且使用者可能在簽發後已被降權。
+   */
+  adoptToken: (token: string) => Promise<Profile>
   logout: () => void
   /** 帳戶設定存檔後同步頁首的顯示名稱（FR-007）。 */
   applyProfile: (profile: Profile) => void
@@ -95,6 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.profile
   }, [])
 
+  const adoptToken = useCallback(async (token: string) => {
+    setToken(token)
+    try {
+      const profile = await api.profile.me()
+      setUser(profile)
+      setStatus('authenticated')
+      return profile
+    } catch (error) {
+      // token 拿到了卻換不到身分，代表它其實不管用。**MUST 清掉**——
+      // 留著它會讓整站表現得像已登入，然後每一次請求各自失敗一次。
+      setToken(null)
+      setUser(null)
+      setStatus('anonymous')
+      throw error
+    }
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
@@ -106,8 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<AuthState>(
-    () => ({ user, status, login, register, logout, applyProfile }),
-    [user, status, login, register, logout, applyProfile],
+    () => ({ user, status, login, register, adoptToken, logout, applyProfile }),
+    [user, status, login, register, adoptToken, logout, applyProfile],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

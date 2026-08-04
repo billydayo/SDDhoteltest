@@ -63,6 +63,14 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
 
+    # -- 前端 -----------------------------------------------------------------
+    #: 前端站台根位址。Google 回呼結束後把瀏覽器送回這裡（見 routers/auth.py）。
+    #:
+    #: OAuth 回呼是**瀏覽器的導覽**，不是前端發出的 fetch。因此那條路徑不能像
+    #: 其他端點一樣回 JSON——使用者會看到一頁 `{"accessToken": ...}`。後端必須
+    #: 知道要把他送回哪裡。
+    frontend_base_url: str = "http://localhost:5173"
+
     # -- CORS -----------------------------------------------------------------
     #: 允許來源 MUST 明確列出，MUST NOT 為 ["*"] 搭配 allow_credentials
     cors_origins: str = "http://localhost:5173"

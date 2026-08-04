@@ -1,10 +1,31 @@
 # Environment
-# 注意：src/config.js 刻意「不」列入忽略。它隨專案提供且預設為空字串（示範模式），
-# 若被忽略，缺檔時 index.html 的 <script> 會產生 404，違反「主控台零錯誤」。
-# anon key 是設計上可公開的識別碼，其防護來自 RLS 而非保密。
+# 憑證一律只存在於 backend/.env（憲章後端約束、FR-085、SC-022）。
+# 前端 MUST NOT 持有任何秘鑰；VITE_ 前綴的變數會被寫進建置產物，僅可承載公開資訊。
+#
+# （2026-08-04：移除舊有的「src/config.js 刻意不列入忽略」註記。該檔屬於舊架構，
+#   其存在前提是瀏覽器直連 Supabase 並以 RLS 為防護，兩者皆已於憲章 v3.0.0 移除。
+#   舊前端於過渡期保留為行為比對來源，將由 T183 一併刪除。）
 .env
 .env.*
 !.env.example
+
+# Python / 後端
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+.pytest_cache/
+.ruff_cache/
+
+# 上傳檔案（管理員房源照片與檢測圖；內容不進版控）
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Node / 前端
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
 # OS / editor
 .DS_Store
@@ -16,6 +37,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Node / package manager（本專案不使用，僅防誤入）
-node_modules/

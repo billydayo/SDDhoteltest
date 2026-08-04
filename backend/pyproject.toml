@@ -1,0 +1,82 @@
+[project]
+name = "sunny"
+version = "0.1.0"
+description = "Sunny 訂房平台 — FastAPI 後端"
+readme = "README.md"
+# 憲章後端約束：MUST 固定於 requires-python，且 MUST 為 3.12 或更新版本
+requires-python = ">=3.12"
+
+dependencies = [
+    # Web 框架與伺服器（憲章原則 II）
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    # 表單與檔案上傳（FastAPI 的 UploadFile 需要）
+    "python-multipart>=0.0.20",
+    # ORM 與驅動（憲章後端約束：SQLAlchemy 2.0 宣告式 + asyncpg）
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    # 遷移（憲章資料庫約束）
+    "alembic>=1.14",
+    # 設定（憲章後端約束：所有設定 MUST 由環境變數讀取）
+    "pydantic-settings>=2.7",
+    # 密碼雜湊（research R5：argon2id）
+    "argon2-cffi>=23.1",
+    # JWT（research R6）
+    "pyjwt[crypto]>=2.10",
+    # Google Authorization Code Flow 的 code 交換由後端執行（research R7）
+    "httpx>=0.28",
+    # 報表匯出 .xlsx（FR-058）
+    "openpyxl>=3.1",
+    # IANA 時區資料庫。憲章原則 IV 要求時區固定 Asia/Taipei 且 MUST 於後端明確指定，
+    # MUST NOT 依賴伺服器的本機時區設定。Windows 沒有系統 tzdata，`zoneinfo` 會直接
+    # 拋 ZoneInfoNotFoundError；即使在 Linux 上，把資料庫版本鎖進 uv.lock 也讓各環境
+    # 拿到同一份，而不是碰運氣看主機裝了哪一版。
+    "tzdata>=2025.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sunny"]
+
+# ---------------------------------------------------------------------------
+# T003：ruff（憲章後端約束「MUST 使用 ruff 進行 lint 與格式化」）
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "ASYNC", # 阻塞式 I/O 出現在 async def 中會被抓到（憲章「非同步」條）
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic 的 revision 樣板慣用未使用的匯入與短變數名
+"alembic/versions/*.py" = ["E501", "F401"]
+
+# ---------------------------------------------------------------------------
+# T009：pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "requires_db: 需要實際的 PostgreSQL 連線（gist 排除約束無法以 SQLite 模擬）",
+]

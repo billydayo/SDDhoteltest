@@ -106,25 +106,25 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 - [X] T021 建立 `backend/src/sunny/config.py`：以 pydantic-settings 讀取全部環境變數；缺少必要變數時 MUST 於啟動時明確失敗，**`JWT_SECRET` MUST NOT 有預設值 fallback**
 - [X] T021a 於 `backend/alembic/versions/0001_initial.py` 建立**非擁有者**的應用連線角色 `sunny_app`，授予 12 張表的 `SELECT, INSERT, UPDATE, DELETE`（`admin_logs` 的 UPDATE／DELETE 隨後由 T019 收回）；於 `backend/.env.example` 與 `backend/src/sunny/config.py` 分離兩組連線字串：`DATABASE_URL`（應用，以 `sunny_app` 連線）與 `MIGRATION_DATABASE_URL`（遷移，以擁有者連線）。**應用 MUST NOT 以資料表擁有者身分連線**——擁有者保有隱含權限，`REVOKE` 對它形同無效，`admin_logs` 的僅可新增保證會安靜失效（research R1 對 RLS 提過同一陷阱，此處同樣適用）
-- [ ] T022 建立 `backend/src/sunny/db.py`：async engine 與 session factory（asyncpg），MUST NOT 混用同步 engine
-- [ ] T023 [P] 建立 `backend/src/sunny/models/profile.py` 與 `backend/src/sunny/models/room.py`（SQLAlchemy 2.0 `Mapped[...]` 宣告式）
-- [ ] T024 [P] 建立 `backend/src/sunny/models/order.py`，於 `__table_args__` 以 `ExcludeConstraint` 宣告 `orders_no_overlap`（運算式以 `text()` 承載，供模型完整性；實際建立仍由 T015 負責）
-- [ ] T025 [P] 建立 `backend/src/sunny/models/review.py` 與 `backend/src/sunny/models/refund.py`
-- [ ] T026 [P] 建立 `backend/src/sunny/models/favorite.py`、`risk_check.py`、`channel_price.py`
-- [ ] T027 [P] 建立 `backend/src/sunny/models/admin_log.py`、`message.py`、`system_setting.py`、`site_content.py`
-- [ ] T028 建立 `backend/src/sunny/main.py`：FastAPI app 與 CORS middleware；允許來源 MUST 自 `CORS_ORIGINS` 明確列出，**MUST NOT 使用 `allow_origins=["*"]` 搭配 `allow_credentials=True`**
-- [ ] T029 於 `backend/src/sunny/main.py` 註冊全域例外處理器，統一輸出 `{"detail": "繁體中文訊息", "code": "..."}`；MUST NOT 回傳堆疊追蹤、SQL 語句或內部檔案路徑
+- [X] T022 建立 `backend/src/sunny/db.py`：async engine 與 session factory（asyncpg），MUST NOT 混用同步 engine
+- [X] T023 [P] 建立 `backend/src/sunny/models/profile.py` 與 `backend/src/sunny/models/room.py`（SQLAlchemy 2.0 `Mapped[...]` 宣告式）
+- [X] T024 [P] 建立 `backend/src/sunny/models/order.py`，於 `__table_args__` 以 `ExcludeConstraint` 宣告 `orders_no_overlap`（運算式以 `text()` 承載，供模型完整性；實際建立仍由 T015 負責）
+- [X] T025 [P] 建立 `backend/src/sunny/models/review.py` 與 `backend/src/sunny/models/refund.py`
+- [X] T026 [P] 建立 `backend/src/sunny/models/favorite.py`、`risk_check.py`、`channel_price.py`
+- [X] T027 [P] 建立 `backend/src/sunny/models/admin_log.py`、`message.py`、`system_setting.py`、`site_content.py`
+- [X] T028 建立 `backend/src/sunny/main.py`：FastAPI app 與 CORS middleware；允許來源 MUST 自 `CORS_ORIGINS` 明確列出，**MUST NOT 使用 `allow_origins=["*"]` 搭配 `allow_credentials=True`**
+- [X] T029 於 `backend/src/sunny/main.py` 註冊全域例外處理器，統一輸出 `{"detail": "繁體中文訊息", "code": "..."}`；MUST NOT 回傳堆疊追蹤、SQL 語句或內部檔案路徑
 - [X] T030 建立 `backend/src/sunny/errors.py`：`DomainError`／`InternalError` 型別，以及 `IntegrityError` → **以約束名稱分派**的轉譯層，涵蓋 `orders_no_overlap`(409)、`valid_date_range`(400)、`nights_matches_dates`(500)、`order_no` 唯一(500)、`profiles_email_key`(409)、`reviews_order_id_key`(409)；只看例外型別會把「夜數對不上」回成「已無空房」
   （2026-08-04 修訂：路徑由原訂的 `services/errors.py` 改為 `sunny/errors.py`。`utils/dates.py` 需要引用 `DomainError`，而 utils 匯入 services 是反向的分層）
-- [ ] T031 建立 `backend/src/sunny/services/auth.py`：argon2id 雜湊與驗證（argon2-cffi，含 `check_needs_rehash`）、JWT 簽發與解析
-- [ ] T032 建立 `backend/src/sunny/deps.py`：`get_current_user` 與 `require_admin`；**預設不是「公開」而是「需登入」**——新增路由時忘記標註 MUST 導致拒絕而非放行
-- [ ] T033 建立 `backend/src/sunny/repositories/base.py`：session 取得與 `expire_stale_orders()` 的呼叫封裝；**三個呼叫點（查詢房況前、建立訂單前、讀取訂單列表前）MUST 收於 repository 層內部**，MUST NOT 交由各路由自行記得
-- [ ] T034 建立 `backend/src/sunny/services/audit.py`：管理員變更寫入 `admin_logs` 的統一入口，**MUST 與變更在同一個交易內**；MUST NOT 記錄密碼、秘鑰或真實個資
+- [X] T031 建立 `backend/src/sunny/services/auth.py`：argon2id 雜湊與驗證（argon2-cffi，含 `check_needs_rehash`）、JWT 簽發與解析
+- [X] T032 建立 `backend/src/sunny/deps.py`：`get_current_user` 與 `require_admin`；**預設不是「公開」而是「需登入」**——新增路由時忘記標註 MUST 導致拒絕而非放行
+- [X] T033 建立 `backend/src/sunny/repositories/base.py`：session 取得與 `expire_stale_orders()` 的呼叫封裝；**三個呼叫點（查詢房況前、建立訂單前、讀取訂單列表前）MUST 收於 repository 層內部**，MUST NOT 交由各路由自行記得
+- [X] T034 建立 `backend/src/sunny/services/audit.py`：管理員變更寫入 `admin_logs` 的統一入口，**MUST 與變更在同一個交易內**；MUST NOT 記錄密碼、秘鑰或真實個資
 - [X] T035 [P] 建立 `backend/src/sunny/utils/dates.py`：Asia/Taipei 時區於程式內明確指定（MUST NOT 依賴伺服器本機時區）、日曆日以 `datetime.date` 承載、夜數計算、明日下限判定、半開區間重疊判定
   （2026-08-04：`tzdata` 已加入執行期相依。Windows 沒有系統時區資料庫，`ZoneInfo("Asia/Taipei")` 會直接拋 `ZoneInfoNotFoundError`；鎖進 `uv.lock` 也讓各環境拿到同一份時區資料，而非碰運氣看主機裝了哪一版。
   另：`parse_calendar_date` 以正規式強制**補零**。`strptime` 會接受 `2026-8-4`，而該字串在字典序下大於 `2026-08-05`——這種錯不會拋例外，只會讓排序悄悄錯掉）
-- [ ] T036 建立 `backend/src/sunny/seed.py`（可重複執行）：12 張表的示範資料，含 8–12 個房源、示範訂單／評論／退款、`channel_prices` 種子；**`guest123` 與 `admin123` MUST 於執行時計算 argon2id 雜湊，MUST NOT 硬編碼雜湊值**（research R5、FR-072）
-- [ ] T037 建立 `backend/tests/conftest.py` 的共用 fixtures：測試資料庫（含 `btree_gist`）、`member_token`、`admin_token`、`other_member_token`（供越權測試使用）
+- [X] T036 建立 `backend/src/sunny/seed.py`（可重複執行）：12 張表的示範資料，含 8–12 個房源、示範訂單／評論／退款、`channel_prices` 種子；**`guest123` 與 `admin123` MUST 於執行時計算 argon2id 雜湊，MUST NOT 硬編碼雜湊值**（research R5、FR-072）
+- [X] T037 建立 `backend/tests/conftest.py` 的共用 fixtures：測試資料庫（含 `btree_gist`）、`member_token`、`admin_token`、`other_member_token`（供越權測試使用）
 
 ### 前端核心
 
@@ -184,7 +184,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [ ] T062 [P] [US2] 契約測試註冊與登入於 `backend/tests/contract/test_auth.py`：email 已存在回 409、密碼少於 6 字元回 400、**帳號不存在與密碼錯誤的訊息與狀態碼一律相同**（FR-002、FR-004、FR-009b）
 - [ ] T063 [P] [US2] 單元測試帳號列舉防護於 `backend/tests/unit/test_auth_timing.py`：帳號不存在時 MUST 仍對虛設值執行一次雜湊比對，確認兩種失敗的回應時間無顯著差異
 - [ ] T064 [P] [US2] 契約測試 Google 登入於 `backend/tests/contract/test_google_auth.py`：以既有電子郵件的 Google 帳號登入時 MUST 進入既有帳號且**帳號總數不變**（FR-088、SC-025）
-- [ ] T065 [P] [US2] 單元測試密碼保管於 `backend/tests/unit/test_password.py`：argon2id 雜湊可驗證；`password_hash` MUST NOT 出現在任何 Pydantic 回應模型的欄位中（FR-009a）
+- [X] T065 [P] [US2] 單元測試密碼保管於 `backend/tests/unit/test_password.py`：argon2id 雜湊可驗證；`password_hash` MUST NOT 出現在任何 Pydantic 回應模型的欄位中（FR-009a）
 - [ ] T065a [P] [US2] 契約測試個人檔案端點於 `backend/tests/contract/test_profile_authz.py`：`GET`／`PATCH /me` 的三案例（未認證 401／他人 token 只能取得自己的資料／正確身分 200）；會員 MUST NOT 能讀取或修改他人的個人檔案（FR-081）
 
 ### Implementation for User Story 2

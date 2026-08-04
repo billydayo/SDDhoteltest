@@ -524,7 +524,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T177 錯誤處理稽核 `backend/src/sunny/` 與 `frontend/src/`：後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑回傳給用戶端；前端所有失敗操作 MUST 顯示可理解訊息並保留使用者已填內容；後端未啟動時 MUST 顯示可理解訊息而非無限轉圈或空白（FR-074、FR-075、FR-083、FR-084）
 - [X] T178 驗證版本控制與前端建置產物中的憑證與秘鑰數為 0：確認 `backend/.env` 未進版控、`frontend/dist/` 不含 `JWT_SECRET`／`DATABASE_URL`／Google client secret，且 `VITE_` 前綴變數僅承載公開資訊（FR-085、SC-022）
 - [X] T179 重寫 `specs/001-booking-site/checklists/browser-acceptance.md`：舊清單的 15 項係為「開啟 index.html／示範模式橫幅」等已作廢的架構而寫；新清單 MUST 覆蓋前後端各自啟動、需人眼判斷的版面與對比，以及**需要真實 Google 帳密的登入往返**（FR-088、SC-025）
-- [ ] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
+- [X] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
 - [ ] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
 - [X] T182 重寫根目錄 `README.md`：前後端各自的啟動指令與必要環境變數；新進者 MUST 能只依 README 完成本機啟動（憲章「啟動說明」條）
 - [ ] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）

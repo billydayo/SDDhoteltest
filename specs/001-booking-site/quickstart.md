@@ -119,14 +119,23 @@ curl localhost:8000/orders/{B的訂單id} -H "Authorization: Bearer $TOKEN_A"
 
 ### V5. 逾期釋出
 
-1. 將 `system_settings` 的保留分鐘數暫時調為 1
+1. 將保留分鐘數暫時調到**下限 5**（`PUT /admin/settings` 的 `pendingPaymentMinutes`）
 2. 建立訂單但不付款
-3. 等 1 分鐘後重新搜尋該房源該區間
+3. 等 5 分鐘後重新對該房源該區間送單
 
-**預期**：該區間重新可訂。訂單狀態轉為 `cancelled`。
+**預期**：該區間重新可訂。原訂單狀態轉為 `cancelled`，`cancel_reason` 為
+`payment-timeout`（與會員自行取消的 `member-cancelled` 分得開）。
+
+⚠️ **下限是 5，不是 1。** 本節原本寫「暫時調為 1」，但 `PUT /admin/settings`
+會拒絕小於 `pendingPaymentMin`（5）的值——回應本身就帶著 `pendingPaymentMin`
+與 `pendingPaymentMax`（1440）這兩個唯讀欄位。照原文操作會拿到 400 而不是
+一個跑得比較快的驗證。**因此這一項至少要等 5 分鐘。**
 
 **注意**：釋出的可觀察時點是「下一次有人查詢時」，不是到期的那一秒——
 本專案不使用排程作業（憲章原則 IV）。若不重新查詢，狀態不會自己變。
+
+**驗完 MUST 把參數改回原值**（預設 60）。這是一個全域設定，留在 5 分鐘會讓
+其他人的測試訂單莫名其妙地過期。
 
 ### V6. 稽核日誌不可竄改
 
@@ -165,14 +174,15 @@ delete from admin_logs;
 
 ```bash
 # 後端：原則 IV 的每一條規則 + 每個端點的授權三案例
-cd backend && uv run pytest
+cd backend && uv run pytest                # 2026-08-04：583 passed（約 4 分 45 秒）
 
-# 前端單元
-cd frontend && npm run test
-
-# 端對端
-cd tests && npm test
+# 前端
+cd frontend && npm run test                # 2026-08-04：504 passed
 ```
+
+⚠️ **根目錄的 `tests/`（puppeteer）驗的是舊版原生 JS 實作，不要拿它驗新版。**
+它打的是 `index.html`，而那份程式碼與 `frontend/` 沒有任何關係。該目錄於 T183
+連同 `src/`、`styles/`、`index.html` 一併移除。
 
 **授權測試的判準**：每個受保護端點 MUST 有三個案例——未認證、以他人身分、
 以正確身分。憲章明訂「僅測試 happy path 的授權測試 MUST NOT 被視為已覆蓋」。
@@ -190,9 +200,26 @@ cd tests && npm test
 | 啟動時報缺少環境變數 | 這是預期行為。補齊 `.env`，不要加預設值繞過 |
 | 前端 401 後停在空白畫面 | `api/client.ts` 的 401 攔截未實作（FR-009d） |
 
-## 尚不存在
+## 執行紀錄
 
-本 quickstart 描述的是**目標狀態**。截至 2026-08-03，`backend/` 與 `frontend/`
-尚未建立——技術選型與設計已定案，實作待 `/speckit-tasks` 產出任務後開始。
-現行可執行的仍是舊版原生 JS 實作（`index.html` + `src/`），該版本已不符憲章 v3.x，
-於新實作通過驗收後移除。
+### 2026-08-04：V1–V8 全數通過（T180）
+
+對著真的伺服器與真的 Supabase 資料庫跑完，**27 項檢查全過**：
+
+| 情境 | 結果 | 實測到的關鍵點 |
+|---|---|---|
+| V1 登入與角色 | ✅ 5/5 | 會員開後台是 **403**，不是只在畫面隱藏；`password_hash` 為 `$argon2id$` 開頭 |
+| V2 房況保證 | ✅ 3/3 | 重疊區間恰有一筆 201、一筆 **409**（不是 500，例外有轉譯），訊息說得出「已無空房」 |
+| V3 相鄰不重疊 | ✅ 1/1 | 前一筆退房日 = 後一筆入住日時**兩筆都成立**（半開區間 `[)`） |
+| V4 越權存取 | ✅ 3/3 | 他人身分 403、本人 200、不帶 token 401 |
+| V5 逾期釋出 | ✅ 6/6 | 逾期後同區間重新可訂，原訂單轉 `cancelled`，原因為 `payment-timeout` |
+| V6 稽核日誌 | ✅ 3/3 | `UPDATE` 與 `DELETE` 皆被資料庫拒絕，筆數未變 |
+| V7 照片不外流 | ✅ 2/2 | `room_risk_checks` 筆數不變；Network 面板部分需人眼，見驗收清單 C2 |
+| V8 付款為模擬 | ✅ 3/3 | 付款端點不接收任何請求內容，回應無任何支付憑證欄位 |
+
+**過程中發現並已修正的文件錯誤**：V5 原本寫「保留分鐘數暫時調為 1」，
+但實作的下限是 5。照原文操作會拿到 400。
+
+**尚未執行**：需要真實 Google 帳號的登入往返（卡在 T066，Google Cloud Console
+的 OAuth client 尚未建立），以及需要人眼與真實瀏覽器的項目——後者列在
+[`checklists/browser-acceptance.md`](./checklists/browser-acceptance.md)。

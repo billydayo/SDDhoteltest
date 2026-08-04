@@ -281,21 +281,21 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 4
 
-- [ ] T094 [P] [US4] 契約測試越權存取於 `backend/tests/contract/test_orders_authz.py`：會員 A 以訂單編號存取會員 B 的訂單 MUST 取不到任何資料；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-034、SC-019）
-- [ ] T095 [P] [US4] 單元測試退款分級金額於 `backend/tests/unit/test_refund_amount.py`：入住前 7 天以上全額、3–6 天 50%、1–2 天 20%、當日起 0%（FR-041）
-- [ ] T096 [P] [US4] 單元測試退款額度於 `backend/tests/unit/test_refund_limit.py`：每位會員上限 5 筆（由 `enforce_refund_limit()` 於**資料庫端**強制，非僅前端檢查）；**已駁回的申請 MUST NOT 佔用額度**，被駁回 5 次的會員仍能提出申請；同一會員 MUST 能對**不同訂單**分別申請、不限一筆（FR-036a、FR-036b、FR-036d、SC-031）
-- [ ] T096a [P] [US4] 契約測試退款端點於 `backend/tests/contract/test_refunds_authz.py`：`POST /refunds` 對他人訂單申請退款 MUST 被拒；`GET /refunds` MUST 只回傳本人的申請；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-081）
+- [X] T094 [P] [US4] 契約測試越權存取於 `backend/tests/contract/test_orders_authz.py`：會員 A 以訂單編號存取會員 B 的訂單 MUST 取不到任何資料；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-034、SC-019）
+- [X] T095 [P] [US4] 單元測試退款分級金額於 `backend/tests/unit/test_refund_amount.py`：入住前 7 天以上全額、3–6 天 50%、1–2 天 20%、當日起 0%（FR-041）
+- [X] T096 [P] [US4] 單元測試退款額度於 `backend/tests/unit/test_refund_limit.py`：每位會員上限 5 筆（由 `enforce_refund_limit()` 於**資料庫端**強制，非僅前端檢查）；**已駁回的申請 MUST NOT 佔用額度**，被駁回 5 次的會員仍能提出申請；同一會員 MUST 能對**不同訂單**分別申請、不限一筆（FR-036a、FR-036b、FR-036d、SC-031）
+- [X] T096a [P] [US4] 契約測試退款端點於 `backend/tests/contract/test_refunds_authz.py`：`POST /refunds` 對他人訂單申請退款 MUST 被拒；`GET /refunds` MUST 只回傳本人的申請；三案例（未認證／他人身分／正確身分）皆需覆蓋（FR-081）
 
 ### Implementation for User Story 4
 
-- [ ] T097 [US4] 建立 `backend/src/sunny/repositories/refunds.py` 與 `backend/src/sunny/services/refunds.py`：分級金額計算與額度判定
-- [ ] T098 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `GET /orders`（僅本人、依入住日排序）與 `GET /orders/{id}`（FR-033）
-- [ ] T099 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/cancel`：**僅 `pending-payment` 可取消**，`cancel_reason` 以 `member-cancelled` 與 `payment-timeout` 區分；已確認的訂單 MUST 走退款申請路徑（FR-035a）
-- [ ] T100 [US4] 於 `backend/src/sunny/routers/refunds.py` 實作 `POST /refunds` 與 `GET /refunds`：同一訂單 MUST NOT 同時存在兩筆審核中的申請（FR-036、FR-037）
-- [ ] T101 [US4] 建立 `frontend/src/pages/Orders.tsx`：依入住日排序顯示全部訂單；**待付款訂單的付款與取消入口 MUST 同時出現在列表上**，不只在詳情頁（FR-035b）
-- [ ] T102 [US4] 建立 `frontend/src/pages/OrderDetail.tsx`：取消的二次確認流程（此操作不可復原、房間會立刻開放）；列表上的入口導向本頁，二次確認 MUST 只實作一份（FR-035a）
-- [ ] T103 [US4] 建立 `frontend/src/pages/RefundForm.tsx`：必填退款原因；已有審核中申請時該操作不可用並顯示目前進度（FR-035、FR-036）
-- [ ] T104 [US4] 於 `frontend/src/pages/Orders.tsx` 實作「退款已駁回」顯示層標籤：**訂單資料仍為 `confirmed`**，僅最新一次申請遭駁回時顯示此標籤並於狀態分頁獨立成一類，MUST NOT 新增資料庫狀態值；未達退款上限時 MUST NOT 顯示已使用或剩餘次數（FR-039、FR-036c、SC-032）
+- [X] T097 [US4] 建立 `backend/src/sunny/repositories/refunds.py` 與 `backend/src/sunny/services/refunds.py`：分級金額計算與額度判定
+- [X] T098 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `GET /orders`（僅本人、依入住日排序）與 `GET /orders/{id}`（FR-033）
+- [X] T099 [US4] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/cancel`：**僅 `pending-payment` 可取消**，`cancel_reason` 以 `member-cancelled` 與 `payment-timeout` 區分；已確認的訂單 MUST 走退款申請路徑（FR-035a）
+- [X] T100 [US4] 於 `backend/src/sunny/routers/refunds.py` 實作 `POST /refunds` 與 `GET /refunds`：同一訂單 MUST NOT 同時存在兩筆審核中的申請（FR-036、FR-037）
+- [X] T101 [US4] 建立 `frontend/src/pages/Orders.tsx`：依入住日排序顯示全部訂單；**待付款訂單的付款與取消入口 MUST 同時出現在列表上**，不只在詳情頁（FR-035b）
+- [X] T102 [US4] 建立 `frontend/src/pages/OrderDetail.tsx`：取消的二次確認流程（此操作不可復原、房間會立刻開放）；列表上的入口導向本頁，二次確認 MUST 只實作一份（FR-035a）
+- [X] T103 [US4] 建立 `frontend/src/pages/RefundForm.tsx`：必填退款原因；已有審核中申請時該操作不可用並顯示目前進度（FR-035、FR-036）
+- [X] T104 [US4] 於 `frontend/src/pages/Orders.tsx` 實作「退款已駁回」顯示層標籤：**訂單資料仍為 `confirmed`**，僅最新一次申請遭駁回時顯示此標籤並於狀態分頁獨立成一類，MUST NOT 新增資料庫狀態值；未達退款上限時 MUST NOT 顯示已使用或剩餘次數（FR-039、FR-036c、SC-032）
 
 **Checkpoint**: 訂單生命週期閉環（除管理員審核端，見 US7）
 

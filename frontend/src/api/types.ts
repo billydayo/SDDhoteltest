@@ -710,3 +710,54 @@ export interface ThreadSummary {
 export interface MessageInput {
   body: string
 }
+
+// ---------------------------------------------------------------------------
+// 會員端：我的退款申請（US4）
+// ---------------------------------------------------------------------------
+/**
+ * 會員自己的退款申請（FR-037）。
+ *
+ * ⚠️ **與後台的 `Refund` 是兩個型別，刻意不共用。** 後台那份帶著 `userId` 與
+ * `applicantName`——那是跨會員檢視才需要的欄位。會員端的回應裡沒有它們，
+ * 而共用一個型別會讓 `refund.applicantName` 在會員頁面上編譯得過、執行時
+ * 永遠是 `undefined`，畫面上只是少一行字。
+ *
+ * `orderNo` 與住宿日期在此**不可為 null**：後端以 join 取得，缺一筆訂單的
+ * 退款申請在資料上不成立。
+ */
+export interface MyRefund {
+  id: string
+  orderId: string
+  /** 對使用者可見的訂單編號（FR-030）。他認得的是這個，不是 uuid。 */
+  orderNo: string
+  /** `YYYY-MM-DD` */
+  checkIn: string
+  checkOut: string
+  reason: string
+  /**
+   * 申請當下依級距算定並凍結的金額，整數新臺幣元（FR-041）。
+   *
+   * ⚠️ 畫面 MUST NOT 自行重算——距入住日的天數會隨時間變動，重算會讓他今天
+   * 看到的金額與昨天送出時被告知的不同。
+   */
+  amount: number
+  status: RefundStatus
+  /** 管理員的審核備註。⚠️ 尚未審核時為 `null`，不是空字串。 */
+  adminNote: string | null
+  createdAt: string
+  /** 審核時間。尚未審核時為 `null`——前端據此分辨「還在等」與「已有結果」。 */
+  reviewedAt: string | null
+}
+
+/**
+ * 提出退款申請（FR-035）。
+ *
+ * ⚠️ **刻意沒有 `amount`，也沒有 `status`。** 金額由後端依距入住日的天數算出
+ * （FR-041），狀態一律是 `pending`——讓用戶端指定其中任何一個，等於開了一條
+ * 「自己決定退多少、自己核准」的路。
+ */
+export interface RefundCreateInput {
+  orderId: string
+  /** MUST 填寫。全空白會被後端以 `field: "reason"` 拒絕（FR-035、FR-010）。 */
+  reason: string
+}

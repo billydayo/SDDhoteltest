@@ -37,7 +37,9 @@ import { Login } from './pages/Login'
 import { Messages } from './pages/Messages'
 import { Forbidden, NotFound } from './pages/NotFound'
 import { OrderConfirm } from './pages/OrderConfirm'
-import { Placeholder } from './pages/Placeholder'
+import { OrderDetail } from './pages/OrderDetail'
+import { Orders } from './pages/Orders'
+import { RefundForm } from './pages/RefundForm'
 import { Register } from './pages/Register'
 import { RiskCheck } from './pages/RiskCheck'
 import { RoomDetail } from './pages/RoomDetail'
@@ -180,7 +182,7 @@ export function AppRoutes() {
           path="/orders"
           element={
             <RequireAuth>
-              <Placeholder title="我的訂單" task="T101" />
+              <Orders />
             </RequireAuth>
           }
         />
@@ -194,6 +196,24 @@ export function AppRoutes() {
           element={
             <RequireAuth>
               <OrderConfirm />
+            </RequireAuth>
+          }
+        />
+        {/* T102：訂單詳情。取消的二次確認**只在這裡實作一份**（FR-035a）——
+            列表上的取消入口（FR-035b）是一個導向這裡的連結，不是第二套流程。 */}
+        <Route
+          path="/orders/:orderId"
+          element={
+            <RequireAuth>
+              <OrderDetail />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/orders/:orderId/refund"
+          element={
+            <RequireAuth>
+              <RefundForm />
             </RequireAuth>
           }
         />

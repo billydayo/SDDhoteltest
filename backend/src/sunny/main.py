@@ -219,6 +219,7 @@ def _register_routers(app: FastAPI) -> None:
         messages,
         orders,
         profiles,
+        refunds,
         rooms,
     )
 
@@ -227,6 +228,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(admin_content.public_router)  # 公開：首頁標題與主圖
     app.include_router(profiles.router)  # 需登入
     app.include_router(orders.router)  # 需登入
+    app.include_router(refunds.router)  # 需登入
     app.include_router(favorites.router)  # 需登入
     app.include_router(messages.router)  # 需登入
 

@@ -49,6 +49,7 @@ import type {
   LoginInput,
   Message,
   MessageInput,
+  MyRefund,
   Order,
   OrderCreateInput,
   OrderStats,
@@ -57,6 +58,7 @@ import type {
   Profile,
   ProfileUpdateInput,
   Refund,
+  RefundCreateInput,
   RefundDecisionInput,
   RefundFilters,
   RegisterInput,
@@ -324,11 +326,42 @@ export const api = {
     get: (signal?: AbortSignal) => request<Vocabulary>('/vocabulary', signal ? { signal } : {}),
   },
 
+  /**
+   * 訂單（FR-020 ~ FR-035b）。
+   *
+   * ⚠️ **`list` 與 `get` 上都沒有 `userId`。** 擁有者由 token 判定——留一個
+   * 查詢參數就等於把整站的訂單開放給任何登入者，而回來的資料看起來完全正常
+   * （FR-034、SC-019）。
+   */
   orders: {
     create: (input: OrderCreateInput) =>
       request<Order>('/orders', { method: 'POST', body: input }),
+    /** 本人的全部訂單，後端已依入住日排序（FR-033）。 */
+    list: (signal?: AbortSignal) => request<Order[]>('/orders', signal ? { signal } : {}),
+    get: (orderId: string, signal?: AbortSignal) =>
+      request<Order>(`/orders/${orderId}`, signal ? { signal } : {}),
     /** 模擬付款。**沒有任何請求內容**——不接收卡號、有效期限、CVV（FR-028）。 */
     pay: (orderId: string) => request<Order>(`/orders/${orderId}/pay`, { method: 'POST' }),
+    /**
+     * 取消待付款訂單（FR-035a）。
+     *
+     * ⚠️ **已確認的訂單會被後端拒絕**，且那是刻意的：款項已付，取消必須走
+     * 退款申請，否則就繞過了 FR-041 的退款級距。前端把按鈕藏起來只是畫面
+     * 呈現，擋住它的是後端（憲章原則 VI）。
+     */
+    cancel: (orderId: string) => request<Order>(`/orders/${orderId}/cancel`, { method: 'POST' }),
+  },
+
+  /**
+   * 退款申請（FR-035 ~ FR-041）。
+   *
+   * ⚠️ **`RefundCreateInput` 沒有 `amount`。** 金額由後端依距入住日的天數
+   * 算出（FR-041）——送一個數字過去等於讓人自訂要退多少錢。
+   */
+  refunds: {
+    list: (signal?: AbortSignal) => request<MyRefund[]>('/refunds', signal ? { signal } : {}),
+    create: (input: RefundCreateInput) =>
+      request<MyRefund>('/refunds', { method: 'POST', body: input }),
   },
 
   /** 首頁的可編輯內容。**公開**——訪客要看得到主視覺（FR-061）。 */

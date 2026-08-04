@@ -31,6 +31,7 @@ from sunny.models.order import (
     STATUS_CANCELLED,
     STATUS_CONFIRMED,
     STATUS_PENDING_PAYMENT,
+    STATUS_REFUND_PENDING,
     Order,
 )
 from sunny.repositories.orders import OrderRepository
@@ -86,6 +87,114 @@ async def create_order(
         raise translate_integrity_error(exc) from exc
 
     return OrderOut.model_validate(order)
+
+
+@router.get("", response_model=list[OrderOut], summary="我的訂單（需登入）")
+async def list_my_orders(user: CurrentUser, session: SessionDep) -> list[OrderOut]:
+    """本人的全部訂單，依入住日由近而遠（FR-033）。
+
+    ⚠️ **只回本人的。** `user_id` 來自 token，**不接受任何查詢參數指定會員**
+    ——留一個 `?userId=` 就等於把整站的訂單開放給任何登入者，而回來的資料
+    看起來完全正常（FR-034、SC-019）。
+    """
+    orders = await OrderRepository(session).list_for_user(user.id)
+    return [OrderOut.model_validate(order) for order in orders]
+
+
+@router.get("/{order_id}", response_model=OrderOut, summary="訂單詳情（需登入、僅本人）")
+async def get_my_order(
+    order_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+) -> OrderOut:
+    """單筆訂單（FR-033、FR-034）。
+
+    非本人回 **403 而非 404**（contracts/README.md）。這確實透露該 id 的訂單
+    存在，但訂單 id 是 uuid4、猜不到；而把越權偽裝成「不存在」會讓真正遇到
+    問題的人收到誤導的訊息，前端也無從分辨該導向登入頁還是顯示無權限。
+    """
+    order = _owned(await OrderRepository(session).get_fresh(order_id), user.id)
+    return OrderOut.model_validate(order)
+
+
+@router.post("/{order_id}/cancel", response_model=OrderOut, summary="取消待付款訂單（需登入）")
+async def cancel_my_order(
+    order_id: uuid.UUID,
+    user: CurrentUser,
+    session: SessionDep,
+) -> OrderOut:
+    """會員主動取消（FR-035a）。
+
+    ⚠️ **僅 `pending-payment` 可取消。已確認的訂單 MUST 走退款申請。**
+
+    款項已付之後還開放直接取消，就繞過了 FR-041 的退款級距——入住前一天
+    取消也能全額拿回。這一條由**伺服器端**強制，MUST NOT 只靠前端把按鈕
+    藏起來（FR-081）。
+
+    取消後該日期區間**立即**釋出，不需要任何額外動作（見 repository）。
+    """
+    repo = OrderRepository(session)
+
+    # 先清理逾期訂單再讀狀態。順序顛倒會讓一筆早已逾期的訂單被「取消」成
+    # `member-cancelled`，而它實際上是 `payment-timeout`——那個數字正是用來
+    # 判斷付款流程是否有問題的依據（FR-035a）。
+    await repo.expire_stale_orders()
+
+    order = _owned(await repo.get(order_id), user.id)
+    _ensure_cancellable(order)
+
+    await repo.cancel_by_member(order)
+    await session.commit()
+    await session.refresh(order)
+    return OrderOut.model_validate(order)
+
+
+def _owned(order: Order | None, user_id: uuid.UUID) -> Order:
+    """存在且屬於本人，回傳該訂單。
+
+    ⚠️ **「不存在」與「非本人」的狀態碼不同（404 / 403），MUST 分開判斷。**
+    合併成一個 404 會讓真正遇到問題的使用者收到誤導的訊息，前端也無從分辨
+    該顯示「查無此訂單」還是「無權存取」。
+
+    回傳而非只做檢查，是為了讓型別檢查器知道之後的 `order` 不是 `None`——
+    否則每個呼叫點都得補一個 `assert`，而 `assert` 在 `-O` 下會被整個移除。
+    """
+    if order is None:
+        raise DomainError("查無此訂單。", code="ORDER_NOT_FOUND", status_code=404)
+    if order.user_id != user_id:
+        raise DomainError("無權存取此訂單。", code="FORBIDDEN", status_code=403)
+    return order
+
+
+def _ensure_cancellable(order: Order) -> None:
+    """可否取消的檢查（FR-035a）。
+
+    每種不可取消的原因 MUST 有各自的訊息，尤其是「已確認」那一條——它要
+    **指出下一步在哪裡**（退款申請），否則使用者只知道按鈕沒用，不知道
+    該去哪裡辦。
+    """
+    if order.status == STATUS_PENDING_PAYMENT:
+        return
+
+    if order.status == STATUS_CONFIRMED:
+        raise DomainError(
+            "此訂單已完成付款，無法直接取消。請改為提出退款申請，由管理員審核後辦理。",
+            code="ORDER_ALREADY_PAID",
+            status_code=409,
+        )
+
+    if order.status == STATUS_CANCELLED:
+        raise DomainError("此訂單已取消。", code="ORDER_CANCELLED", status_code=409)
+
+    if order.status == STATUS_REFUND_PENDING:
+        raise DomainError(
+            "此訂單的退款申請正在審核中，請等待審核結果。",
+            code="REFUND_ALREADY_PENDING",
+            status_code=409,
+        )
+
+    # refunded / completed
+    raise DomainError("此訂單目前的狀態無法取消。", code="ORDER_NOT_CANCELLABLE", status_code=409)
 
 
 @router.post("/{order_id}/pay", response_model=OrderOut, summary="模擬付款（需登入）")

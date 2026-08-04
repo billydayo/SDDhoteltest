@@ -16,6 +16,7 @@ import type {
   AdminRoom,
   AdminUser,
   DashboardStats,
+  MyRefund,
   Order,
   OrderStats,
   Profile,
@@ -150,6 +151,24 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
   }
 }
 
+/** 一筆退款申請（會員端）。 */
+export function makeRefund(overrides: Partial<MyRefund> = {}): MyRefund {
+  return {
+    id: 'cccccccc-0000-0000-0000-000000000001',
+    orderId: 'bbbbbbbb-0000-0000-0000-000000000001',
+    orderNo: 'SN20260804001',
+    checkIn: '2026-09-01',
+    checkOut: '2026-09-03',
+    reason: '行程有變。',
+    amount: 6400,
+    status: 'pending',
+    adminNote: null,
+    createdAt: '2026-08-05T00:00:00Z',
+    reviewedAt: null,
+    ...overrides,
+  }
+}
+
 /** 一則要回給前端的錯誤。`body` 的形狀與後端的 `DomainError` 一致。 */
 export interface MockError {
   status: number
@@ -202,6 +221,16 @@ export interface MockOptions {
   onOrderCreate?: (body: unknown) => MockError | Order
   /** `POST /orders/{id}/pay`。 */
   onOrderPay?: (orderId: string) => MockError | Order
+  /** `GET /orders`。後端已依入住日排序，這裡原樣回傳。 */
+  orders?: Order[]
+  /** `GET /orders/{id}`。未指定時取 `orders` 裡 id 相符的那一筆。 */
+  onOrderGet?: (orderId: string) => MockError | Order
+  /** `POST /orders/{id}/cancel`。 */
+  onOrderCancel?: (orderId: string) => MockError | Order
+  /** `GET /refunds`。 */
+  refunds?: MyRefund[]
+  /** `POST /refunds`。 */
+  onRefundCreate?: (body: unknown) => MockError | MyRefund
 }
 
 function json(body: unknown, status = 200): Response {
@@ -284,10 +313,44 @@ export function mockApi(options: MockOptions = {}) {
       if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
       return Promise.resolve(json(result ?? makeOrder({ status: 'confirmed' })))
     }
+    const cancelMatch = /\/orders\/([^/]+)\/cancel$/.exec(path)
+    if (cancelMatch && method === 'POST') {
+      const id = cancelMatch[1] ?? ''
+      const result = options.onOrderCancel?.(id)
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(
+        json(result ?? makeOrder({ id, status: 'cancelled', cancelReason: 'member-cancelled' })),
+      )
+    }
     if (path.endsWith('/orders') && method === 'POST') {
       const result = options.onOrderCreate?.(body)
       if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
       return Promise.resolve(json(result ?? makeOrder(), 201))
+    }
+    if (path.endsWith('/orders') && method === 'GET') {
+      return Promise.resolve(json(options.orders ?? []))
+    }
+    if (path.endsWith('/refunds') && method === 'POST') {
+      const result = options.onRefundCreate?.(body)
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(json(result ?? makeRefund(), 201))
+    }
+    if (path.endsWith('/refunds') && method === 'GET') {
+      return Promise.resolve(json(options.refunds ?? []))
+    }
+    // ⚠️ 這一條 MUST 排在 `/orders`、`/orders/{id}/pay` 與 `/orders/{id}/cancel`
+    // 之後：`/api/orders/xxx/pay` 也符合「/orders/ 加一段」的形狀。
+    const orderMatch = /\/orders\/([^/]+)$/.exec(path)
+    if (orderMatch && method === 'GET') {
+      const id = orderMatch[1] ?? ''
+      const result = options.onOrderGet?.(id)
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      const found = result ?? options.orders?.find((o) => o.id === id)
+      return Promise.resolve(
+        found
+          ? json(found)
+          : json({ detail: '查無此訂單。', code: 'ORDER_NOT_FOUND' }, 404),
+      )
     }
 
     if (path.endsWith('/vocabulary')) {

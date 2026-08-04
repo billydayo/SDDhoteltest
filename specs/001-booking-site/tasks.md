@@ -175,14 +175,22 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T051 [P] [US1] 建立 `backend/src/sunny/schemas/room.py`：`RoomOut` 明列輸出欄位；`average_rating` 為 null 時 MUST 保持 null，**MUST NOT 以 0 表示**（FR-047）
 - [X] T052 [US1] 建立 `backend/src/sunny/routers/rooms.py`：`GET /rooms`、`GET /rooms/{id}`，**MUST 明確標註為公開端點**
 - [X] T053 [US1] 建立 `backend/src/sunny/routers/vocabulary.py`：設施與房型特色可選項目的公開讀取端點；尚未設定過時 MUST 退回程式內建預設值（FR-010a）
-- [ ] T054 [P] [US1] 建立 `frontend/src/components/RoomCard.tsx`：直向拱形卡片，拱形 MUST 以 `border-radius` 雙值語法實作（水平半徑遠大於垂直半徑），顯示照片、房名、房型、每晚價格、人數上限與平均評分（FR-013）
-- [ ] T055 [P] [US1] 建立 `frontend/src/components/FilterBar.tsx`：七項篩選條件、目前生效條件的顯示與一鍵清除；欄位標籤 MUST NOT 標示「必填」，改以說明文字交代三者連動；缺漏 MUST 逐欄顯示訊息並將焦點移至第一個有問題的欄位；清單為空時 MUST 隱藏該組篩選（FR-010、FR-010a）
-- [ ] T056 [US1] 建立 `frontend/src/pages/Home.tsx`：房型頁籤（切換 MUST NOT 清除其他篩選條件）、排序切換、滿版主視覺；條件檢查 MUST 只在按下「搜尋」時執行，首次載入 MUST 顯示全部房源（FR-010、FR-012）
-- [ ] T057 [US1] 建立 `frontend/src/pages/RoomDetail.tsx`：照片縮圖切換（僅一張時 MUST NOT 顯示單格縮圖列）、設施、特色、描述、平均評分、已公開評論、目前房態、依所選日期的夜數與總金額（FR-014、FR-017）
-- [ ] T058 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 顯示最新一次房源品質檢測結果；尚未檢測 MUST 顯示「尚未檢測」而非 0 分或空白區塊（FR-014）
-- [ ] T059 [P] [US1] 建立 `frontend/src/pages/Terms.tsx`：服務條款與隱私聲明，明確說明本站為展示用專案、不提供真實住宿服務與真實交易（FR-121、FR-122）
-- [ ] T060 [P] [US1] 建立 `frontend/src/components/EmptyState.tsx` 並套用於房源列表：無結果時顯示「查無符合條件的房源」與調整建議，而非空白畫面（FR-018）
-- [ ] T061 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 實作未登入點選「立即訂房」導向登入頁並提示需先登入（FR-019）
+- [X] T054 [P] [US1] 建立 `frontend/src/components/RoomCard.tsx`：直向拱形卡片，拱形 MUST 以 `border-radius` 雙值語法實作（水平半徑遠大於垂直半徑），顯示照片、房名、房型、每晚價格、人數上限與平均評分（FR-013）
+  （拱形實作於 `styles/index.css` 的 `@utility arch`——Tailwind 的 `rounded-*` 只吐得出單一半徑。整張卡片可點但**只有一個連結**：`after:absolute inset-0` 撐滿可點區，避免讀屏把同一間房念兩次。平均評分經 `components/Rating.tsx`，`null` 顯示「尚無評分」而非 0）
+- [X] T055 [P] [US1] 建立 `frontend/src/components/FilterBar.tsx`：七項篩選條件、目前生效條件的顯示與一鍵清除；欄位標籤 MUST NOT 標示「必填」，改以說明文字交代三者連動；缺漏 MUST 逐欄顯示訊息並將焦點移至第一個有問題的欄位；清單為空時 MUST 隱藏該組篩選（FR-010、FR-010a）
+  （純函式部分抽到 `lib/filters.ts`，不掛 DOM 就能測，也避免元件檔同時匯出非元件而讓熱更新退化成整頁重載。**焦點移動當時是壞的**——見下方 T061a）
+- [X] T056 [US1] 建立 `frontend/src/pages/Home.tsx`：房型頁籤（切換 MUST NOT 清除其他篩選條件）、排序切換、滿版主視覺；條件檢查 MUST 只在按下「搜尋」時執行，首次載入 MUST 顯示全部房源（FR-010、FR-012）
+  （`filters`（編輯中）與 `applied`（上次送出）分開兩份狀態，頁籤與排序獨立於表單即時生效；房型選項由另一次不帶篩選的查詢推導，否則頁籤會隨篩選結果消失。400 只交給篩選列，其餘錯誤才換成結果區的錯誤畫面——同一句話兩處都印會被當成兩個問題）
+- [X] T057 [US1] 建立 `frontend/src/pages/RoomDetail.tsx`：照片縮圖切換（僅一張時 MUST NOT 顯示單格縮圖列）、設施、特色、描述、平均評分、已公開評論、目前房態、依所選日期的夜數與總金額（FR-014、FR-017）
+  （⚠️ **「已公開評論」尚未實作**：需要 T110 的公開評論端點（US5 後端），目前後端沒有任何非後台的 reviews 路徑。此處明講「評論功能即將開放」，**MUST NOT 以假評論或空白區塊冒充**。T110 完成後回頭補上）
+- [X] T058 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 顯示最新一次房源品質檢測結果；尚未檢測 MUST 顯示「尚未檢測」而非 0 分或空白區塊（FR-014）
+- [X] T059 [P] [US1] 建立 `frontend/src/pages/Terms.tsx`：服務條款與隱私聲明，明確說明本站為展示用專案、不提供真實住宿服務與真實交易（FR-121、FR-122）
+- [X] T060 [P] [US1] 建立 `frontend/src/components/EmptyState.tsx` 並套用於房源列表：無結果時顯示「查無符合條件的房源」與調整建議，而非空白畫面（FR-018）
+  （分兩種訊息：有下條件 → 給調整建議與一鍵清除；沒下條件卻沒結果是資料問題，叫使用者「放寬條件」毫無幫助）
+- [X] T061 [US1] 於 `frontend/src/pages/RoomDetail.tsx` 實作未登入點選「立即訂房」導向登入頁並提示需先登入（FR-019）
+  （⚠️ 提示**不能**寫在來源頁：導向的那一刻它就卸載了，任何在此 `setState` 顯示的話都沒有機會被繪製——那是看起來有做、實際上永遠不會出現的死程式碼。理由隨 location state 送到登入頁，由 `components/LoginReasonNotice.tsx` 渲染，T073 的真實登入頁沿用同一個）
+- [X] T061a [US1] 修正 `backend/src/sunny/main.py` 的例外處理器：`DomainError.field` MUST 進入回應本體，且 MUST 以請求上的名稱（camelCase）回覆（FR-010、contracts/README.md）
+  （**實跑後端才發現的缺陷**：領域層各處都仔細設了 `field`，但 `_error_response()` 只組 `{"detail", "code"}`，`field` 從來沒到過前端——FR-010 的「將焦點移至第一個有問題的欄位」因此無法實作。同時在邊界轉 camelCase 並擋掉非識別字的值：`utils/dates.parse_calendar_date` 也有一個叫 `field` 的參數，但那是給人看的中文標籤，接錯了前端會拿「入住日」去組 DOM 選擇器而**靜默失敗**。契約與 `tests/contract/test_error_contract.py` 一併補上）
 
 **Checkpoint**: 一個能搜尋、篩選、排序並瀏覽詳情的公開站台已可獨立驗收——MVP 達成
 

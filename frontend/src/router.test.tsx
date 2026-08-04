@@ -15,40 +15,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setToken } from './api/client'
 import { AppRoutes } from './router'
 import { AuthProvider } from './state/AuthContext'
+import { ADMIN, MEMBER, mockApi } from './test/mockApi'
 import type { Profile } from './api/types'
 
-const MEMBER: Profile = {
-  id: 'ffffffff-0000-0000-0000-000000000001',
-  email: 'member@example.com',
-  role: 'member',
-  displayName: '測試會員',
-  phone: null,
-  createdAt: '2026-08-01T00:00:00Z',
-}
-
-const ADMIN: Profile = { ...MEMBER, id: '...2', email: 'admin@example.com', role: 'admin' }
-
+/**
+ * 換上帶指定身分的假後端。
+ *
+ * ⚠️ 用共用的 `mockApi` 而不是就地寫一個只認得 `/me`、其餘一律回 `{}` 的
+ * 版本：`/` 現在是真的首頁，它會去要 `/rooms`。回 `{}` 的話 `rooms.map`
+ * 會炸，而症狀會出現在一個看起來與房源無關的路由測試裡。
+ */
 function mockMe(profile: Profile | null) {
-  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-    if (url.endsWith('/me')) {
-      if (profile === null) {
-        return Promise.resolve(
-          new Response(JSON.stringify({ detail: '請先登入。', code: 'NOT_AUTHENTICATED' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          }),
-        )
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify(profile), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-    }
-    return Promise.resolve(new Response('{}', { status: 200 }))
-  })
+  mockApi(profile ? { profile } : {})
 }
 
 function renderAt(path: string) {
@@ -63,6 +41,8 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   setToken(null)
+  // 預設：未登入的訪客 + 一間房源。需要其他身分的測試再呼叫 mockMe 覆蓋。
+  mockApi()
 })
 
 afterEach(() => {
@@ -71,9 +51,12 @@ afterEach(() => {
 })
 
 describe('公開路由', () => {
-  it('未登入也能看房源列表', () => {
+  it('未登入也能看房源列表', async () => {
     renderAt('/')
-    expect(screen.getByRole('heading', { level: 1, name: '房源' })).toBeInTheDocument()
+    // 主視覺標題即 h1。房源卡片本身要真的出現——只驗標題的話，
+    // 一個永遠在載入中的列表也會通過。
+    expect(screen.getByRole('heading', { level: 1, name: 'Sunny 訂房平台' })).toBeInTheDocument()
+    expect(await screen.findByRole('article')).toBeInTheDocument()
   })
 
   it('未登入也能看服務條款', () => {
@@ -175,17 +158,19 @@ describe('頁首導覽', () => {
 })
 
 describe('版面地標', () => {
-  it('有 banner／main／contentinfo 三個地標與跳至主要內容連結', () => {
+  it('有 banner／main／contentinfo 三個地標與跳至主要內容連結', async () => {
     renderAt('/')
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByRole('main')).toBeInTheDocument()
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '跳至主要內容' })).toBeInTheDocument()
+    await screen.findByRole('article')
   })
 
-  it('頁尾載明本站不提供真實住宿服務（FR-121）', () => {
+  it('頁尾載明本站不提供真實住宿服務（FR-121）', async () => {
     renderAt('/')
     expect(screen.getByRole('contentinfo')).toHaveTextContent('不提供真實住宿服務')
     expect(screen.getByRole('link', { name: '服務條款與隱私聲明' })).toBeInTheDocument()
+    await screen.findByRole('article')
   })
 })

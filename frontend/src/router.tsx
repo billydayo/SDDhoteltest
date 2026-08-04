@@ -28,13 +28,23 @@ import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
+import { LoginReasonNotice } from './components/LoginReasonNotice'
+import { Home } from './pages/Home'
 import { Forbidden, NotFound } from './pages/NotFound'
 import { Placeholder } from './pages/Placeholder'
+import { RoomDetail } from './pages/RoomDetail'
+import { Terms } from './pages/Terms'
 import { useAuth } from './state/AuthContext'
 
-/** 登入頁用來記住「登入完要回哪裡」的 location state。 */
+/**
+ * 登入頁用來記住「登入完要回哪裡」與「為什麼被送來這裡」的 location state。
+ *
+ * `reason` 由 `LoginReasonNotice` 轉成給人看的句子。缺了它，使用者按下
+ * 「立即訂房」後畫面直接變成登入表單，看起來像誤觸或網站出錯。
+ */
 export interface LoginRedirectState {
-  from?: Location
+  from?: Location | { pathname: string }
+  reason?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +121,9 @@ export function AppRoutes() {
     setUnauthorizedHandler(() => {
       void navigate('/login', {
         replace: true,
-        state: { from: location } satisfies LoginRedirectState,
+        // 憑證過期與「本來就沒登入」對使用者是不同的事。不說清楚，
+        // 他會以為自己被登出了或站壞了（FR-009d）。
+        state: { from: location, reason: 'SESSION_EXPIRED' } satisfies LoginRedirectState,
       })
     })
     return () => {
@@ -123,10 +135,19 @@ export function AppRoutes() {
     <Layout>
       <Routes>
         {/* -- 公開 ------------------------------------------------------- */}
-        <Route path="/" element={<Placeholder title="房源" task="T056" />} />
-        <Route path="/rooms/:roomId" element={<Placeholder title="房源詳情" task="T057" />} />
-        <Route path="/terms" element={<Placeholder title="服務條款與隱私聲明" task="T059" />} />
-        <Route path="/login" element={<Placeholder title="登入" task="T073" />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/rooms/:roomId" element={<RoomDetail />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route
+          path="/login"
+          element={
+            <>
+              {/* FR-019：MUST 說明他為什麼被送到這裡。T073 的真實登入頁沿用 */}
+              <LoginReasonNotice />
+              <Placeholder title="登入" task="T073" />
+            </>
+          }
+        />
         <Route path="/register" element={<Placeholder title="註冊" task="T074" />} />
 
         {/* -- 需登入 ----------------------------------------------------- */}

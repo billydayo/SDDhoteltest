@@ -63,6 +63,21 @@ React SPA
 { "detail": "使用者可理解的繁體中文訊息", "code": "ROOM_UNAVAILABLE" }
 ```
 
+**逐欄的輸入錯誤 MUST 另帶 `field`**，前端據此把焦點移至第一個有問題的欄位
+（FR-010）：
+
+```json
+{ "detail": "填寫入住日時，退房日也需一併填寫。", "code": "INCOMPLETE_DATE_FILTER", "field": "checkOut" }
+```
+
+⚠️ **`field` MUST 為請求上的名稱，即 camelCase。** 領域層內部寫的是
+`check_out`（Python／資料庫命名），由例外處理器在邊界轉換。回一個 `check_out`
+等於指向請求裡不存在的欄位——前端拿它找輸入框會找不到，**焦點安靜地不動**，
+而畫面上只是「錯誤訊息出現了但游標沒動」，沒有人會把它當成 bug 回報。
+
+無法對應到單一欄位的錯誤（`ROOM_UNAVAILABLE`、`INVALID_SORT` 以外的一般失敗）
+省略 `field`，由前端顯示為整體訊息。
+
 MUST NOT 回傳堆疊追蹤、SQL 語句或內部檔案路徑（憲章後端約束）。
 
 | 狀態碼 | 用途 |

@@ -25,8 +25,29 @@ export interface ApiErrorBody {
   detail: string
   /** 供程式判斷的機器可讀代碼，例如 `ROOM_UNAVAILABLE`。 */
   code: string
-  /** 出問題的欄位名（camelCase）。用於把焦點移到正確的輸入框（FR-010）。 */
+  /**
+   * 出問題的欄位名。用於把焦點移到正確的輸入框（FR-010）。
+   *
+   * ⚠️ **後端送出的可能是 snake_case（`check_out`、`guest_count`）。**
+   * 其餘欄位一律經 `alias_generator=to_camel` 轉換，但 `field` 是在
+   * `DomainError` 裡以字串手寫的，沒有經過那層轉換。
+   *
+   * 不一致的後果很隱蔽：焦點移動會**安靜地失效**（找不到叫 `check_out` 的
+   * 輸入框），畫面看起來只是「沒有跳到出錯的欄位」，沒有任何錯誤。
+   * 因此前端一律經 `lib/errors.ts` 的 `fieldOf()` 正規化，不直接使用本欄位。
+   */
   field?: string
+}
+
+// ---------------------------------------------------------------------------
+// 首頁內容（FR-061）
+// ---------------------------------------------------------------------------
+export interface SiteContent {
+  heroTitle: string
+  heroSubtitle: string
+  /** 上傳路徑或外部網址皆可。**空字串代表不使用主圖**，前台改以純色底渲染。 */
+  heroImage: string
+  updatedAt: string
 }
 
 // ---------------------------------------------------------------------------

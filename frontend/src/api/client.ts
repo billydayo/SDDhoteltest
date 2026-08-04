@@ -33,6 +33,7 @@ import type {
   Room,
   RoomDetail,
   RoomSearchParams,
+  SiteContent,
   TokenResponse,
   Vocabulary,
 } from './types'
@@ -264,6 +265,11 @@ export const api = {
 
   vocabulary: {
     get: (signal?: AbortSignal) => request<Vocabulary>('/vocabulary', signal ? { signal } : {}),
+  },
+
+  /** 首頁主視覺。**公開端點**——首頁不需登入（FR-061）。 */
+  siteContent: {
+    get: (signal?: AbortSignal) => request<SiteContent>('/site-content', signal ? { signal } : {}),
   },
 
   orders: {

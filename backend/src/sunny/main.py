@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -42,8 +43,41 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await dispose_engine()
 
 
-def _error_response(detail: str, code: str, status_code: int) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content={"detail": detail, "code": code})
+#: 合法的 `field` 值：ASCII 識別字。前端會拿它組 `[name="..."]` 選擇器。
+_FIELD_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+
+def _to_camel(value: str) -> str:
+    head, *rest = value.split("_")
+    return head + "".join(word.capitalize() for word in rest)
+
+
+def _error_response(
+    detail: str, code: str, status_code: int, field: str | None = None
+) -> JSONResponse:
+    """錯誤回應：`{"detail", "code"}`，逐欄錯誤另帶 `field`。
+
+    ⚠️ **`field` MUST 以請求上的名稱回覆，也就是 camelCase。**
+
+    領域層寫的是 `check_out`——那是 Python／資料庫的命名。但用戶端送出的是
+    `checkOut`，它的輸入框也叫 `checkOut`。回一個 `check_out` 等於指向一個
+    請求裡不存在的欄位：前端拿它去找輸入框會找不到，於是**焦點安靜地不動**，
+    而 FR-010 要求的正是「將焦點移至第一個有問題的欄位」。
+
+    這種失敗不會拋錯、不會出現在日誌裡，畫面上只是「錯誤訊息出現了但游標
+    沒動」——沒有人會把它當成 bug 回報。
+    """
+    content: dict[str, str] = {"detail": detail, "code": code}
+    if field:
+        # ⚠️ `utils.dates.parse_calendar_date` 也有一個叫 `field` 的參數，
+        # 但它是**給人看的中文標籤**（「入住日」），只被插進訊息裡。哪天有人
+        # 把它接到這裡，前端就會拿「入住日」去查 DOM 選擇器而靜默失敗。
+        # 在邊界擋掉，並留下日誌——這比在十個呼叫端各自小心可靠。
+        if _FIELD_NAME_RE.match(field):
+            content["field"] = _to_camel(field)
+        else:
+            logger.warning("捨棄非識別字的錯誤欄位名: %r（code=%s）", field, code)
+    return JSONResponse(status_code=status_code, content=content)
 
 
 #: 框架層 HTTP 錯誤的繁體中文訊息與機器可讀代碼。
@@ -90,7 +124,7 @@ def create_app() -> FastAPI:
         if isinstance(exc, InternalError):
             # 成因只寫日誌，不送給用戶端
             logger.error("內部錯誤: %s", exc.internal_reason)
-        return _error_response(exc.detail, exc.code, exc.status_code)
+        return _error_response(exc.detail, exc.code, exc.status_code, exc.field)
 
     @app.exception_handler(IntegrityError)
     async def _integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
@@ -99,7 +133,7 @@ def create_app() -> FastAPI:
         domain = translate_integrity_error(exc)
         if isinstance(domain, InternalError):
             logger.error("未預期的約束違反: %s", domain.internal_reason)
-        return _error_response(domain.detail, domain.code, domain.status_code)
+        return _error_response(domain.detail, domain.code, domain.status_code, domain.field)
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

@@ -115,6 +115,67 @@ async def test_error_messages_are_traditional_chinese(
     assert re.search(r"[一-鿿]", detail), f"錯誤訊息不是中文：{detail!r}"
 
 
+# ---------------------------------------------------------------------------
+# 逐欄錯誤的 `field`（FR-010）
+# ---------------------------------------------------------------------------
+#: (查詢字串, 預期 code, 預期 field)
+_FIELD_CASES = [
+    ("?checkIn=2026-12-01", "INCOMPLETE_DATE_FILTER", "checkOut"),
+    ("?checkOut=2026-12-03", "INCOMPLETE_DATE_FILTER", "checkIn"),
+    ("?checkIn=2026-12-01&checkOut=2026-12-03", "GUEST_COUNT_REQUIRED", "guestCount"),
+    ("?guestCount=0", "INVALID_GUEST_COUNT", "guestCount"),
+    ("?sort=nonsense", "INVALID_SORT", "sort"),
+]
+
+
+@pytest.mark.parametrize(("query", "code", "field"), _FIELD_CASES, ids=[c[1] for c in _FIELD_CASES])
+async def test_field_errors_name_the_field_as_the_request_spells_it(
+    client: httpx.AsyncClient, query: str, code: str, field: str
+) -> None:
+    """**逐欄錯誤 MUST 帶 `field`，且 MUST 為 camelCase**（FR-010）。
+
+    這兩項曾經各壞過一次，而症狀完全一樣、都不會有任何東西報錯：
+
+    1. 例外處理器根本沒把 `field` 放進回應——領域層設得再仔細也到不了前端。
+    2. 放進去了但是 snake_case（`check_out`）——用戶端送的是 `checkOut`，
+       它的輸入框也叫 `checkOut`，拿 `check_out` 去查 DOM 找不到東西。
+
+    兩種情況下畫面都是「錯誤訊息出現了，但游標沒有移到那一欄」。FR-010 要求
+    的正是移動焦點，而沒有人會把「游標沒動」當成 bug 回報。
+    """
+    res = await client.get(f"/rooms{query}")
+    assert res.status_code == 400, res.text
+
+    payload = res.json()
+    assert payload["code"] == code, payload
+    assert "field" in payload, f"逐欄錯誤沒有帶 field：{payload}"
+    assert payload["field"] == field, f"field 應為請求上的名稱（camelCase）：{payload}"
+
+
+async def test_a_human_label_never_escapes_as_a_field_name() -> None:
+    """⚠️ **`field` MUST 為 ASCII 識別字，中文標籤 MUST 在邊界被擋掉。**
+
+    `utils.dates.parse_calendar_date` 也有一個叫 `field` 的參數，但它是給人看的
+    中文標籤（「入住日」），只被插進訊息裡。哪天有人把兩者接起來，前端就會拿
+    「入住日」去組 `[name="入住日"]`，找不到、焦點不動、沒有任何錯誤。
+    """
+    from sunny.errors import DomainError
+
+    app = create_app()
+
+    @app.get("/__mislabelled")
+    async def _mislabelled() -> None:
+        raise DomainError("入住日格式錯誤。", code="INVALID_DATE_FORMAT", field="入住日")
+
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        res = await c.get("/__mislabelled")
+
+    assert res.status_code == 400
+    # 寧可沒有 field（前端顯示為整體訊息），也不要一個永遠對不上的選擇器
+    assert "field" not in res.json(), res.json()
+
+
 async def test_an_unhandled_exception_reveals_nothing(client: httpx.AsyncClient) -> None:
     """未預期的例外 MUST 回一句固定的話，**成因只寫日誌**。
 

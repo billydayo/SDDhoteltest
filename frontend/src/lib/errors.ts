@@ -35,11 +35,23 @@ export function messageFor(error: unknown): DisplayableError {
 }
 
 /**
- * 出問題的欄位名（camelCase），供把焦點移到正確的輸入框（FR-010）。
+ * 出問題的欄位名（FR-010）。
  *
  * FR-010 要求「缺漏 MUST **逐欄**顯示訊息並將焦點移至第一個有問題的欄位，
- * MUST NOT 只丟一句籠統的錯誤」。後端已在錯誤裡帶上 `field`，前端只要用它。
+ * MUST NOT 只丟一句籠統的錯誤」。後端在錯誤裡帶上 `field`，並已在例外處理器
+ * 的邊界轉成 camelCase（contracts/README.md「錯誤格式」）。
+ *
+ * ⚠️ 這裡仍然過一次 `toCamel`，因為它是冪等的，而反過來的代價不對稱：
+ * 拿到一個 snake_case 的 `field` 時，`querySelector('[name="check_out"]')`
+ * 找不到東西，焦點就**安靜地不動**——畫面上沒有任何錯誤，只是「沒跳到出錯的
+ * 欄位」，而那正是 FR-010 唯一要求的行為。這種漏掉沒有人會回報。
  */
 export function fieldOf(error: unknown): string | null {
-  return error instanceof ApiError ? (error.field ?? null) : null
+  if (!(error instanceof ApiError) || !error.field) return null
+  return toCamel(error.field)
+}
+
+/** `check_out` → `checkOut`。已是 camelCase 的字串原樣通過。 */
+export function toCamel(value: string): string {
+  return value.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }

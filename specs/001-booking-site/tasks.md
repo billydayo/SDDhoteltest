@@ -331,11 +331,11 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T122 [US6] 建立 `backend/src/sunny/routers/admin_orders.py`：訂單搜尋與篩選（訂單編號、狀態、日期區間）與狀態變更；狀態變更 MUST 經 T034 寫入 `admin_logs`（FR-053、FR-054）
 - [X] T123 [US6] 建立 `backend/src/sunny/routers/admin_users.py`：會員資料檢視編輯與角色升降；**`role` 變更 MUST 只能由此端點執行且 MUST 進稽核日誌**（原 `prevent_role_escalation()` trigger 的職責移至此）（FR-055、data-model.md）
 - [X] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
-- [ ] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
-- [ ] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
-- [ ] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
-- [ ] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
-- [ ] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
+- [X] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
+- [X] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
+- [X] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
+- [X] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
+- [X] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
 
 **Checkpoint**: 後台核心可用；前後台資料互相反映
 
@@ -356,8 +356,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T131 [US7] 建立 `backend/src/sunny/routers/admin_reviews.py`：通過／駁回／**覆寫自動審核結果**／刪除已公開評論；四者皆 MUST 寫入 `admin_logs`；刪除後平均評分 MUST 重新計算（FR-056、FR-103b、FR-103c）
 - [X] T132 [US7] 於 `backend/src/sunny/routers/admin_reviews.py` 實作業者回覆的撰寫、修改與收回：清空內容等同收回；**待審核與已駁回的評論 MUST NOT 提供回覆入口**；三種操作皆寫入 `admin_logs`（FR-103d）
 - [X] T133 [US7] 建立 `backend/src/sunny/routers/admin_refunds.py`：核准／駁回；核准後訂單轉 `refunded` 並**立即釋回該區間**；駁回後回到 `confirmed` 且會員可再次申請（FR-038、FR-039、FR-057）
-- [ ] T134 [P] [US7] 建立 `frontend/src/pages/admin/Reviews.tsx`：依送出時間顯示待審核評論，含房源、會員、評分、內容、自動審核判定與觸發規則；無待審核項目時顯示引導性空狀態
-- [ ] T135 [P] [US7] 建立 `frontend/src/pages/admin/Refunds.tsx`：顯示對應訂單、申請人、退款原因、申請時間與分級後的退款金額；無待審核項目時顯示引導性空狀態
+- [X] T134 [P] [US7] 建立 `frontend/src/pages/admin/Reviews.tsx`：依送出時間顯示待審核評論，含房源、會員、評分、內容、自動審核判定與觸發規則；無待審核項目時顯示引導性空狀態
+- [X] T135 [P] [US7] 建立 `frontend/src/pages/admin/Refunds.tsx`：顯示對應訂單、申請人、退款原因、申請時間與分級後的退款金額；無待審核項目時顯示引導性空狀態
 
 **Checkpoint**: US4、US5、US7 三者構成完整的送出—審核—反映閉環
 
@@ -378,8 +378,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T137 [US8] 建立 `backend/src/sunny/services/export.py`：涵蓋七個模組（房源、訂單、用戶、評論、退款、渠道比價、操作日誌）的資料組裝
 - [X] T138 [US8] 於 `backend/src/sunny/services/export.py` 實作匯出的稽核紀錄：每次成功匯出寫入模組、筆數與檔案格式；**匯出操作日誌本身同樣 MUST 被記錄**；零筆而未產生檔案時 MUST NOT 記錄（FR-058a）
 - [X] T139 [US8] 建立 `backend/src/sunny/routers/admin_content.py`：`GET`／`PUT /admin/site-content` 與主圖上傳；上傳後尚未儲存就離開或改選其他圖片時該檔案 MUST 被清除（FR-061）
-- [ ] T140 [US8] 建立 `frontend/src/components/ExportButton.tsx` 並嵌入七個資料頁面；**匯出範圍 MUST 為該頁當前的篩選結果**，MUST NOT 另設獨立的「報表匯出」分頁（FR-058、SC-033）
-- [ ] T141 [US8] 於 `frontend/src/components/ExportButton.tsx` 實作 xlsx 函式庫無法載入或離線時**自動退回 CSV 並顯示「目前離線，已改用 CSV 格式」**，MUST NOT 中斷或無回應（FR-059、SC-010）
+- [X] T140 [US8] 建立 `frontend/src/components/ExportButton.tsx` 並嵌入七個資料頁面；**匯出範圍 MUST 為該頁當前的篩選結果**，MUST NOT 另設獨立的「報表匯出」分頁（FR-058、SC-033）
+- [X] T141 [US8] 於 `frontend/src/components/ExportButton.tsx` 實作 xlsx 函式庫無法載入或離線時**自動退回 CSV 並顯示「目前離線，已改用 CSV 格式」**，MUST NOT 中斷或無回應（FR-059、SC-010）
 - [ ] T142 [US8] 建立 `frontend/src/pages/admin/Content.tsx`，並於 `frontend/src/pages/Home.tsx` 實作滿版主視覺：隨視窗寬度連續縮放、MUST NOT 產生橫向捲動、標題 MUST 與頁面其餘內容對齊同一條量測線（FR-061、FR-061a）
 
 **Checkpoint**: 後台輔助模組完成
@@ -396,16 +396,16 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 9
 
-- [ ] T143 [P] [US9] 單元測試風險公式於 `frontend/src/lib/riskScore.test.ts`：`100 − (0.4×亮度 + 0.35×雜亂度 + 0.25×對比)`；等級切分 0–34 低／35–59 中／60–100 高；過暗、雜亂、正常三類樣本 MUST NOT 全部落在同一等級（FR-068、SC-016）
-- [ ] T144 [P] [US9] 相依圖檢查於 `frontend/src/lib/__tests__/riskCheckIsolation.test.ts`：斷言 `frontend/src/pages/RiskCheck.tsx` 的相依圖中**不存在任何上傳模組或圖片端點呼叫**；此測試失敗即代表 SC-030 已失守（research R8、plan.md）
-- [ ] T144a [P] [US9] **執行期**網路驗證於 `frontend/src/pages/__tests__/riskCheckNetwork.test.tsx`：以攔截器包住 `fetch` 與 `XMLHttpRequest`，於安全檢測頁完成一次完整分析後斷言**夾帶照片內容的請求數為 0**。與 T144 是不同的驗證面——T144 驗靜態相依（SC-030：不出現在儲存或資料表），本項驗執行期流量（SC-015）
+- [X] T143 [P] [US9] 單元測試風險公式於 `frontend/src/lib/riskScore.test.ts`：`100 − (0.4×亮度 + 0.35×雜亂度 + 0.25×對比)`；等級切分 0–34 低／35–59 中／60–100 高；過暗、雜亂、正常三類樣本 MUST NOT 全部落在同一等級（FR-068、SC-016）
+- [X] T144 [P] [US9] 相依圖檢查於 `frontend/src/lib/__tests__/riskCheckIsolation.test.ts`：斷言 `frontend/src/pages/RiskCheck.tsx` 的相依圖中**不存在任何上傳模組或圖片端點呼叫**；此測試失敗即代表 SC-030 已失守（research R8、plan.md）
+- [X] T144a [P] [US9] **執行期**網路驗證於 `frontend/src/pages/__tests__/riskCheckNetwork.test.tsx`：以攔截器包住 `fetch` 與 `XMLHttpRequest`，於安全檢測頁完成一次完整分析後斷言**夾帶照片內容的請求數為 0**。與 T144 是不同的驗證面——T144 驗靜態相依（SC-030：不出現在儲存或資料表），本項驗執行期流量（SC-015）
 
 ### Implementation for User Story 9
 
-- [ ] T145 [US9] 建立 `frontend/src/lib/riskScore.ts`：純函式，以 Canvas 計算亮度、雜亂度、對比三項指標；兩條路徑共用「計算」
-- [ ] T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`：**只 import `riskScore.ts`**；顯示預覽與亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級（FR-064）、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；照片僅於瀏覽器內處理、MUST NOT 送往任何外部服務或長期儲存（FR-066、FR-086）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；前台與後台皆提供此功能（FR-062）
+- [X] T145 [US9] 建立 `frontend/src/lib/riskScore.ts`：純函式，以 Canvas 計算亮度、雜亂度、對比三項指標；兩條路徑共用「計算」
+- [X] T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`：**只 import `riskScore.ts`**；顯示預覽與亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級（FR-064）、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；照片僅於瀏覽器內處理、MUST NOT 送往任何外部服務或長期儲存（FR-066、FR-086）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；前台與後台皆提供此功能（FR-062）
 - [X] T147 [US9] 於 `backend/src/sunny/routers/admin_rooms.py` 實作 `POST /admin/rooms/{id}/risk-checks`（需管理員）：**這是系統中唯一接收檢測圖片的端點**；MUST 檢查檔案大小與 MIME 類型（FR-104、FR-107）
-- [ ] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
+- [X] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
 - [X] T149 [US9] 於 `backend/src/sunny/services/room_photos.py` 實作重新檢測後**舊圖片不再對外可讀取**；房源詳情頁僅顯示最新一筆（FR-106、FR-107）
 
 **Checkpoint**: 差異化功能完成，且前台照片的禁令由結構而非紀律保證
@@ -425,8 +425,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 ### Implementation for User Story 10
 
 - [X] T151 [US10] 建立 `backend/src/sunny/routers/favorites.py`：`GET`／`POST`／`DELETE /favorites`（需登入）；複合主鍵 `(user_id, room_id)`，依 `created_at` 由新到舊排序（FR-091、FR-092）
-- [ ] T152 [US10] 建立 `frontend/src/components/FavoriteButton.tsx`：未登入時導向登入頁，**登入後 MUST 回到原本的房源並完成收藏**（FR-093）
-- [ ] T153 [US10] 建立 `frontend/src/pages/Favorites.tsx`：已下架或被刪除的房源 MUST 自動消失或標示為已下架，MUST NOT 顯示錯誤或空白卡片；尚無收藏時顯示引導性空狀態（FR-095）
+- [X] T152 [US10] 建立 `frontend/src/components/FavoriteButton.tsx`：未登入時導向登入頁，**登入後 MUST 回到原本的房源並完成收藏**（FR-093）
+- [X] T153 [US10] 建立 `frontend/src/pages/Favorites.tsx`：已下架或被刪除的房源 MUST 自動消失或標示為已下架，MUST NOT 顯示錯誤或空白卡片；尚無收藏時顯示引導性空狀態（FR-095）
 
 **Checkpoint**: 收藏可獨立驗收
 
@@ -450,7 +450,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T156 [US11] 建立 `backend/src/sunny/services/channel.py`：預警判定（外部售價低於官網價）並將未處理筆數併入儀表板（FR-111）
 - [X] T157 [US11] 於 `backend/src/sunny/services/channel.py` 實作申訴郵件範本組裝（房源、平台、官網價、對方售價、價差）；**MUST NOT 發送任何郵件**（FR-112）
 - [X] T158 [US11] 於 `backend/src/sunny/routers/admin_channel.py` 實作標記已處理，並寫入 `admin_logs`（FR-113）
-- [ ] T159 [US11] 建立 `frontend/src/pages/admin/Channel.tsx` 與 `frontend/src/components/SimulatedBadge.tsx`：頁面頂端**常駐**「模擬資料：此模組不連線至任何外部平台」；郵件範本畫面 MUST 明確告知系統不會代為寄送；尚無資料時顯示引導性空狀態（FR-110、FR-112）
+- [X] T159 [US11] 建立 `frontend/src/pages/admin/Channel.tsx` 與 `frontend/src/components/SimulatedBadge.tsx`：頁面頂端**常駐**「模擬資料：此模組不連線至任何外部平台」；郵件範本畫面 MUST 明確告知系統不會代為寄送；尚無資料時顯示引導性空狀態（FR-110、FR-112）
 
 **Checkpoint**: 營運輔助模組完成，模擬性質已明確標示
 
@@ -472,8 +472,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 - [X] T162 [US12] 建立 `backend/src/sunny/routers/admin_logs.py`：`GET /admin/logs` 依時間由新到舊，支援依操作者、動作類型與日期區間篩選；**MUST NOT 提供任何 UPDATE 或 DELETE 端點**（FR-114、FR-115、contracts/README.md）
 - [X] T163 [US12] 建立 `backend/src/sunny/routers/admin_settings.py`：系統參數的讀取與更新；MUST 有範圍檢查、超出範圍 MUST 被拒絕並顯示可接受範圍、變更 MUST 進稽核日誌、**MUST NOT 回溯影響既有訂單的 `expires_at`**（FR-098、FR-101、FR-119、FR-120）
-- [ ] T164 [P] [US12] 建立 `frontend/src/pages/admin/Logs.tsx`：篩選與唯讀呈現，畫面上 MUST NOT 出現編輯或刪除入口
-- [ ] T165 [P] [US12] 建立 `frontend/src/pages/admin/Settings.tsx`：未付款訂單保留分鐘數的調整與可接受範圍提示
+- [X] T164 [P] [US12] 建立 `frontend/src/pages/admin/Logs.tsx`：篩選與唯讀呈現，畫面上 MUST NOT 出現編輯或刪除入口
+- [X] T165 [P] [US12] 建立 `frontend/src/pages/admin/Settings.tsx`：未付款訂單保留分鐘數的調整與可接受範圍提示
 - [X] T165a [US12] 於 `backend/src/sunny/routers/admin_settings.py` 實作 `POST /admin/reset-demo-data`（需管理員）並於 `frontend/src/pages/admin/Settings.tsx` 提供入口：呼叫 `sunny.seed` 將所有資料還原為初始種子狀態，需二次確認且 MUST 寫入 `admin_logs`。FR-072（可重複執行的種子機制，T036）與 FR-073（**還原入口**）是兩條需求——只有 CLI 腳本不構成使用者可及的入口（FR-073）
 
 **Checkpoint**: 十二個使用者故事全數完成
@@ -488,8 +488,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T166 [P] 契約測試於 `backend/tests/contract/test_messages.py`：會員 MUST NOT 能讀寫他人的討論串；**發話者身分與角色 MUST 由伺服器判定**，前端送出的 `sender_role` MUST 被忽略（FR-125、FR-126）
 - [X] T167 建立 `backend/src/sunny/repositories/messages.py` 與 `backend/src/sunny/routers/messages.py`：`GET`／`POST /messages`（需登入）；討論串以 `thread_user_id`（會員）為單位、不存收件者；`sender_id` 與 `sender_role` 由後端寫入（改寫後的 `stamp_message_sender()`）；送出後 MUST NOT 可修改內容，僅已讀時間可更新（FR-123、FR-124）
 - [X] T168 建立 `backend/src/sunny/routers/admin_messages.py`：**任一管理員皆可讀取並回覆所有討論串**；MUST NOT 提供「指派給特定客服」的機制；每次回覆 MUST 寫入 `admin_logs` 且**日誌 MUST NOT 含訊息內容**（FR-118、FR-127、FR-128）
-- [ ] T169 [P] 建立 `frontend/src/pages/Messages.tsx` 與 `frontend/src/components/MessageThread.tsx`：前台的會員 MUST 只看到「客服人員」，MUST NOT 顯示管理員姓名（FR-127）
-- [ ] T170 [P] 建立 `frontend/src/pages/admin/Messages.tsx`：管理員端 MUST 看得出每則回覆出自哪一位管理員（FR-127）
+- [X] T169 [P] 建立 `frontend/src/pages/Messages.tsx` 與 `frontend/src/components/MessageThread.tsx`：前台的會員 MUST 只看到「客服人員」，MUST NOT 顯示管理員姓名（FR-127）
+- [X] T170 [P] 建立 `frontend/src/pages/admin/Messages.tsx`：管理員端 MUST 看得出每則回覆出自哪一位管理員（FR-127）
 
 ---
 

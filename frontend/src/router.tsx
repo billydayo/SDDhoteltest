@@ -28,7 +28,12 @@ import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
+import { Favorites } from './pages/Favorites'
+import { Messages } from './pages/Messages'
 import { Forbidden, NotFound } from './pages/NotFound'
+import { RiskCheck } from './pages/RiskCheck'
+import { AdminLayout } from './pages/admin/AdminLayout'
+import { ADMIN_MODULES } from './pages/admin/modules'
 import { Placeholder } from './pages/Placeholder'
 import { useAuth } from './state/AuthContext'
 
@@ -125,6 +130,9 @@ export function AppRoutes() {
         {/* -- 公開 ------------------------------------------------------- */}
         <Route path="/" element={<Placeholder title="房源" task="T056" />} />
         <Route path="/rooms/:roomId" element={<Placeholder title="房源詳情" task="T057" />} />
+        {/* T146：照片安全檢測。**公開**——照片全程留在瀏覽器內，沒有任何
+            資料會被送到後端，因此不需要身分（FR-062、FR-066、SC-030）。 */}
+        <Route path="/risk-check" element={<RiskCheck />} />
         <Route path="/terms" element={<Placeholder title="服務條款與隱私聲明" task="T059" />} />
         <Route path="/login" element={<Placeholder title="登入" task="T073" />} />
         <Route path="/register" element={<Placeholder title="註冊" task="T074" />} />
@@ -154,16 +162,52 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
-
-        {/* -- 僅管理員 --------------------------------------------------- */}
+        {/* T153：我的收藏。⚠️ 網址上沒有 `userId`——收藏的擁有者由 token 判定，
+            「看別人的收藏」在介面上不可表達（`routers/favorites.py`）。 */}
         <Route
-          path="/admin/*"
+          path="/favorites"
           element={
-            <RequireAdmin>
-              <Placeholder title="後台" task="T126" />
-            </RequireAdmin>
+            <RequireAuth>
+              <Favorites />
+            </RequireAuth>
           }
         />
+        {/* T169：會員的客服訊息。⚠️ 網址上沒有討論串 id——每位會員只有一串，
+            由 token 決定是哪一串（`routers/messages.py`）。 */}
+        <Route
+          path="/messages"
+          element={
+            <RequireAuth>
+              <Messages />
+            </RequireAuth>
+          }
+        />
+
+        {/* -- 僅管理員 ---------------------------------------------------
+            T125：十二個模組掛在同一個 `AdminLayout` 之下，路由由
+            `pages/admin/modules.tsx` 的同一份陣列展開——導覽與路由因而
+            不可能分歧（見該檔說明）。
+
+            ⚠️ 守衛包在外層一次，而非逐個模組包一次。逐個包的問題是新增模組時
+            會忘記包，而忘記的那一個不會有任何測試失敗。 */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          {ADMIN_MODULES.map((module) =>
+            module.path === '' ? (
+              <Route key="index" index element={module.element} />
+            ) : (
+              <Route key={module.path} path={module.path} element={module.element} />
+            ),
+          )}
+          {/* 後台底下打錯的網址仍留在後台，導覽還在手邊。 */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>

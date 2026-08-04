@@ -25,6 +25,7 @@ import pytest
 import pytest_asyncio
 from fastapi.routing import APIRoute
 from httpx import ASGITransport
+from sqlalchemy import text
 
 from sunny.db import get_session
 from sunny.main import create_app
@@ -168,10 +169,24 @@ async def test_admin_can_read_logs(client, session, admin, admin_token: str) -> 
             target_table="rooms",
             summary={"index": i},
         )
-        # ⚠️ 每一筆各自提交。`created_at` 的預設是 `now()`，而 `now()` 是**交易
-        # 開始的時間**——三筆寫在同一個交易裡會拿到完全相同的時間戳，「由新到舊」
-        # 於是無序可言，排序結果隨執行計畫變動。真實情況本來就是一次請求一筆。
-        await session.commit()
+    await session.commit()
+
+    # ⚠️ 三筆的時間戳 MUST 手動撥開。`created_at` 的預設是 `now()`，而 `now()`
+    # 回的是**交易開始的時間**——同一個交易裡寫的三筆會拿到一模一樣的時間，
+    # 「由新到舊」於是無序可言，排序結果隨執行計畫而變。
+    #
+    # 提交也救不了：測試跑在一個永不提交的外層交易裡（tests/conftest.py），
+    # 那個交易的 `now()` 從頭到尾是同一個值。正式環境是一次請求一筆、一筆一個
+    # 交易，本來就不會有這個問題，因此撥時間戳是還原真實情況，不是遷就測試。
+    for i in range(3):
+        await session.execute(
+            text(
+                "update admin_logs set created_at = now() + :offset * interval '1 second' "
+                "where action = :action"
+            ),
+            {"offset": i, "action": f"test.action{i}"},
+        )
+    await session.commit()
 
     res = await client.get("/admin/logs", headers=auth_header(admin_token))
     assert res.status_code == 200

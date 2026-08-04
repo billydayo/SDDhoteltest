@@ -26,6 +26,7 @@ import pytest
 import pytest_asyncio
 from fastapi.routing import APIRoute
 from httpx import ASGITransport
+from sqlalchemy import text
 
 from sunny.db import get_session
 from sunny.main import create_app
@@ -192,6 +193,20 @@ async def test_favorites_are_newest_first(client, session, member_token: str) ->
     for r in rooms:
         res = await client.post(f"/favorites/{r.id}", headers=auth_header(member_token))
         assert res.status_code == 204
+
+    # ⚠️ 三筆的 `created_at` MUST 手動撥開。它的預設是 `now()`，而 `now()` 回的是
+    # **交易開始的時間**——同一個交易裡的三筆收藏時間完全相同，「由新到舊」於是
+    # 無序可言。測試跑在一個永不提交的外層交易裡（tests/conftest.py），連提交
+    # 都換不到新的時間。正式環境是三次請求、三個交易，本來就不會撞在一起。
+    for i, r in enumerate(rooms):
+        await session.execute(
+            text(
+                "update favorites set created_at = now() + :offset * interval '1 second' "
+                "where room_id = :room_id"
+            ),
+            {"offset": i, "room_id": r.id},
+        )
+    await session.commit()
 
     listed = await client.get("/favorites", headers=auth_header(member_token))
     ids = [r["id"] for r in listed.json()]

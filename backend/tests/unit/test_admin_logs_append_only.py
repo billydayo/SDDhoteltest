@@ -87,6 +87,38 @@ def _app_role_url() -> str | None:
 
 
 @pytest_asyncio.fixture
+async def actor_id(engine) -> AsyncIterator[str]:
+    """一位**真的存在於資料庫**的操作者，測試結束後連同其日誌一併刪除。
+
+    ⚠️ 不能沿用 conftest 的 `member`／`admin`。那些帳號寫在測試的外層交易裡，
+    從未提交；本檔以另一條連線（應用角色）寫日誌，看不到未提交的資料，
+    外鍵會直接違反。
+
+    清理由**擁有者**這條連線執行：`REVOKE UPDATE, DELETE` 只綁 `sunny_app`，
+    擁有者刪得掉——這正是本檔要驗證的那道分界，順手用在這裡不衝突。
+    """
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as owner:
+        pid = await owner.scalar(
+            text(
+                "insert into public.profiles (email, password_hash, role, display_name) "
+                "values (:email, 'x', 'admin', '稽核測試') returning id"
+            ),
+            {"email": f"append-only-{uuid.uuid4().hex[:8]}@example.com"},
+        )
+        await owner.commit()
+        try:
+            yield str(pid)
+        finally:
+            await owner.rollback()
+            await owner.execute(
+                text("delete from public.admin_logs where actor_id = :id"), {"id": pid}
+            )
+            await owner.execute(text("delete from public.profiles where id = :id"), {"id": pid})
+            await owner.commit()
+
+
+@pytest_asyncio.fixture
 async def app_session() -> AsyncIterator:
     url = _app_role_url()
     if url is None:
@@ -102,19 +134,15 @@ async def app_session() -> AsyncIterator:
         await engine.dispose()
 
 
-async def _existing_log_id(session) -> str:
-    """取一筆現有的紀錄；沒有就插一筆。
+async def _existing_log_id(session, actor: str) -> str:
+    """插入一筆屬於本次測試的紀錄並回傳其 id。
 
     **INSERT 必須是被允許的**——僅可新增的意思是「只能新增」，不是「不能寫」。
     這一步順帶驗證了那件事：若連 INSERT 都失敗，稽核根本無法運作。
-    """
-    existing = await session.scalar(text("select id from public.admin_logs limit 1"))
-    if existing is not None:
-        return str(existing)
 
-    actor = await session.scalar(text("select id from public.profiles limit 1"))
-    if actor is None:
-        pytest.skip("資料庫中沒有任何 profile，無法建立測試用日誌")
+    ⚠️ 刻意不沿用資料庫裡既有的任何一筆。改動別人的資料列會讓「刪不掉」與
+    「這一列不存在」變得無從分辨。
+    """
 
     inserted = await session.scalar(
         text(
@@ -127,20 +155,20 @@ async def _existing_log_id(session) -> str:
     return str(inserted)
 
 
-async def test_the_app_role_can_insert(app_session) -> None:
+async def test_the_app_role_can_insert(app_session, actor_id) -> None:
     """**僅可新增**的前半段：INSERT MUST 成功。
 
     若這裡失敗，`services/audit.py` 根本寫不進任何東西，而每一個後台寫入
     端點都會 500——那是比日誌可竄改更明顯的問題，但仍值得在這裡標明，
     否則下面兩個測試「全都失敗」看起來會像是通過了。
     """
-    log_id = await _existing_log_id(app_session)
+    log_id = await _existing_log_id(app_session, actor_id)
     assert log_id
 
 
-async def test_update_is_denied(app_session) -> None:
+async def test_update_is_denied(app_session, actor_id) -> None:
     """**UPDATE MUST 失敗**（FR-116、SC-027）。"""
-    log_id = await _existing_log_id(app_session)
+    log_id = await _existing_log_id(app_session, actor_id)
 
     with pytest.raises((ProgrammingError, DBAPIError)) as exc:
         await app_session.execute(
@@ -153,9 +181,9 @@ async def test_update_is_denied(app_session) -> None:
     await app_session.rollback()
 
 
-async def test_delete_is_denied(app_session) -> None:
+async def test_delete_is_denied(app_session, actor_id) -> None:
     """**DELETE MUST 失敗**（FR-116、SC-027）。"""
-    log_id = await _existing_log_id(app_session)
+    log_id = await _existing_log_id(app_session, actor_id)
 
     with pytest.raises((ProgrammingError, DBAPIError)) as exc:
         await app_session.execute(
@@ -177,7 +205,7 @@ async def test_truncate_is_denied(app_session) -> None:
     await app_session.rollback()
 
 
-async def test_an_admin_identity_does_not_help(app_session) -> None:
+async def test_an_admin_identity_does_not_help(app_session, actor_id) -> None:
     """**含以管理員身分。**
 
     這是本檔最容易被誤解的一點：資料庫層**根本不知道誰是管理員**。
@@ -188,7 +216,7 @@ async def test_an_admin_identity_does_not_help(app_session) -> None:
     使用者，包含管理員。此測試把這件事寫下來，讓日後有人問「那管理員呢」時
     有個明確的答案，而不是去補一個實際上測不到差異的案例。
     """
-    log_id = await _existing_log_id(app_session)
+    log_id = await _existing_log_id(app_session, actor_id)
 
     with pytest.raises((ProgrammingError, DBAPIError)):
         await app_session.execute(

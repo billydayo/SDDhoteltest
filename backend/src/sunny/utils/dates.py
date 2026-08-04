@@ -52,7 +52,7 @@ def tomorrow() -> date:
 _CALENDAR_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
-def parse_calendar_date(value: str, *, field: str = "日期") -> date:
+def parse_calendar_date(value: str, *, field: str = "日期", field_name: str | None = None) -> date:
     """嚴格解析 `YYYY-MM-DD`。
 
     兩層檢查，缺一不可：
@@ -64,11 +64,22 @@ def parse_calendar_date(value: str, *, field: str = "日期") -> date:
       在字典序下大於 `"2026-08-05"`。這種錯不會拋例外，只會讓順序悄悄錯掉。
 
     因此先以正規式鎖住形狀，再交給 `strptime` 驗證該日期真的存在（擋掉 2026-02-30）。
+
+    ⚠️ **兩個參數長得很像，但用途完全相反：**
+
+    - `field` 是**給人看的標籤**（「入住日」），會出現在訊息裡
+    - `field_name` 是**給程式看的欄位名**（`check_in`），前端拿它組
+      `[name="..."]` 選擇器把焦點移過去（FR-010）
+
+    弄反的後果不對稱：把中文標籤當欄位名送出去，前端找不到那個輸入框，焦點
+    就**安靜地不動**。`main.py` 的 `_FIELD_NAME_RE` 會擋下並記一筆警告，
+    但畫面上看不出任何異常。
     """
     if not isinstance(value, str) or not _CALENDAR_DATE_RE.match(value):
         raise DomainError(
             f"{field}格式錯誤，需為 YYYY-MM-DD（月與日需補零）。",
             code="INVALID_DATE_FORMAT",
+            field=field_name,
         )
     try:
         return datetime.strptime(value, CALENDAR_DATE_FORMAT).date()
@@ -76,6 +87,7 @@ def parse_calendar_date(value: str, *, field: str = "日期") -> date:
         raise DomainError(
             f"{field}不是有效的日期。",
             code="INVALID_DATE_FORMAT",
+            field=field_name,
         ) from exc
 
 
@@ -115,14 +127,24 @@ def validate_stay_dates(check_in: date, check_out: date) -> int:
     8/10–8/08 這種倒置區間時，先告訴他「退房日必須晚於入住日」比先說
     「入住日太早」有用——後者會讓他去改一個不是問題的欄位。
     """
+    # ⚠️ `field` 指向**使用者該去改的那一格**，不是「被判定為錯的那一格」。
+    #
+    # 區間倒置時把焦點送到退房日：改退房日一次就能修好，改入住日則要連帶重想
+    # 整趟行程。少了這個值，FR-010 的焦點移動會安靜地失效——訊息出現了，
+    # 而游標留在原地，使用者得自己找那一格在哪。
     if check_out <= check_in:
-        raise DomainError("退房日必須晚於入住日。", code="INVALID_DATE_RANGE")
+        raise DomainError(
+            "退房日必須晚於入住日。",
+            code="INVALID_DATE_RANGE",
+            field="check_out",
+        )
 
     earliest = tomorrow()
     if check_in < earliest:
         raise DomainError(
             f"訂房需提前一天，最早可選日期為 {format_calendar_date(earliest)}。",
             code="CHECK_IN_TOO_EARLY",
+            field="check_in",
         )
 
     return nights_between(check_in, check_out)

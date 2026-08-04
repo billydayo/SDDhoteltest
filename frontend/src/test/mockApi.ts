@@ -16,6 +16,7 @@ import type {
   AdminRoom,
   AdminUser,
   DashboardStats,
+  Order,
   OrderStats,
   Profile,
   RiskCheck,
@@ -120,10 +121,51 @@ export const ORDER_STATS: OrderStats = {
   averageOrderValue: 10667,
 }
 
+/**
+ * 一筆訂單。
+ *
+ * ⚠️ `expiresAt` 預設在**很遠的未來**：`PaymentCountdown` 會依它決定顯示倒數
+ * 還是「付款時間已過」。用一個接近現在的時間當預設，測試會在跑得慢的機器上
+ * 隨機失敗，而失敗訊息會指向一個與時間毫無關係的斷言。
+ */
+export function makeOrder(overrides: Partial<Order> = {}): Order {
+  return {
+    id: 'bbbbbbbb-0000-0000-0000-000000000001',
+    orderNo: 'SN20260804001',
+    roomId: 'aaaaaaaa-0000-0000-0000-000000000001',
+    checkIn: '2026-09-01',
+    checkOut: '2026-09-03',
+    nights: 2,
+    guestCount: 2,
+    contactName: '王小明',
+    phone: '0912345678',
+    email: 'member@example.com',
+    paymentMethod: 'LINE Pay',
+    totalAmount: 6400,
+    status: 'pending-payment',
+    expiresAt: '2099-01-01T00:00:00Z',
+    cancelReason: null,
+    createdAt: '2026-08-04T00:00:00Z',
+    ...overrides,
+  }
+}
+
 /** 一則要回給前端的錯誤。`body` 的形狀與後端的 `DomainError` 一致。 */
 export interface MockError {
   status: number
   body: { detail: string; code: string; field?: string }
+}
+
+/**
+ * 這個回傳值是「錯誤」還是「資料」。
+ *
+ * ⚠️ **MUST NOT 用 `'status' in result` 判斷。** `Order` 自己就有一個 `status`
+ * 欄位（`pending-payment` 等），那樣寫會把每一筆正常的訂單都當成錯誤回應，
+ * 而 `status` 是字串，`new Response(..., {status: 'pending-payment'})` 會拋一個
+ * 與訂單毫無關係的例外。`body` 才是 `MockError` 獨有的。
+ */
+function isMockError(result: object): result is MockError {
+  return 'body' in result
 }
 
 export interface MockOptions {
@@ -156,6 +198,10 @@ export interface MockOptions {
    * 條件出錯時，前一次的結果 MUST 留在畫面上。
    */
   onRooms?: (query: string) => MockError | null
+  /** `POST /orders`。回傳建立好的訂單，或 `MockError`。 */
+  onOrderCreate?: (body: unknown) => MockError | Order
+  /** `POST /orders/{id}/pay`。 */
+  onOrderPay?: (orderId: string) => MockError | Order
 }
 
 function json(body: unknown, status = 200): Response {
@@ -196,7 +242,7 @@ export function mockApi(options: MockOptions = {}) {
 
     if (path.endsWith('/me') && method === 'PATCH') {
       const result = options.onProfileUpdate?.(body)
-      if (result && 'status' in result) return Promise.resolve(json(result.body, result.status))
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
       return Promise.resolve(json(result ?? loggedIn()))
     }
 
@@ -228,6 +274,20 @@ export function mockApi(options: MockOptions = {}) {
     }
     if (path.endsWith('/admin/users')) {
       return Promise.resolve(json(options.adminUsers ?? []))
+    }
+
+    // 訂單。⚠️ `/pay` 要在 `/orders` 之前判斷——後者用的是 `endsWith`，
+    // 而 `/api/orders/xxx/pay` 並不以 `/orders` 結尾，但先寫先贏的習慣值得保持。
+    const payMatch = /\/orders\/([^/]+)\/pay$/.exec(path)
+    if (payMatch && method === 'POST') {
+      const result = options.onOrderPay?.(payMatch[1] ?? '')
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(json(result ?? makeOrder({ status: 'confirmed' })))
+    }
+    if (path.endsWith('/orders') && method === 'POST') {
+      const result = options.onOrderCreate?.(body)
+      if (result && isMockError(result)) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(json(result ?? makeOrder(), 201))
     }
 
     if (path.endsWith('/vocabulary')) {

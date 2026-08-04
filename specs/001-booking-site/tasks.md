@@ -262,12 +262,12 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；回應含 `expires_at` 供前端倒數
 - [X] T087 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/pay`：MUST 為訂單擁有者（非本人回 **403 而非 404**）；已逾期回 409 並說明該區間可能已被他人預訂（contracts/README.md）
 - [X] T088 [US3] 建立 `backend/src/sunny/repositories/settings.py`：讀取 `pending_payment_minutes()` 作為 `expires_at` 預設；**變更 MUST NOT 回溯影響既有訂單**（FR-098、FR-101）
-- [ ] T089 [US3] 建立 `frontend/src/pages/Booking.tsx`：三步驟流程與步驟間往返，已填內容 MUST 被保留；重整行為 MUST 可預期（回到該步驟保留內容，或明確回到起點並告知），MUST NOT 呈現半殘狀態（FR-020、FR-021）
-- [ ] T090 [US3] 於 `frontend/src/pages/Booking.tsx` 實作付款方式選擇（LINE Pay／信用卡／銀行轉帳）與「虛擬支付，不會產生任何實際交易」的明顯標示；**畫面上 MUST NOT 有任何要求輸入真實卡號、有效期限、CVV 或銀行帳號的欄位**（FR-027、FR-028、FR-029）
-- [ ] T091 [US3] 建立 `frontend/src/pages/OrderConfirm.tsx`：訂單確認頁含訂單編號、房源、日期、夜數、人數、付款方式與總金額（FR-031）
-- [ ] T092 [P] [US3] 建立 `frontend/src/components/PaymentCountdown.tsx`：待付款訂單的剩餘付款時間（FR-102）
-- [ ] T093 [US3] 於 `frontend/src/pages/Booking.tsx` 實作送出失敗的處理：伺服器逾時或拒絕時顯示可理解訊息並**保留使用者已填內容**，MUST NOT 靜默失敗、MUST NOT 改存本機後假裝成功（FR-083）
-- [ ] T093a [US3] 建立 `frontend/src/state/useStaleOrderSweep.ts`：應用開啟期間**至多每分鐘一次**主動觸發逾期訂單清理，使房源可訂狀態在使用者未主動操作時也能更新；**分頁不可見時 MUST 暫停**（`visibilitychange`），且 **MUST NOT 在使用者填寫表單的頁面上觸發重繪**（訂房流程與各表單頁 MUST 抑制）。此為前端輪詢，與 T081 的 repository 三個呼叫點是不同層次的機制，兩者皆需（FR-099a）
+- [X] T089 [US3] 建立 `frontend/src/pages/Booking.tsx`：三步驟流程與步驟間往返，已填內容 MUST 被保留；重整行為 MUST 可預期（回到該步驟保留內容，或明確回到起點並告知），MUST NOT 呈現半殘狀態（FR-020、FR-021）
+- [X] T090 [US3] 於 `frontend/src/pages/Booking.tsx` 實作付款方式選擇（LINE Pay／信用卡／銀行轉帳）與「虛擬支付，不會產生任何實際交易」的明顯標示；**畫面上 MUST NOT 有任何要求輸入真實卡號、有效期限、CVV 或銀行帳號的欄位**（FR-027、FR-028、FR-029）
+- [X] T091 [US3] 建立 `frontend/src/pages/OrderConfirm.tsx`：訂單確認頁含訂單編號、房源、日期、夜數、人數、付款方式與總金額（FR-031）
+- [X] T092 [P] [US3] 建立 `frontend/src/components/PaymentCountdown.tsx`：待付款訂單的剩餘付款時間（FR-102）
+- [X] T093 [US3] 於 `frontend/src/pages/Booking.tsx` 實作送出失敗的處理：伺服器逾時或拒絕時顯示可理解訊息並**保留使用者已填內容**，MUST NOT 靜默失敗、MUST NOT 改存本機後假裝成功（FR-083）
+- [X] T093a [US3] 建立 `frontend/src/state/useStaleOrderSweep.ts`：應用開啟期間**至多每分鐘一次**主動觸發逾期訂單清理，使房源可訂狀態在使用者未主動操作時也能更新；**分頁不可見時 MUST 暫停**（`visibilitychange`），且 **MUST NOT 在使用者填寫表單的頁面上觸發重繪**（訂房流程與各表單頁 MUST 抑制）。此為前端輪詢，與 T081 的 repository 三個呼叫點是不同層次的機制，兩者皆需（FR-099a）
 
 **Checkpoint**: 平台從型錄變成訂房系統；房況保證已由資料庫實際驗證
 

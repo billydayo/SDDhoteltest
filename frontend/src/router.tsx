@@ -30,9 +30,11 @@ import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
 import { Account } from './pages/Account'
 import { AuthCallback } from './pages/AuthCallback'
+import { Booking } from './pages/Booking'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { Forbidden, NotFound } from './pages/NotFound'
+import { OrderConfirm } from './pages/OrderConfirm'
 import { Placeholder } from './pages/Placeholder'
 import { Register } from './pages/Register'
 import { RoomDetail } from './pages/RoomDetail'
@@ -167,7 +169,7 @@ export function AppRoutes() {
           path="/booking/:roomId"
           element={
             <RequireAuth>
-              <Placeholder title="訂房" task="T089" />
+              <Booking />
             </RequireAuth>
           }
         />
@@ -175,7 +177,20 @@ export function AppRoutes() {
           path="/orders"
           element={
             <RequireAuth>
-              <Placeholder title="我的訂單" task="T094" />
+              <Placeholder title="我的訂單" task="T101" />
+            </RequireAuth>
+          }
+        />
+        {/*
+          訂單確認頁（FR-031）。獨立於日後的 `/orders/:orderId`（T102）之外，
+          因為兩者的資料來源不同：這一頁的內容由 `Booking` 以 location state
+          交過來，而訂單詳情頁會自己去查 `GET /orders/{id}`（T098）。
+        */}
+        <Route
+          path="/orders/:orderId/confirmed"
+          element={
+            <RequireAuth>
+              <OrderConfirm />
             </RequireAuth>
           }
         />

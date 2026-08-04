@@ -156,8 +156,10 @@ def prepare_booking(
     """
     ensure_room_is_bookable(room)
 
-    parsed_in = dates.parse_calendar_date(check_in, field="入住日")
-    parsed_out = dates.parse_calendar_date(check_out, field="退房日")
+    # `field` 是訊息裡的中文標籤，`field_name` 是前端拿來找輸入框的欄位名。
+    # 兩者都要給——只給前者的話，畫面會顯示訊息但游標不動（FR-010）。
+    parsed_in = dates.parse_calendar_date(check_in, field="入住日", field_name="check_in")
+    parsed_out = dates.parse_calendar_date(check_out, field="退房日", field_name="check_out")
     nights = dates.validate_stay_dates(parsed_in, parsed_out)
 
     guests = validate_guest_count(guest_count, room)

@@ -133,3 +133,49 @@ def test_today_uses_taipei_not_system_timezone() -> None:
 
 def test_tomorrow_is_exactly_one_day_after_today() -> None:
     assert dates.tomorrow() - dates.today() == timedelta(days=1)
+
+
+# ---------------------------------------------------------------------------
+# 逐欄錯誤要指得出「該去改哪一格」（FR-010）
+#
+# ⚠️ 這一組曾經整組是空的：訊息正確、`code` 正確，就是沒有 `field`。
+# 症狀是使用者看到「退房日必須晚於入住日」，而游標留在他剛剛離開的地方——
+# 表單長的時候，那一格根本不在畫面上。沒有人會把「游標沒動」回報成 bug。
+# ---------------------------------------------------------------------------
+def test_inverted_range_points_at_the_checkout_field() -> None:
+    """區間倒置指向**退房日**：改那一格一次就能修好。"""
+    tomorrow = dates.tomorrow()
+    with pytest.raises(DomainError) as exc:
+        dates.validate_stay_dates(tomorrow + timedelta(days=3), tomorrow)
+    assert exc.value.code == "INVALID_DATE_RANGE"
+    assert exc.value.field == "check_out"
+
+
+def test_same_day_range_points_at_the_checkout_field() -> None:
+    tomorrow = dates.tomorrow()
+    with pytest.raises(DomainError) as exc:
+        dates.validate_stay_dates(tomorrow, tomorrow)
+    assert exc.value.field == "check_out"
+
+
+def test_check_in_too_early_points_at_the_check_in_field() -> None:
+    today = dates.today()
+    with pytest.raises(DomainError) as exc:
+        dates.validate_stay_dates(today, today + timedelta(days=2))
+    assert exc.value.code == "CHECK_IN_TOO_EARLY"
+    assert exc.value.field == "check_in"
+
+
+def test_parse_calendar_date_carries_the_field_name_when_given_one() -> None:
+    """`field` 是給人看的標籤，`field_name` 才是欄位名。**兩者 MUST NOT 混用。**"""
+    with pytest.raises(DomainError) as exc:
+        dates.parse_calendar_date("2026/08/04", field="入住日", field_name="check_in")
+    assert "入住日" in exc.value.detail, "訊息裡要用看得懂的標籤"
+    assert exc.value.field == "check_in", "送給前端的要是欄位名，不是中文標籤"
+
+
+def test_parse_calendar_date_omits_the_field_when_there_is_no_input_box() -> None:
+    """沒有對應輸入框時 MUST NOT 硬塞一個名字——前端會拿它去查一個不存在的元素。"""
+    with pytest.raises(DomainError) as exc:
+        dates.parse_calendar_date("2026/08/04")
+    assert exc.value.field is None

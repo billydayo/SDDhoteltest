@@ -1,95 +1,166 @@
 /**
- * 列舉值 → 繁體中文顯示文字。
+ * 狀態代碼 → **繁體中文**（FR-069）。
  *
- * ⚠️ **T172a：所有介面文字 MUST 為繁體中文（台灣用語）。** 而後端回的是
- * `pending-payment`、`member-cancelled` 這類機器可讀的代碼——它們是**資料**，
- * 不是文案，MUST NOT 直接顯示。
+ * ## 為什麼集中在一處
  *
- * ## 為什麼集中在一個檔案
+ * 同一個 `pending-payment` 會出現在後台訂單列表、會員的我的訂單、匯出的檔案
+ * 與稽核日誌上。各處自己寫一份的話，同一個狀態在不同畫面上會有不同的名字
+ * ——「待付款」與「未付款」看起來像兩件事，而業者會問哪一個才對。
  *
- * 訂單狀態會同時出現在會員的訂單列表、訂單詳情、後台訂單管理與匯出的表頭。
- * 各頁面自己寫一份的話，同一個 `refund-pending` 會在四個地方變成四種說法
- * （「退款中」「退款審核中」「申請退款」「處理中」），而使用者會以為那是四種
- * 不同的狀態。
+ * ## 找不到對應時回傳原始代碼
  *
- * ## 為什麼是 `Record<..., string>` 而不是函式加 `default`
- *
- * 型別寫成完整的 `Record<OrderStatus, string>`，漏掉一個狀態會在**編譯期**
- * 就報錯。用 `switch` 加 `default: return value` 的話，新增一個狀態時畫面上
- * 會直接顯示英文代碼，而沒有任何東西會失敗。
- *
- * ⚠️ 本檔只 append、不重排（assignments.md「交界處」的同一條約定）。
+ * **MUST NOT 回空字串或「未知」。** 空白會讓那一格看起來像資料掉了；
+ * 而原始代碼雖然不好看，至少說得出實際發生的事，也讓漏掉的那一項在畫面上
+ * 就看得見，不必等有人回報。
  */
-import type { Availability, CancelReason, OrderStatus, PaymentMethod, Role, RoomStatus } from '../api/types'
+import type {
+  Availability,
+  AutoVerdict,
+  CancelReason,
+  OrderStatus,
+  RefundStatus,
+  ReviewStatus,
+  Role,
+  RoomStatus,
+} from '../api/types'
 
-/** 訂單狀態（FR-030 ~ FR-042）。 */
-export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+/** 徽章的語意色。與 `styles/index.css` 的語意色 token 對應。 */
+export type Tone = 'neutral' | 'ok' | 'warn' | 'danger' | 'info'
+
+export const TONE_CLASS: Record<Tone, string> = {
+  neutral: 'border-line-strong bg-surface-alt text-ink-muted',
+  ok: 'border-ok/30 bg-ok-soft text-ok',
+  warn: 'border-warn/30 bg-warn-soft text-warn',
+  danger: 'border-danger/30 bg-danger-soft text-danger',
+  info: 'border-info/30 bg-info-soft text-info',
+}
+
+function lookup<K extends string>(table: Record<K, string>, key: string): string {
+  return (table as Record<string, string | undefined>)[key] ?? key
+}
+
+// ---------------------------------------------------------------------------
+// 訂單
+// ---------------------------------------------------------------------------
+const ORDER_STATUS: Record<OrderStatus, string> = {
   'pending-payment': '待付款',
   confirmed: '已確認',
-  'refund-pending': '退款審核中',
+  'refund-pending': '退款待審核',
   refunded: '已退款',
   cancelled: '已取消',
   completed: '已完成',
 }
 
-/**
- * 訂單狀態的語意色。
- *
- * 顏色**只是輔助**：每一處都同時顯示文字。只用顏色區分狀態，對色覺辨識障礙者
- * 等於沒有區分（憲章原則 V）。
- */
-export const ORDER_STATUS_TONES: Record<OrderStatus, string> = {
-  'pending-payment': 'bg-warn-soft text-warn',
-  confirmed: 'bg-ok-soft text-ok',
-  'refund-pending': 'bg-info-soft text-info',
-  refunded: 'bg-surface-alt text-ink-muted',
-  cancelled: 'bg-surface-alt text-ink-muted',
-  completed: 'bg-forest-soft text-forest',
+const ORDER_STATUS_TONE: Record<OrderStatus, Tone> = {
+  'pending-payment': 'warn',
+  confirmed: 'ok',
+  'refund-pending': 'warn',
+  refunded: 'info',
+  cancelled: 'neutral',
+  completed: 'ok',
 }
 
+export const ORDER_STATUSES = Object.keys(ORDER_STATUS) as OrderStatus[]
+
+export const orderStatusLabel = (value: string) => lookup(ORDER_STATUS, value)
+export const orderStatusTone = (value: string): Tone =>
+  (ORDER_STATUS_TONE as Record<string, Tone | undefined>)[value] ?? 'neutral'
+
 /**
- * 取消原因（FR-035a）。
+ * 取消原因。
  *
- * ⚠️ 兩者都計入「未付款取消訂單數」，但 MUST 可區分——逾時未付與客人主動
- * 取消是兩種完全不同的營運訊號，前者多半代表付款流程有問題。
+ * ⚠️ 兩者都計入「未付款取消訂單數」，但**MUST 可區分**（FR-035a）：
+ * 逾時未付款是系統造成的流失，會員主動取消是需求改變，兩者要分開看。
  */
-export const CANCEL_REASON_LABELS: Record<CancelReason, string> = {
+const CANCEL_REASON: Record<CancelReason, string> = {
   'payment-timeout': '逾時未付款',
-  'member-cancelled': '會員自行取消',
+  'member-cancelled': '會員取消',
 }
 
-/** ⚠️ 三者皆為**模擬支付**，不涉及任何真實金流（FR-028）。 */
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  'LINE Pay': 'LINE Pay',
-  'credit-card': '信用卡',
-  'bank-transfer': '銀行轉帳',
+export const cancelReasonLabel = (value: string) => lookup(CANCEL_REASON, value)
+
+// ---------------------------------------------------------------------------
+// 房源
+// ---------------------------------------------------------------------------
+/**
+ * 房源的**營運狀態**（不分日期）。
+ *
+ * ⚠️ 只有兩種。「已預訂」不在這裡——它綁定日期，由訂單推導（FR-051）。
+ */
+const ROOM_STATUS: Record<RoomStatus, string> = {
+  available: '開放預訂',
+  maintenance: '維護中',
 }
 
-/** 房源的營運狀態。**刻意沒有「已預訂」**——那由訂單推導（FR-051）。 */
-export const ROOM_STATUS_LABELS: Record<RoomStatus, string> = {
-  available: '可販售',
-  maintenance: '整理中',
-}
+export const ROOM_STATUSES = Object.keys(ROOM_STATUS) as RoomStatus[]
+export const roomStatusLabel = (value: string) => lookup(ROOM_STATUS, value)
 
-/** 某一天的房態（FR-015）。這才是含「已預訂」的那一組。 */
-export const AVAILABILITY_LABELS: Record<Availability, string> = {
-  available: '空房',
+/** 某一天（或某個區間）的**推導**房態（FR-015、FR-051b）。 */
+const AVAILABILITY: Record<Availability, string> = {
+  available: '可訂',
   booked: '已預訂',
-  maintenance: '整理中',
+  maintenance: '維護中',
   unknown: '未知',
 }
 
-export const ROLE_LABELS: Record<Role, string> = {
+const AVAILABILITY_TONE: Record<Availability, Tone> = {
+  available: 'ok',
+  booked: 'info',
+  maintenance: 'warn',
+  unknown: 'neutral',
+}
+
+export const availabilityLabel = (value: string) => lookup(AVAILABILITY, value)
+export const availabilityTone = (value: string): Tone =>
+  (AVAILABILITY_TONE as Record<string, Tone | undefined>)[value] ?? 'neutral'
+
+// ---------------------------------------------------------------------------
+// 審核
+// ---------------------------------------------------------------------------
+const REVIEW_STATUS: Record<ReviewStatus, string> = {
+  pending: '待審核',
+  approved: '已通過',
+  rejected: '已駁回',
+}
+
+const REFUND_STATUS: Record<RefundStatus, string> = {
+  pending: '待審核',
+  approved: '已核准',
+  rejected: '已駁回',
+}
+
+const MODERATION_TONE: Record<string, Tone> = {
+  pending: 'warn',
+  approved: 'ok',
+  rejected: 'danger',
+}
+
+export const reviewStatusLabel = (value: string) => lookup(REVIEW_STATUS, value)
+export const refundStatusLabel = (value: string) => lookup(REFUND_STATUS, value)
+export const moderationTone = (value: string): Tone => MODERATION_TONE[value] ?? 'neutral'
+
+/**
+ * 自動審核的判定。
+ *
+ * ⚠️ 介面上 MUST 標示為「自動審核（規則式）」，**MUST NOT 描述為 AI**
+ * （FR-103a、憲章原則 VI）。這些字串刻意都用「建議」開頭：它是初判，
+ * 最終決定在管理員手上（FR-103b）。
+ */
+const AUTO_VERDICT: Record<AutoVerdict, string> = {
+  pass: '建議通過',
+  reject: '建議駁回',
+  review: '建議人工判斷',
+}
+
+export const autoVerdictLabel = (value: string) => lookup(AUTO_VERDICT, value)
+
+// ---------------------------------------------------------------------------
+// 身分
+// ---------------------------------------------------------------------------
+const ROLE: Record<Role, string> = {
   member: '會員',
   admin: '管理員',
 }
 
-/**
- * 顯示一個可能不在對照表裡的值。
- *
- * 後端新增了一個狀態而前端還沒跟上時，這裡回傳原始代碼而不是空白——
- * 空白會被讀成「沒有狀態」，而原始代碼至少讓人看得出發生了什麼事。
- */
-export function labelOf<T extends string>(labels: Record<T, string>, value: string): string {
-  return (labels as Record<string, string | undefined>)[value] ?? value
-}
+export const ROLES = Object.keys(ROLE) as Role[]
+export const roleLabel = (value: string) => lookup(ROLE, value)

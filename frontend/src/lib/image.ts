@@ -1,102 +1,102 @@
 /**
- * 上傳前的瀏覽器端縮圖與轉檔（FR-050c）。
+ * T127：**上傳前於瀏覽器內縮圖轉檔。MUST NOT 上傳原始檔**（憲章「上傳」條、
+ * FR-050c）。
  *
- * ⚠️ **MUST NOT 上傳原始檔。** 手機拍的照片動輒 4000×3000、5 MB 以上，而房源
- * 詳情頁最寬也只用到 1600px。直接送原始檔的代價不只是頻寬：後端有大小上限
- * （`max_upload_bytes`），使用者會在選好照片、等了十幾秒之後收到一句「圖片
- * 太大」——而他手上根本沒有縮圖工具。
+ * ## 為什麼不是「後端會擋，所以前端可以偷懶」
  *
- * ## ⚠️ 這個模組 MUST NOT 被 `pages/RiskCheck.tsx` 匯入
+ * 後端的 2 MB 上限（`config.py` 的 `max_upload_bytes`）是**最後一道網**，
+ * 不是壓縮的替代品。少了這一步，業者從手機挑一張 8 MB 的原圖會得到一個
+ * 「檔案過大」——他能做的只有放棄，或去找一個修圖軟體。而那張圖縮到 1600px
+ * 之後只有 200 KB，畫面上完全看不出差別。
  *
- * 前台的「安全檢測」是**照片不離開瀏覽器**的功能（FR-086、SC-030），
- * T144 會檢查 `RiskCheck.tsx` 的相依圖中不存在任何上傳模組。本檔雖然自己
- * 不發任何請求，但它存在的目的就是「為上傳做準備」——留在那張相依圖裡，
- * 下一個維護者只要順手接上 `api.admin.photos.upload` 就完成了一次外洩，
- * 而每一步看起來都很合理。
+ * 附帶的效果是原始檔的 EXIF（含 GPS 座標）不會被送出去：Canvas 重繪只保留
+ * 像素。業者用手機拍的房間照片帶著拍攝地點，而那些圖會公開顯示。
  *
- * 兩條路徑共用的是「以 Canvas 讀像素」這個手法，不是這個模組。
+ * ## 這裡沒有任何網路呼叫，也不該有
+ *
+ * 本模組只做「檔案 → 較小的檔案」。上傳由 `api/client.ts` 負責。
+ * 前台的安全檢測（US9）會用到同一組 Canvas 操作，但**MUST NOT 觸及上傳**
+ * ——照片全程留在瀏覽器內（FR-066、SC-030）。
  */
 
-/** 縮圖後的最長邊。房源詳情頁最寬用到約 1600px，再大只是浪費。 */
-const MAX_EDGE = 1600
+/** 長邊上限。1600px 在一般螢幕上放大看仍然清楚，而檔案通常落在 200–400 KB。 */
+export const MAX_EDGE = 1600
+
+/** JPEG 品質。0.82 是「肉眼看不出差別」與「檔案明顯變小」的常見折衷點。 */
+export const JPEG_QUALITY = 0.82
 
 /**
- * JPEG 品質。0.82 是肉眼幾乎看不出差別、檔案卻小上數倍的常見折衷點。
- * 再往下調，房間照片的漸層牆面會開始出現色塊。
+ * 接受的來源類型。
+ *
+ * ⚠️ **不含 SVG**，與後端 `services/room_photos.py` 一致：它是 XML，
+ * 可以內嵌 `<script>`，而這些圖片會被公開顯示於房源詳情頁。
  */
-const QUALITY = 0.82
+export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
 
-/** 轉出的格式。後端只收 jpeg／png／webp，三者中 jpeg 的相容性最好。 */
-const OUTPUT_TYPE = 'image/jpeg'
+/** 來源檔的大小上限。壓縮之後才送出，因此這裡可以比後端寬鬆得多。 */
+export const MAX_SOURCE_BYTES = 20 * 1024 * 1024
+
+export const ACCEPT_ATTRIBUTE = ACCEPTED_TYPES.join(',')
 
 /**
- * 讀進一個圖片檔並取得其像素來源。
+ * 檔案能不能處理。**回傳給使用者看的中文訊息，或 `null` 代表通過。**
  *
- * 優先用 `createImageBitmap`——它在 worker 之外也不阻塞主執行緒解碼。
- * 舊瀏覽器退回 `HTMLImageElement`，並且**一定要 `revokeObjectURL`**：
- * 每張沒有釋放的 object URL 都會讓那份檔案內容留在記憶體裡，
- * 而管理員一次挑八張照片是常態。
+ * 不丟例外：這是預期中的使用者輸入錯誤，不是程式錯誤。丟例外會誘使呼叫端
+ * 用 try/catch 把它和「壓縮失敗」混在一起，而那兩件事該顯示不同的話。
  */
-async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
-  if (typeof createImageBitmap === 'function') {
-    return await createImageBitmap(file)
+export function validateImageFile(file: File): string | null {
+  if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
+    return `僅接受 JPEG、PNG 或 WebP 圖片，「${file.name}」不是這些格式。`
   }
+  if (file.size > MAX_SOURCE_BYTES) {
+    const mb = Math.round(MAX_SOURCE_BYTES / 1024 / 1024)
+    return `「${file.name}」超過 ${String(mb)} MB，請先縮小後再試。`
+  }
+  return null
+}
 
-  const url = URL.createObjectURL(file)
-  try {
-    return await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image()
-      img.onload = () => {
-        resolve(img)
-      }
-      img.onerror = () => {
-        reject(new Error('這個檔案不是可讀取的圖片。'))
-      }
-      img.src = url
-    })
-  } finally {
-    URL.revokeObjectURL(url)
-  }
+/** 等比例縮到長邊不超過 `maxEdge`。已經夠小的圖不放大。 */
+function fit(width: number, height: number, maxEdge: number): { width: number; height: number } {
+  const longest = Math.max(width, height)
+  if (longest <= maxEdge) return { width, height }
+  const scale = maxEdge / longest
+  return { width: Math.round(width * scale), height: Math.round(height * scale) }
 }
 
 /**
- * 縮圖並轉成 JPEG。回傳一個可直接送出的 `File`。
+ * 縮圖並轉為 JPEG。回傳可直接上傳的 `Blob`。
  *
- * 小於上限的圖片**也會重新編碼**，不是浪費：手機照片帶著 EXIF，裡面可能含
- * 拍攝時的 GPS 座標。這些照片會被公開顯示在房源詳情頁上，而 Canvas 重繪的
- * 產物只有像素，沒有任何原始中繼資料——順手解決了一個沒有人會想到要檢查的
- * 隱私問題。
- *
- * @throws Error 檔案不是圖片，或瀏覽器無法編碼。訊息可直接顯示給使用者。
+ * 失敗時丟出帶有中文訊息的 `Error`——瀏覽器不支援、圖片損毀、記憶體不足都
+ * 可能發生，而「什麼都沒發生」是最糟的表現方式（FR-084 禁止靜默失敗）。
  */
-export async function resizeImageFile(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('請選擇圖片檔（JPG、PNG 或 WebP）。')
-  }
-
-  const source = await decode(file)
-  const scale = Math.min(1, MAX_EDGE / Math.max(source.width, source.height))
-  const width = Math.max(1, Math.round(source.width * scale))
-  const height = Math.max(1, Math.round(source.height * scale))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('瀏覽器無法處理這張圖片，請改用其他圖片或瀏覽器。')
-
-  // 先鋪白底：JPEG 沒有透明色，PNG 的透明區域直接畫上去會變成黑色。
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, width, height)
-  ctx.drawImage(source, 0, 0, width, height)
-
-  const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, OUTPUT_TYPE, QUALITY)
+export async function shrinkForUpload(file: File, maxEdge = MAX_EDGE): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => {
+    throw new Error(`無法讀取「${file.name}」，檔案可能已損毀。`)
   })
-  if (!blob) throw new Error('圖片轉檔失敗，請再試一次。')
 
-  // 檔名只是給人看的——伺服器會另外產生自己的檔名，不使用客戶端送來的值。
-  const name = file.name.replace(/\.[^.]+$/, '') || 'photo'
-  return new File([blob], `${name}.jpg`, { type: OUTPUT_TYPE })
+  try {
+    const size = fit(bitmap.width, bitmap.height, maxEdge)
+    const canvas = document.createElement('canvas')
+    canvas.width = size.width
+    canvas.height = size.height
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('此瀏覽器不支援圖片處理，請改用其他瀏覽器。')
+    ctx.drawImage(bitmap, 0, 0, size.width, size.height)
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob)
+          else reject(new Error('圖片壓縮失敗，請再試一次。'))
+        },
+        'image/jpeg',
+        JPEG_QUALITY,
+      )
+    })
+  } finally {
+    // 位圖佔的是解碼後的記憶體（寬 × 高 × 4 位元組）。連續處理八張 4000px
+    // 的照片而不釋放，在行動裝置上足以讓分頁被系統回收。
+    bitmap.close()
+  }
 }

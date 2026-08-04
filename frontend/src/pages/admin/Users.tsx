@@ -1,414 +1,363 @@
 /**
- * T129：用戶管理——會員資料維護與權限升降（FR-055）。
+ * T129：會員管理（FR-055）。
  *
- * ## 兩個入口，不是一個表單
+ * ## 資料維護與權限升降是兩個動作，不是同一張表單
  *
- * ⚠️ **角色變更與資料編輯是兩個端點，介面上也 MUST 分開。**
+ * 後端刻意把 `role` 從 `UserUpdateIn` 拿掉，只留一個獨立端點
+ * （`schemas/admin.py`）——這樣每一次角色變更都必然留下稽核紀錄。
+ * 畫面照著這個形狀走：改名字改電話是一件事，升降權限是另一件，
+ * 而且後者要二次確認。
  *
- * 後端的 `UserUpdateIn` 刻意沒有 `role` 欄位：角色走獨立端點，才能保證每一次
- * 升降權都留下稽核紀錄。前端若把兩者併成同一個表單再各自送兩個請求，畫面上
- * 看起來是一次儲存，實際上可能一半成功一半失敗——而失敗的那一半剛好是權限。
+ * 把它們合成一張表單的話，管理員在改電話時順手把下拉選單碰到了，
+ * 存檔後對方就成了管理員——而畫面上什麼異狀都沒有。
  *
- * 分成兩個明確的操作，也讓「升權」在介面上是一件需要刻意去做的事，
- * 而不是編輯電話時順手改到的一個下拉選單。
+ * ## 這裡看不到密碼，也看不到 Google 識別碼
  *
- * ## 降權立即生效
- *
- * `require_admin` 每次都重新查資料庫的 `role`，不信任 token payload。因此被
- * 降權的人**下一個操作**就會被擋下，不必等他重新登入（spec Edge Cases）。
- * 介面上要講清楚這件事——否則管理員會以為降權要等對方登出才生效，
- * 而在處理盜用帳號時那個誤解會讓他多等好幾個小時。
+ * `AdminUserOut` 明列欄位而非把 ORM 物件整個倒出來（`schemas/admin.py`）。
+ * 前端因此連「不小心顯示出來」的機會都沒有。
  */
-import { useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 
 import { api } from '../../api/client'
-import type { AdminUser, Role } from '../../api/types'
+import type { AdminUser, AdminUserFilters, Role } from '../../api/types'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
-import { Field } from '../../components/Field'
+import { ExportButton } from '../../components/ExportButton'
 import { LoadingState } from '../../components/LoadingState'
-import { TD, TH, TableScroll } from '../../components/TableScroll'
-import { formatTimestamp } from '../../lib/dates'
+import { useAsync } from '../../hooks/useAsync'
 import { messageFor } from '../../lib/errors'
-import { inputClass } from '../../lib/form'
-import { ROLE_LABELS, labelOf } from '../../lib/labels'
-import { useAsync } from '../../lib/useAsync'
-import { useAuth } from '../../state/AuthContext'
-import { AdminPageHeader } from './AdminLayout'
+import { roleLabel, ROLES } from '../../lib/labels'
+import {
+  Badge,
+  buttonClass,
+  Field,
+  FilterBar,
+  inputClass,
+  ModuleHeading,
+  Notice,
+  primaryButtonClass,
+  TableShell,
+  Td,
+  Th,
+} from './ui'
 
-export function AdminUsers() {
-  const [keyword, setKeyword] = useState('')
-  const [role, setRole] = useState('')
-  const [applied, setApplied] = useState({ keyword: '', role: '' })
+const EMPTY: AdminUserFilters = {}
 
-  const users = useAsync(
-    (signal) => {
-      // 空字串 MUST NOT 被送出：`?role=` 在後端是「角色等於空字串」，
-      // 結果是零筆，而使用者只是沒有選那一欄（同 `lib/filters.ts` 的作法）。
-      const query: { keyword?: string; role?: string } = {}
-      if (applied.keyword.trim()) query.keyword = applied.keyword.trim()
-      if (applied.role) query.role = applied.role
-      return api.admin.users.list(query, signal)
-    },
-    [applied.keyword, applied.role],
-  )
+// ---------------------------------------------------------------------------
+// 編輯一列
+// ---------------------------------------------------------------------------
+function EditRow({
+  user,
+  onDone,
+  onCancel,
+}: {
+  user: AdminUser
+  onDone: (message: string) => void
+  onCancel: () => void
+}) {
+  const [displayName, setDisplayName] = useState(user.displayName)
+  const [phone, setPhone] = useState(user.phone ?? '')
+  const [saving, setSaving] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+  const ids = useId()
+
+  async function save() {
+    setSaving(true)
+    setFailure(null)
+    try {
+      await api.admin.users.update(user.id, { displayName, phone })
+      onDone(`已更新「${displayName}」的資料。`)
+    } catch (cause) {
+      // ⚠️ 已填內容 MUST 保留（FR-083）。
+      setFailure(messageFor(cause).detail)
+      setSaving(false)
+    }
+  }
 
   return (
-    <div>
-      <AdminPageHeader
-        title="用戶管理"
-        description="維護會員資料與角色。角色變更會立即生效並寫入操作日誌。"
-      />
-
-      <form
-        className="mb-gap-5 grid gap-gap-3 rounded-lg border border-line-soft bg-surface p-gap-4 sm:grid-cols-3"
-        onSubmit={(e) => {
-          e.preventDefault()
-          setApplied({ keyword, role })
-        }}
-      >
-        <Field label="關鍵字" htmlFor="keyword" hint="比對顯示名稱與電子郵件">
-          <input
-            id="keyword"
-            name="keyword"
-            value={keyword}
-            onChange={(e) => {
-              setKeyword(e.target.value)
-            }}
-            className={inputClass}
-          />
-        </Field>
-
-        <Field label="角色" htmlFor="role">
-          <select
-            id="role"
-            name="role"
-            value={role}
-            onChange={(e) => {
-              setRole(e.target.value)
-            }}
-            className={inputClass}
-          >
-            <option value="">全部</option>
-            <option value="member">會員</option>
-            <option value="admin">管理員</option>
-          </select>
-        </Field>
-
-        <div className="flex items-end gap-gap-2">
-          <button
-            type="submit"
-            className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
-          >
-            搜尋
-          </button>
+    <tr className="bg-brand-soft/40">
+      <Td className="align-top">
+        <label htmlFor={`${ids}-name`} className="block text-tiny text-ink-muted">
+          顯示名稱
+        </label>
+        <input
+          id={`${ids}-name`}
+          value={displayName}
+          maxLength={60}
+          onChange={(e) => {
+            setDisplayName(e.target.value)
+          }}
+          className={inputClass}
+        />
+      </Td>
+      <Td className="align-top">{user.email}</Td>
+      <Td className="align-top">
+        <label htmlFor={`${ids}-phone`} className="block text-tiny text-ink-muted">
+          聯絡電話
+        </label>
+        <input
+          id={`${ids}-phone`}
+          value={phone}
+          maxLength={30}
+          onChange={(e) => {
+            setPhone(e.target.value)
+          }}
+          className={inputClass}
+        />
+      </Td>
+      <Td className="align-top">{roleLabel(user.role)}</Td>
+      <Td className="align-top">
+        <div className="flex flex-wrap gap-gap-1">
           <button
             type="button"
+            disabled={saving}
             onClick={() => {
-              setKeyword('')
-              setRole('')
-              setApplied({ keyword: '', role: '' })
+              void save()
             }}
-            className="rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
+            className={primaryButtonClass}
           >
-            清除
+            {saving ? '儲存中…' : '儲存'}
+          </button>
+          <button type="button" disabled={saving} onClick={onCancel} className={buttonClass}>
+            取消
           </button>
         </div>
-      </form>
+        {failure !== null && <p className="mt-gap-1 text-tiny text-danger">{failure}</p>}
+      </Td>
+    </tr>
+  )
+}
 
-      {users.error ? (
-        <ErrorState error={users.error} onRetry={users.reload} />
-      ) : users.loading && !users.data ? (
-        <LoadingState label="載入會員…" />
-      ) : users.data?.length === 0 ? (
-        <EmptyState title="沒有符合條件的會員" hint="試著清除關鍵字或改選其他角色。" />
-      ) : (
-        <>
-          <p aria-live="polite" className="mb-gap-2 text-small text-ink-muted">
-            共 {users.data?.length ?? 0} 位會員
-          </p>
-          <TableScroll label="會員清單">
-            <table className="w-full border-collapse">
-              <thead className="border-b border-line-soft bg-surface-alt">
-                <tr>
-                  <th className={TH}>顯示名稱</th>
-                  <th className={TH}>電子郵件</th>
-                  <th className={TH}>聯絡電話</th>
-                  <th className={TH}>角色</th>
-                  <th className={TH}>註冊時間</th>
-                  <th className={TH}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.data?.map((user) => (
-                  <UserRow key={user.id} user={user} onChanged={users.reload} />
-                ))}
-              </tbody>
-            </table>
-          </TableScroll>
-        </>
-      )}
+// ---------------------------------------------------------------------------
+// 角色升降的二次確認（FR-055）
+// ---------------------------------------------------------------------------
+function RoleConfirm({
+  user,
+  target,
+  onDone,
+  onCancel,
+}: {
+  user: AdminUser
+  target: Role
+  onDone: (message: string) => void
+  onCancel: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  async function apply() {
+    setBusy(true)
+    setFailure(null)
+    try {
+      await api.admin.users.setRole(user.id, target)
+      onDone(`已將「${user.displayName}」設為${roleLabel(target)}。`)
+    } catch (cause) {
+      setFailure(messageFor(cause).detail)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      role="alertdialog"
+      aria-label="變更權限"
+      className="mt-gap-4 rounded-base border border-warn/40 bg-warn-soft p-gap-4"
+    >
+      <h3 className="text-md text-ink">
+        將「{user.displayName}」從{roleLabel(user.role)}改為{roleLabel(target)}？
+      </h3>
+      <p className="mt-gap-2 text-small text-ink">
+        {target === 'admin'
+          ? '管理員能看到所有訂單與會員資料，並可調整系統參數。'
+          : '對方將失去後台的所有存取權限。'}
+        這項變更會記入操作日誌，且日誌無法修改或刪除。
+      </p>
+      {failure !== null && <Notice tone="danger">{failure}</Notice>}
+      <div className="mt-gap-3 flex gap-gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            void apply()
+          }}
+          className={primaryButtonClass}
+        >
+          {busy ? '變更中…' : '確定變更'}
+        </button>
+        <button type="button" disabled={busy} onClick={onCancel} className={buttonClass}>
+          取消
+        </button>
+      </div>
     </div>
   )
 }
 
-type Panel = 'none' | 'profile' | 'role'
+// ---------------------------------------------------------------------------
+// 頁面
+// ---------------------------------------------------------------------------
+export function Users() {
+  const [draft, setDraft] = useState<AdminUserFilters>(EMPTY)
+  const [filters, setFilters] = useState<AdminUserFilters>(EMPTY)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [roleChange, setRoleChange] = useState<{ user: AdminUser; target: Role } | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const ids = useId()
 
-function UserRow({ user, onChanged }: { user: AdminUser; onChanged: () => void }) {
-  const { user: me } = useAuth()
-  const [panel, setPanel] = useState<Panel>('none')
-  const isSelf = me?.id === user.id
+  const load = useCallback(
+    (signal: AbortSignal) => api.admin.users.list(filters, signal),
+    [filters],
+  )
+  const { status, data, error, reload } = useAsync<AdminUser[]>(load)
 
-  function toggle(next: Panel) {
-    setPanel((current) => (current === next ? 'none' : next))
+  function finish(text: string) {
+    setMessage(text)
+    setEditing(null)
+    setRoleChange(null)
+    reload()
   }
 
   return (
-    <>
-      <tr className="border-b border-line-soft last:border-0">
-        <td className={TD}>
-          {user.displayName}
-          {isSelf && <span className="ml-gap-1 text-tiny text-ink-muted">（你自己）</span>}
-        </td>
-        <td className={TD}>{user.email}</td>
-        <td className={TD}>{user.phone ?? '—'}</td>
-        <td className={TD}>
-          <span
-            className={[
-              'rounded-pill px-gap-2 py-gap-1 text-tiny',
-              user.role === 'admin' ? 'bg-brand-soft text-brand-strong' : 'bg-surface-alt text-ink-muted',
-            ].join(' ')}
+    <div>
+      {/* ⚠️ 匯出的用戶欄位不含電子郵件與密碼（`services/export.py` 的
+          `USER_COLUMNS`）——畫面上看得到 email，檔案裡沒有，這是刻意的
+          （FR-118）。 */}
+      <ModuleHeading
+        title="會員管理"
+        actions={
+          <ExportButton module="users" params={{ keyword: filters.keyword, role: filters.role }} />
+        }
+      />
+
+      <FilterBar
+        onReset={() => {
+          setDraft(EMPTY)
+          setFilters(EMPTY)
+        }}
+      >
+        <Field label="關鍵字" htmlFor={`${ids}-kw`} className="min-w-56">
+          <input
+            id={`${ids}-kw`}
+            value={draft.keyword ?? ''}
+            placeholder="顯示名稱或電子郵件"
+            onChange={(e) => {
+              setDraft({ ...draft, keyword: e.target.value })
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="身分" htmlFor={`${ids}-role`}>
+          <select
+            id={`${ids}-role`}
+            value={draft.role ?? ''}
+            onChange={(e) => {
+              const value = e.target.value
+              setDraft({ ...draft, role: value === '' ? undefined : (value as Role) })
+            }}
+            className={inputClass}
           >
-            {labelOf(ROLE_LABELS, user.role)}
-          </span>
-        </td>
-        <td className={`${TD} whitespace-nowrap`}>{formatTimestamp(user.createdAt)}</td>
-        <td className={TD}>
-          <div className="flex gap-gap-2">
-            <RowButton
-              active={panel === 'profile'}
-              onClick={() => {
-                toggle('profile')
-              }}
-            >
-              編輯資料
-            </RowButton>
-            <RowButton
-              active={panel === 'role'}
-              onClick={() => {
-                toggle('role')
-              }}
-            >
-              變更角色
-            </RowButton>
-          </div>
-        </td>
-      </tr>
-
-      {panel !== 'none' && (
-        <tr className="border-b border-line-soft bg-surface-alt">
-          <td colSpan={6} className="px-gap-3 py-gap-3">
-            {panel === 'profile' ? (
-              <ProfileForm
-                user={user}
-                onDone={() => {
-                  setPanel('none')
-                  onChanged()
-                }}
-              />
-            ) : (
-              <RoleForm
-                user={user}
-                isSelf={isSelf}
-                onDone={() => {
-                  setPanel('none')
-                  onChanged()
-                }}
-              />
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  )
-}
-
-function RowButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-expanded={active}
-      className="rounded-xs border border-line-strong px-gap-2 py-gap-1 text-tiny whitespace-nowrap text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
-    >
-      {children}
-    </button>
-  )
-}
-
-/** 顯示名稱與聯絡電話。**沒有角色欄位**——見本檔開頭。 */
-function ProfileForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
-  const [displayName, setDisplayName] = useState(user.displayName)
-  const [phone, setPhone] = useState(user.phone ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-
-  async function submit() {
-    setSaving(true)
-    setError(null)
-    try {
-      await api.admin.users.update(user.id, { displayName, phone })
-      onDone()
-    } catch (cause) {
-      setError(cause)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit()
-      }}
-      className="flex flex-wrap items-end gap-gap-3"
-    >
-      <div className="min-w-48">
-        <label htmlFor={`name-${user.id}`} className="mb-gap-1 block text-tiny text-ink-muted">
-          顯示名稱
-        </label>
-        <input
-          id={`name-${user.id}`}
-          name="displayName"
-          value={displayName}
-          onChange={(e) => {
-            setDisplayName(e.target.value)
+            <option value="">全部</option>
+            {ROLES.map((role) => (
+              <option key={role} value={role}>
+                {roleLabel(role)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <button
+          type="button"
+          className={buttonClass}
+          onClick={() => {
+            setFilters(draft)
           }}
-          maxLength={60}
-          className={inputClass}
-        />
-      </div>
-      <div className="min-w-48">
-        <label htmlFor={`phone-${user.id}`} className="mb-gap-1 block text-tiny text-ink-muted">
-          聯絡電話
-        </label>
-        <input
-          id={`phone-${user.id}`}
-          name="phone"
-          value={phone}
-          onChange={(e) => {
-            setPhone(e.target.value)
-          }}
-          maxLength={30}
-          className={inputClass}
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={saving}
-        className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:opacity-50"
-      >
-        {saving ? '儲存中…' : '儲存'}
-      </button>
-      {error != null && (
-        <p role="alert" className="w-full text-small text-danger">
-          {messageFor(error).detail}
-        </p>
-      )}
-    </form>
-  )
-}
-
-/**
- * 角色升降。
- *
- * ⚠️ **不可將自己降權**，後端會以 409 拒絕（`CANNOT_DEMOTE_SELF`）。這裡在
- * 送出前就擋下並說明理由——讓使用者按下按鈕才被拒絕，他會以為是系統故障，
- * 而真正的原因（系統可能因此失去所有管理員）他完全看不到。
- */
-function RoleForm({
-  user,
-  isSelf,
-  onDone,
-}: {
-  user: AdminUser
-  isSelf: boolean
-  onDone: () => void
-}) {
-  const [role, setRole] = useState<Role>(user.role)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-
-  const demotingSelf = isSelf && role !== 'admin'
-  const unchanged = role === user.role
-
-  async function submit() {
-    setSaving(true)
-    setError(null)
-    try {
-      await api.admin.users.setRole(user.id, role)
-      onDone()
-    } catch (cause) {
-      setError(cause)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit()
-      }}
-      className="flex flex-wrap items-end gap-gap-3"
-    >
-      <div className="min-w-40">
-        <label htmlFor={`role-${user.id}`} className="mb-gap-1 block text-tiny text-ink-muted">
-          角色
-        </label>
-        <select
-          id={`role-${user.id}`}
-          name="role"
-          value={role}
-          onChange={(e) => {
-            setRole(e.target.value as Role)
-          }}
-          className={inputClass}
         >
-          <option value="member">會員</option>
-          <option value="admin">管理員</option>
-        </select>
-      </div>
+          搜尋
+        </button>
+      </FilterBar>
 
-      <button
-        type="submit"
-        disabled={saving || unchanged || demotingSelf}
-        className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? '變更中…' : '確認變更'}
-      </button>
+      {message !== null && <Notice tone="ok">{message}</Notice>}
 
-      <p className="w-full text-tiny text-ink-muted">
-        {demotingSelf
-          ? '不可將自己降權。請由另一位管理員執行，以免系統失去所有管理員。'
-          : unchanged
-            ? '角色未變更。'
-            : '變更會立即生效——對方的下一個操作就會依新角色判定，不需要等他重新登入。'}
-      </p>
-
-      {error != null && (
-        <p role="alert" className="w-full text-small text-danger">
-          {messageFor(error).detail}
-        </p>
+      {roleChange !== null && (
+        <RoleConfirm
+          user={roleChange.user}
+          target={roleChange.target}
+          onDone={finish}
+          onCancel={() => {
+            setRoleChange(null)
+          }}
+        />
       )}
-    </form>
+
+      {status === 'error' ? (
+        <ErrorState error={error} onRetry={reload} />
+      ) : data === null ? (
+        <LoadingState label="載入會員…" />
+      ) : data.length === 0 ? (
+        <EmptyState title="沒有符合條件的會員" hint="換一組關鍵字或清除條件後再試一次。" />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <Th>顯示名稱</Th>
+              <Th>電子郵件</Th>
+              <Th>聯絡電話</Th>
+              <Th>身分</Th>
+              <Th>操作</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((user) =>
+              editing === user.id ? (
+                <EditRow
+                  key={user.id}
+                  user={user}
+                  onDone={finish}
+                  onCancel={() => {
+                    setEditing(null)
+                  }}
+                />
+              ) : (
+                <tr key={user.id}>
+                  <Td>{user.displayName}</Td>
+                  <Td>{user.email}</Td>
+                  <Td>{user.phone ?? '—'}</Td>
+                  <Td>
+                    <Badge tone={user.role === 'admin' ? 'info' : 'neutral'}>
+                      {roleLabel(user.role)}
+                    </Badge>
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-gap-1">
+                      <button
+                        type="button"
+                        className={buttonClass}
+                        onClick={() => {
+                          setRoleChange(null)
+                          setEditing(user.id)
+                        }}
+                      >
+                        編輯資料
+                      </button>
+                      <button
+                        type="button"
+                        className={buttonClass}
+                        onClick={() => {
+                          setEditing(null)
+                          setRoleChange({
+                            user,
+                            target: user.role === 'admin' ? 'member' : 'admin',
+                          })
+                        }}
+                      >
+                        {user.role === 'admin' ? '降為會員' : '升為管理員'}
+                      </button>
+                    </div>
+                  </Td>
+                </tr>
+              ),
+            )}
+          </tbody>
+        </TableShell>
+      )}
+    </div>
   )
 }

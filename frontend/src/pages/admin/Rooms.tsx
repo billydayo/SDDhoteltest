@@ -1,86 +1,59 @@
 /**
- * T127：房源管理——CRUD、房態調整與照片管理（FR-050 ~ FR-053a）。
+ * T127：房源管理（FR-050 ~ FR-052、FR-051b）。
  *
- * ## 「已預訂」不是一個可以設定的房態
+ * ## 房態有兩種，畫面上必須分得開
  *
- * ⚠️ **可人工設定的只有「可販售」與「整理中」**（FR-051）。「已預訂」由當日
- * 的有效訂單推導，MUST NOT 出現在任何一個 `<select>` 裡。
+ * - `status`：**營運狀態**，只有「開放預訂」與「維護中」，不分日期，可人工設定
+ * - `availability`：**所查區間推導出來的**，含「已預訂」，MUST NOT 人工設定
  *
- * 因此這張表有**兩欄狀態**，而它們不是重複：
+ * 後端連 `RoomWriteIn.status` 都拒絕 `booked`（`schemas/admin.py`）。畫面上
+ * 若把兩者畫成同一個下拉選單，業者會去找「為什麼不能把房間設成已預訂」。
  *
- * - 「房態」＝ `status`，業者設定的營運狀態，不分日期
- * - 「所查期間」＝ `availability`，依查詢的日期區間推導（FR-051b）
+ * ## 刪除前先說清楚會影響誰（FR-052）
  *
- * 一間房可以同時是「可販售」與「已預訂」——那正是正常營運的樣子。合併成一欄
- * 就得二選一，而無論選哪個都會讓另一件事看不見。
+ * 直接跳一句「確定刪除？」等於沒問——業者不知道那間房底下還有三筆已付款的
+ * 訂單。因此按下刪除後先向後端取受影響的訂單，逐筆列出來再讓他決定。
  *
- * ## 篩「已預訂」要先選日期
+ * ## 照片：上傳與掛載分開（FR-050f）
  *
- * FR-053a：沒有日期的「已預訂」不成立——已預訂是相對於某一天說的。這裡在送出
- * 前就擋下並說明，而不是送一個註定被拒的請求。
- *
- * ## 刪除是兩段式
- *
- * FR-052：先問後端影響範圍，列出受影響的訂單，確認後才帶 `confirm=true` 執行。
- * ⚠️ 二次確認**由伺服器端落實**——前端這個對話框只是把理由講給人聽，
- * 真正擋下未確認刪除的是後端（見 `api.admin.rooms.remove`）。
+ * 上傳只回傳路徑，沒有寫進任何房源。因此本頁記下「這次上傳了哪些」，
+ * 在取消時清掉它們，在儲存時清掉「上傳了但最後沒留在清單裡」的那些。
+ * 少了這一步，每一次反悔都會在伺服器上留下一個沒有人引用的檔案。
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useId, useMemo, useState, type SyntheticEvent } from 'react'
 
 import { api } from '../../api/client'
-import type {
-  AdminRoom,
-  AdminRoomSearchParams,
-  AffectedOrder,
-  RoomStatus,
-  RoomWriteInput,
-} from '../../api/types'
+import type { AdminRoom, AdminRoomFilters, AffectedOrder, RoomWriteInput } from '../../api/types'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState } from '../../components/ErrorState'
-import { Field } from '../../components/Field'
+import { ExportButton } from '../../components/ExportButton'
 import { ImageManager } from '../../components/ImageManager'
 import { LoadingState } from '../../components/LoadingState'
-import { TD, TD_NUM, TH, TableScroll } from '../../components/TableScroll'
-import { formatDisplayDate } from '../../lib/dates'
+import { useAsync } from '../../hooks/useAsync'
 import { messageFor } from '../../lib/errors'
-import { inputClass } from '../../lib/form'
-import { AVAILABILITY_LABELS, ORDER_STATUS_LABELS, ROOM_STATUS_LABELS, labelOf } from '../../lib/labels'
-import { formatAmount } from '../../lib/money'
-import { useAsync } from '../../lib/useAsync'
-import { AdminPageHeader } from './AdminLayout'
+import {
+  availabilityLabel,
+  availabilityTone,
+  ROOM_STATUSES,
+  roomStatusLabel,
+} from '../../lib/labels'
+import { formatTWD } from '../../lib/money'
+import {
+  Badge,
+  buttonClass,
+  dangerButtonClass,
+  Field,
+  FilterBar,
+  inputClass,
+  ModuleHeading,
+  Notice,
+  primaryButtonClass,
+  TableShell,
+  Td,
+  Th,
+} from './ui'
 
-interface RoomFilters {
-  keyword: string
-  type: string
-  minPrice: string
-  maxPrice: string
-  startDate: string
-  endDate: string
-  status: string
-}
-
-const EMPTY_FILTERS: RoomFilters = {
-  keyword: '',
-  type: '',
-  minPrice: '',
-  maxPrice: '',
-  startDate: '',
-  endDate: '',
-  status: '',
-}
-
-/** 表單值 → 查詢參數。空字串 MUST NOT 被送出（同 `lib/filters.ts` 的作法）。 */
-function toQuery(values: RoomFilters): AdminRoomSearchParams {
-  const query: AdminRoomSearchParams = {}
-  if (values.keyword.trim()) query.keyword = values.keyword.trim()
-  if (values.type) query.type = values.type
-  if (values.minPrice) query.minPrice = Number(values.minPrice)
-  if (values.maxPrice) query.maxPrice = Number(values.maxPrice)
-  if (values.startDate) query.startDate = values.startDate
-  if (values.endDate) query.endDate = values.endDate
-  if (values.status) query.status = values.status
-  return query
-}
+const EMPTY_FILTERS: AdminRoomFilters = {}
 
 const BLANK_ROOM: RoomWriteInput = {
   name: '',
@@ -94,756 +67,584 @@ const BLANK_ROOM: RoomWriteInput = {
   status: 'available',
 }
 
-/** 編輯中的對象：`null` 為關閉，`'new'` 為新增，否則為該房源。 */
-type Editing = null | 'new' | AdminRoom
+function toInput(room: AdminRoom): RoomWriteInput {
+  return {
+    name: room.name,
+    type: room.type,
+    maxGuests: room.maxGuests,
+    nightlyPrice: room.nightlyPrice,
+    description: room.description,
+    images: room.images,
+    amenities: room.amenities,
+    features: room.features,
+    status: room.status,
+  }
+}
 
-export function AdminRooms() {
-  const [filters, setFilters] = useState<RoomFilters>(EMPTY_FILTERS)
-  const [applied, setApplied] = useState<RoomFilters>(EMPTY_FILTERS)
-  const [editing, setEditing] = useState<Editing>(null)
-  const [deleting, setDeleting] = useState<AdminRoom | null>(null)
+// ---------------------------------------------------------------------------
+// 表單
+// ---------------------------------------------------------------------------
+interface RoomFormProps {
+  /** `null` 為新增。 */
+  room: AdminRoom | null
+  onDone: (message: string) => void
+  onCancel: () => void
+}
 
-  const rooms = useAsync(
-    (signal) => api.admin.rooms.list(toQuery(applied), signal),
-    [JSON.stringify(applied)],
-  )
+function RoomForm({ room, onDone, onCancel }: RoomFormProps) {
+  const [draft, setDraft] = useState<RoomWriteInput>(room ? toInput(room) : BLANK_ROOM)
+  /** 本次上傳的檔案路徑。⚠️ 沒有這份清單就無法履行 FR-050f。 */
+  const [uploaded, setUploaded] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<unknown>(null)
+  const ids = useId()
 
-  const done = useCallback(() => {
-    setEditing(null)
-    setDeleting(null)
-    rooms.reload()
-  }, [rooms])
+  const loadVocabulary = useCallback((signal: AbortSignal) => api.vocabulary.get(signal), [])
+  const vocabulary = useAsync(loadVocabulary)
+
+  /** 上傳了但最後不在清單裡的檔案。取消時是全部，儲存時是被移除的那些。 */
+  function orphans(keep: string[]): string[] {
+    return uploaded.filter((path) => !keep.includes(path))
+  }
+
+  function discard(paths: string[]) {
+    // 清理失敗不該擋住使用者——他要的是離開這張表單。失敗的檔案留在伺服器上
+    // 是個小問題，卡住不讓他走是個大問題。
+    for (const path of paths) {
+      void api.admin.roomPhotos.discard(path).catch(() => undefined)
+    }
+  }
+
+  function cancel() {
+    discard(orphans([]))
+    onCancel()
+  }
+
+  async function submit(event: SyntheticEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      if (room) {
+        await api.admin.rooms.update(room.id, draft)
+      } else {
+        await api.admin.rooms.create(draft)
+      }
+      discard(orphans(draft.images))
+      onDone(room ? `已更新「${draft.name}」。` : `已新增「${draft.name}」。`)
+    } catch (cause) {
+      // ⚠️ **表單內容保留**（FR-083）。清空重來會讓使用者失去剛剛打的一切，
+      // 而失敗的原因常常只是一個欄位。
+      setError(cause)
+      setSaving(false)
+    }
+  }
+
+  function toggle(key: 'amenities' | 'features', value: string) {
+    setDraft((prev) => ({
+      ...prev,
+      [key]: prev[key].includes(value)
+        ? prev[key].filter((v) => v !== value)
+        : [...prev[key], value],
+    }))
+  }
 
   return (
-    <div>
-      <AdminPageHeader
-        title="房源管理"
-        description="新增、編輯與下架房源。「已預訂」由訂單推導，不可人工設定。"
-        actions={
-          <button
-            type="button"
-            onClick={() => {
-              setEditing('new')
-            }}
-            className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
-          >
-            新增房源
-          </button>
-        }
-      />
+    <form
+      onSubmit={(event) => {
+        void submit(event)
+      }}
+      className="mt-gap-4 rounded-base border border-brand/30 bg-surface p-gap-4"
+      aria-label={room ? '編輯房源' : '新增房源'}
+    >
+      <h3 className="text-md text-ink">{room ? `編輯「${room.name}」` : '新增房源'}</h3>
 
-      {editing !== null ? (
-        <RoomForm
-          room={editing === 'new' ? null : editing}
-          onCancel={() => {
-            setEditing(null)
+      <div className="mt-gap-3 flex flex-wrap gap-gap-3">
+        <Field label="房名" htmlFor={`${ids}-name`} className="min-w-56 flex-1">
+          <input
+            id={`${ids}-name`}
+            required
+            maxLength={120}
+            value={draft.name}
+            onChange={(e) => {
+              setDraft({ ...draft, name: e.target.value })
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="房型" htmlFor={`${ids}-type`} className="min-w-40 flex-1">
+          <input
+            id={`${ids}-type`}
+            required
+            maxLength={60}
+            value={draft.type}
+            onChange={(e) => {
+              setDraft({ ...draft, type: e.target.value })
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="可住人數" htmlFor={`${ids}-guests`} className="w-32">
+          <input
+            id={`${ids}-guests`}
+            type="number"
+            min={1}
+            max={20}
+            required
+            value={draft.maxGuests}
+            onChange={(e) => {
+              setDraft({ ...draft, maxGuests: Number(e.target.value) })
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field
+          label="每晚房價"
+          htmlFor={`${ids}-price`}
+          className="w-40"
+          hint="整數新臺幣元，不接受小數"
+        >
+          <input
+            id={`${ids}-price`}
+            type="number"
+            min={1}
+            step={1}
+            required
+            value={draft.nightlyPrice}
+            onChange={(e) => {
+              setDraft({ ...draft, nightlyPrice: Math.trunc(Number(e.target.value)) })
+            }}
+            className={inputClass}
+          />
+        </Field>
+        {/* ⚠️ 只有兩種。「已預訂」由訂單推導，不在這裡（FR-051）。 */}
+        <Field
+          label="營運狀態"
+          htmlFor={`${ids}-status`}
+          className="w-40"
+          hint="「已預訂」由訂單推導，無法人工設定"
+        >
+          <select
+            id={`${ids}-status`}
+            value={draft.status}
+            onChange={(e) => {
+              setDraft({ ...draft, status: e.target.value === 'maintenance' ? 'maintenance' : 'available' })
+            }}
+            className={inputClass}
+          >
+            {ROOM_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {roomStatusLabel(value)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="mt-gap-3">
+        <Field label="房源描述" htmlFor={`${ids}-desc`} className="w-full">
+          <textarea
+            id={`${ids}-desc`}
+            rows={3}
+            maxLength={4000}
+            value={draft.description}
+            onChange={(e) => {
+              setDraft({ ...draft, description: e.target.value })
+            }}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      {/* 設施與特色來自系統參數的詞彙表（FR-010a）。清單為空時整組隱藏，
+          而不是顯示一個沒有選項的空方框。 */}
+      {vocabulary.data &&
+        (
+          [
+            ['amenities', '設施', vocabulary.data.amenities],
+            ['features', '房型特色', vocabulary.data.features],
+          ] as const
+        ).map(([key, label, options]) =>
+          options.length === 0 ? null : (
+            <fieldset key={key} className="mt-gap-3">
+              <legend className="text-tiny text-ink-muted">{label}</legend>
+              <div className="mt-gap-1 flex flex-wrap gap-gap-2">
+                {options.map((option) => (
+                  <label
+                    key={option}
+                    className="flex items-center gap-gap-1 rounded-pill border border-line-strong px-gap-3 py-gap-1 text-small"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={draft[key].includes(option)}
+                      onChange={() => {
+                        toggle(key, option)
+                      }}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ),
+        )}
+
+      <div className="mt-gap-4">
+        <ImageManager
+          images={draft.images}
+          disabled={saving}
+          onChange={(images) => {
+            setDraft((prev) => ({ ...prev, images }))
           }}
-          onSaved={done}
-        />
-      ) : deleting !== null ? (
-        <DeletePanel
-          room={deleting}
-          onCancel={() => {
-            setDeleting(null)
+          onUploaded={(path) => {
+            setUploaded((prev) => [...prev, path])
           }}
-          onDeleted={done}
         />
+      </div>
+
+      {error !== null && <Notice tone="danger">{messageFor(error).detail}</Notice>}
+
+      <div className="mt-gap-4 flex gap-gap-2">
+        <button type="submit" disabled={saving} className={primaryButtonClass}>
+          {saving ? '儲存中…' : '儲存'}
+        </button>
+        <button type="button" onClick={cancel} disabled={saving} className={buttonClass}>
+          取消
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 刪除確認（FR-052）
+// ---------------------------------------------------------------------------
+function DeletePanel({
+  room,
+  onDone,
+  onCancel,
+}: {
+  room: AdminRoom
+  onDone: (message: string) => void
+  onCancel: () => void
+}) {
+  const load = useCallback(
+    (signal: AbortSignal) => api.admin.rooms.affectedOrders(room.id, signal),
+    [room.id],
+  )
+  const { status, data, error, reload } = useAsync<AffectedOrder[]>(load)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState<unknown>(null)
+
+  async function remove() {
+    setBusy(true)
+    setFailure(null)
+    try {
+      await api.admin.rooms.remove(room.id)
+      onDone(`已刪除「${room.name}」。`)
+    } catch (cause) {
+      setFailure(cause)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      role="alertdialog"
+      aria-label={`刪除「${room.name}」`}
+      className="mt-gap-4 rounded-base border border-danger/40 bg-danger-soft p-gap-4"
+    >
+      <h3 className="text-md text-danger">刪除「{room.name}」</h3>
+
+      {status === 'error' ? (
+        <ErrorState error={error} onRetry={reload} title="無法確認受影響的訂單" />
+      ) : !data ? (
+        <LoadingState label="確認受影響的訂單…" />
+      ) : data.length === 0 ? (
+        <p className="mt-gap-2 text-small text-ink">
+          目前沒有任何訂單使用這間房源。刪除後將無法復原。
+        </p>
       ) : (
         <>
-          <RoomFilterForm
-            values={filters}
-            onChange={setFilters}
-            onSearch={() => {
-              setApplied(filters)
-            }}
-            onClear={() => {
-              setFilters(EMPTY_FILTERS)
-              setApplied(EMPTY_FILTERS)
-            }}
-          />
-
-          {rooms.error ? (
-            <ErrorState error={rooms.error} onRetry={rooms.reload} />
-          ) : rooms.loading && !rooms.data ? (
-            <LoadingState label="載入房源…" />
-          ) : rooms.data?.length === 0 ? (
-            <EmptyState
-              title="沒有符合條件的房源"
-              hint="試著清除篩選條件，或先新增一間房源。"
-            />
-          ) : (
-            <>
-              <p aria-live="polite" className="mb-gap-2 text-small text-ink-muted">
-                共 {rooms.data?.length ?? 0} 間房源
-                {applied.startDate || applied.endDate ? '（房態依所查期間推導）' : ''}
-              </p>
-              <TableScroll label="房源清單">
-                <table className="w-full border-collapse">
-                  <thead className="border-b border-line-soft bg-surface-alt">
-                    <tr>
-                      <th className={TH}>房源</th>
-                      <th className={TH}>房型</th>
-                      <th className={`${TH} text-right`}>每晚價格</th>
-                      <th className={`${TH} text-right`}>可住人數</th>
-                      <th className={TH}>房態</th>
-                      <th className={TH}>所查期間</th>
-                      <th className={TH}>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rooms.data?.map((room) => (
-                      <RoomRow
-                        key={room.id}
-                        room={room}
-                        onEdit={() => {
-                          setEditing(room)
-                        }}
-                        onDelete={() => {
-                          setDeleting(room)
-                        }}
-                        onChanged={rooms.reload}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </TableScroll>
-            </>
-          )}
+          {/* ⚠️ FR-052：MUST 列出受影響的訂單。只問「確定嗎」等於沒問。 */}
+          <p className="mt-gap-2 text-small text-ink">
+            以下 {data.length} 筆訂單使用這間房源，刪除後將一併受影響：
+          </p>
+          <ul className="mt-gap-2 max-h-56 overflow-y-auto text-small text-ink">
+            {data.map((order) => (
+              <li key={order.id} className="border-b border-line-soft py-gap-1">
+                {order.orderNo}｜{order.contactName}｜{order.checkIn} → {order.checkOut}
+              </li>
+            ))}
+          </ul>
         </>
       )}
+
+      {failure !== null && <Notice tone="danger">{messageFor(failure).detail}</Notice>}
+
+      <div className="mt-gap-4 flex gap-gap-2">
+        <button
+          type="button"
+          disabled={busy || status === 'loading'}
+          onClick={() => {
+            void remove()
+          }}
+          className={dangerButtonClass}
+        >
+          {busy ? '刪除中…' : '確定刪除'}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy} className={buttonClass}>
+          取消
+        </button>
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// 篩選
+// 頁面
 // ---------------------------------------------------------------------------
-function RoomFilterForm({
-  values,
-  onChange,
-  onSearch,
-  onClear,
-}: {
-  values: RoomFilters
-  onChange: (next: RoomFilters) => void
-  onSearch: () => void
-  onClear: () => void
-}) {
-  const [hint, setHint] = useState<string | null>(null)
+export function Rooms() {
+  const [draftFilters, setDraftFilters] = useState<AdminRoomFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<AdminRoomFilters>(EMPTY_FILTERS)
+  const [editing, setEditing] = useState<AdminRoom | 'new' | null>(null)
+  const [deleting, setDeleting] = useState<AdminRoom | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const ids = useId()
 
-  function set<K extends keyof RoomFilters>(key: K, value: RoomFilters[K]) {
-    onChange({ ...values, [key]: value })
+  const load = useCallback((signal: AbortSignal) => api.admin.rooms.list(filters, signal), [filters])
+  const { status, data, error, reload } = useAsync<AdminRoom[]>(load)
+
+  const rooms = useMemo(() => data ?? [], [data])
+
+  function finish(text: string) {
+    setMessage(text)
+    setEditing(null)
+    setDeleting(null)
+    reload()
   }
 
-  function submit() {
-    // FR-053a：沒有日期的「已預訂」不成立——已預訂是相對於某一天說的
-    if (values.status === 'booked' && !values.startDate && !values.endDate) {
-      setHint('篩選「已預訂」需要先選定日期或日期區間。')
-      return
-    }
-    setHint(null)
-    onSearch()
-  }
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        submit()
-      }}
-      className="mb-gap-5 grid gap-gap-3 rounded-lg border border-line-soft bg-surface p-gap-4 sm:grid-cols-2 lg:grid-cols-4"
-    >
-      <Field label="關鍵字" htmlFor="room-keyword" hint="比對房名與房型">
-        <input
-          id="room-keyword"
-          name="keyword"
-          value={values.keyword}
-          onChange={(e) => {
-            set('keyword', e.target.value)
-          }}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field label="每晚價格下限" htmlFor="minPrice">
-        <input
-          id="minPrice"
-          name="minPrice"
-          type="number"
-          min={0}
-          value={values.minPrice}
-          onChange={(e) => {
-            set('minPrice', e.target.value)
-          }}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field label="每晚價格上限" htmlFor="maxPrice">
-        <input
-          id="maxPrice"
-          name="maxPrice"
-          type="number"
-          min={0}
-          value={values.maxPrice}
-          onChange={(e) => {
-            set('maxPrice', e.target.value)
-          }}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field
-        label="房態"
-        htmlFor="room-status"
-        error={hint}
-        hint="「已預訂」由訂單推導，需先選定日期"
-      >
-        <select
-          id="room-status"
-          name="status"
-          value={values.status}
-          onChange={(e) => {
-            set('status', e.target.value)
-          }}
-          className={inputClass}
-        >
-          <option value="">全部</option>
-          <option value="available">空房</option>
-          <option value="booked">已預訂</option>
-          <option value="maintenance">整理中</option>
-        </select>
-      </Field>
-
-      <Field label="查詢期間起" htmlFor="room-start" hint="只填一端視為單日">
-        <input
-          id="room-start"
-          name="startDate"
-          type="date"
-          value={values.startDate}
-          onChange={(e) => {
-            set('startDate', e.target.value)
-          }}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field label="查詢期間迄" htmlFor="room-end">
-        <input
-          id="room-end"
-          name="endDate"
-          type="date"
-          value={values.endDate}
-          onChange={(e) => {
-            set('endDate', e.target.value)
-          }}
-          className={inputClass}
-        />
-      </Field>
-
-      <div className="flex items-end gap-gap-2 lg:col-span-2">
-        <button
-          type="submit"
-          className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong"
-        >
-          搜尋
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setHint(null)
-            onClear()
-          }}
-          className="rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
-        >
-          清除
-        </button>
-      </div>
-    </form>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// 列
-// ---------------------------------------------------------------------------
-function RoomRow({
-  room,
-  onEdit,
-  onDelete,
-  onChanged,
-}: {
-  room: AdminRoom
-  onEdit: () => void
-  onDelete: () => void
-  onChanged: () => void
-}) {
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-
-  async function setStatus(status: RoomStatus) {
-    setSaving(true)
-    setError(null)
+  async function toggleStatus(room: AdminRoom) {
+    setMessage(null)
     try {
-      await api.admin.rooms.setStatus(room.id, status)
-      onChanged()
+      await api.admin.rooms.setStatus(
+        room.id,
+        room.status === 'maintenance' ? 'available' : 'maintenance',
+      )
+      reload()
     } catch (cause) {
-      setError(cause)
-    } finally {
-      setSaving(false)
+      setMessage(messageFor(cause).detail)
     }
   }
 
   return (
-    <tr className="border-b border-line-soft last:border-0">
-      <td className={TD}>
-        <div className="flex items-center gap-gap-2">
-          {room.images[0] ? (
-            <img
-              src={room.images[0]}
-              alt=""
-              aria-hidden="true"
-              className="size-10 shrink-0 rounded-xs bg-surface-alt object-cover"
+    <div>
+      <ModuleHeading
+        title="房源管理"
+        actions={
+          <>
+            {/* ⚠️ 帶入的是**已套用**的篩選（`filters`）而不是輸入中的
+                `draftFilters`——匯出的筆數 MUST 等於畫面上的筆數（SC-033）。 */}
+            <ExportButton
+              module="rooms"
+              params={{
+                keyword: filters.keyword,
+                type: filters.type,
+                minPrice: filters.minPrice,
+                maxPrice: filters.maxPrice,
+              }}
             />
-          ) : (
-            <span
-              aria-hidden="true"
-              className="size-10 shrink-0 rounded-xs bg-surface-alt"
-            />
-          )}
-          <span>{room.name}</span>
-        </div>
-        {error != null && (
-          <p role="alert" className="mt-gap-1 text-tiny text-danger">
-            {messageFor(error).detail}
-          </p>
-        )}
-      </td>
-      <td className={TD}>{room.type}</td>
-      <td className={TD_NUM}>{formatAmount(room.nightlyPrice)}</td>
-      <td className={TD_NUM}>{room.maxGuests}</td>
-      <td className={TD}>
-        {/* ⚠️ 只有兩個選項。「已預訂」不在這裡，也不該在這裡（FR-051） */}
-        <select
-          aria-label={`${room.name} 的房態`}
-          value={room.status}
-          disabled={saving}
-          onChange={(e) => {
-            void setStatus(e.target.value as RoomStatus)
-          }}
-          className="rounded-xs border border-line-strong bg-surface px-gap-2 py-gap-1 text-tiny text-ink"
-        >
-          <option value="available">{ROOM_STATUS_LABELS.available}</option>
-          <option value="maintenance">{ROOM_STATUS_LABELS.maintenance}</option>
-        </select>
-      </td>
-      <td className={TD}>
-        <span className="text-tiny whitespace-nowrap text-ink-muted">
-          {labelOf(AVAILABILITY_LABELS, room.availability)}
-        </span>
-      </td>
-      <td className={TD}>
-        <div className="flex gap-gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-xs border border-line-strong px-gap-2 py-gap-1 text-tiny whitespace-nowrap text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
-          >
-            編輯
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="rounded-xs border border-line-strong px-gap-2 py-gap-1 text-tiny whitespace-nowrap text-danger transition-colors hover:bg-danger-soft"
-          >
-            刪除
-          </button>
-        </div>
-      </td>
-    </tr>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// 新增／編輯
-// ---------------------------------------------------------------------------
-function RoomForm({
-  room,
-  onCancel,
-  onSaved,
-}: {
-  room: AdminRoom | null
-  onCancel: () => void
-  onSaved: () => void
-}) {
-  const vocabulary = useAsync((signal) => api.vocabulary.get(signal), [])
-
-  const [values, setValues] = useState<RoomWriteInput>(() =>
-    room
-      ? {
-          name: room.name,
-          type: room.type,
-          maxGuests: room.maxGuests,
-          nightlyPrice: room.nightlyPrice,
-          description: room.description,
-          images: [...room.images],
-          amenities: [...room.amenities],
-          features: [...room.features],
-          status: room.status,
+            <button
+              type="button"
+              className={primaryButtonClass}
+              onClick={() => {
+                setDeleting(null)
+                setEditing('new')
+              }}
+            >
+              新增房源
+            </button>
+          </>
         }
-      : BLANK_ROOM,
-  )
-  /** 本次編輯期間上傳到伺服器的路徑，供取消時清除（FR-050f）。 */
-  const [uploaded, setUploaded] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<unknown>(null)
+      />
 
-  function set<K extends keyof RoomWriteInput>(key: K, value: RoomWriteInput[K]) {
-    setValues((current) => ({ ...current, [key]: value }))
-  }
-
-  /**
-   * 清掉本次上傳但沒有留在 `images` 裡的檔案。
-   *
-   * 取消時全部都算「沒留下」；儲存成功時只清被移除的那幾張。找不到檔案不是
-   * 錯誤，因此這裡不理會失敗——真正要避免的是**沒有人引用的檔案留在磁碟上**，
-   * 而那種垃圾不會有任何症狀（FR-050f）。
-   */
-  const discardUnused = useCallback(
-    (keep: readonly string[]) => {
-      for (const path of uploaded) {
-        if (!keep.includes(path)) void api.admin.photos.discard(path)
-      }
-    },
-    [uploaded],
-  )
-
-  async function submit() {
-    setSaving(true)
-    setError(null)
-    try {
-      if (room) await api.admin.rooms.update(room.id, values)
-      else await api.admin.rooms.create(values)
-      discardUnused(values.images)
-      onSaved()
-    } catch (cause) {
-      // MUST NOT 靜默失敗，且已填內容 MUST 保留（FR-083）
-      setError(cause)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit()
-      }}
-      className="rounded-lg border border-line-soft bg-surface p-gap-5"
-    >
-      <h2 className="mb-gap-4 font-display text-h3 text-ink">
-        {room ? `編輯房源：${room.name}` : '新增房源'}
-      </h2>
-
-      <div className="grid gap-gap-4 sm:grid-cols-2">
-        <Field label="房源名稱" htmlFor="name">
+      <FilterBar
+        onReset={() => {
+          setDraftFilters(EMPTY_FILTERS)
+          setFilters(EMPTY_FILTERS)
+        }}
+      >
+        <Field label="關鍵字" htmlFor={`${ids}-kw`}>
           <input
-            id="name"
-            name="name"
-            required
-            maxLength={120}
-            value={values.name}
+            id={`${ids}-kw`}
+            value={draftFilters.keyword ?? ''}
+            placeholder="房名或房型"
             onChange={(e) => {
-              set('name', e.target.value)
+              setDraftFilters({ ...draftFilters, keyword: e.target.value })
             }}
             className={inputClass}
           />
         </Field>
-
-        <Field label="房型" htmlFor="type" hint="例如：雙人房、家庭房">
+        <Field label="價格下限" htmlFor={`${ids}-min`} className="w-28">
           <input
-            id="type"
-            name="type"
-            required
-            maxLength={60}
-            value={values.type}
-            onChange={(e) => {
-              set('type', e.target.value)
-            }}
-            className={inputClass}
-          />
-        </Field>
-
-        <Field label="每晚價格（新臺幣元）" htmlFor="nightlyPrice" hint="整數，不含小數">
-          <input
-            id="nightlyPrice"
-            name="nightlyPrice"
+            id={`${ids}-min`}
             type="number"
-            required
-            min={1}
-            step={1}
-            value={values.nightlyPrice}
+            min={0}
+            value={draftFilters.minPrice ?? ''}
             onChange={(e) => {
-              set('nightlyPrice', Number(e.target.value))
+              const raw = e.target.value
+              setDraftFilters({ ...draftFilters, minPrice: raw === '' ? undefined : Number(raw) })
             }}
             className={inputClass}
           />
         </Field>
-
-        <Field label="可住人數" htmlFor="maxGuests">
+        <Field label="價格上限" htmlFor={`${ids}-max`} className="w-28">
           <input
-            id="maxGuests"
-            name="maxGuests"
+            id={`${ids}-max`}
             type="number"
-            required
-            min={1}
-            max={20}
-            value={values.maxGuests}
+            min={0}
+            value={draftFilters.maxPrice ?? ''}
             onChange={(e) => {
-              set('maxGuests', Number(e.target.value))
+              const raw = e.target.value
+              setDraftFilters({ ...draftFilters, maxPrice: raw === '' ? undefined : Number(raw) })
             }}
             className={inputClass}
           />
         </Field>
-
-        <Field
-          label="房態"
-          htmlFor="status"
-          hint="「已預訂」由訂單推導，不在此設定"
-        >
-          <select
-            id="status"
-            name="status"
-            value={values.status}
+        {/* 房態依**區間**推導，含頭含尾（FR-051b）。未指定時後端以今日計。 */}
+        <Field label="房態起日" htmlFor={`${ids}-start`} className="w-40">
+          <input
+            id={`${ids}-start`}
+            type="date"
+            value={draftFilters.startDate ?? ''}
             onChange={(e) => {
-              set('status', e.target.value as RoomStatus)
-            }}
-            className={inputClass}
-          >
-            <option value="available">{ROOM_STATUS_LABELS.available}</option>
-            <option value="maintenance">{ROOM_STATUS_LABELS.maintenance}</option>
-          </select>
-        </Field>
-      </div>
-
-      <div className="mt-gap-4">
-        <Field label="房源介紹" htmlFor="description">
-          <textarea
-            id="description"
-            name="description"
-            rows={4}
-            maxLength={4000}
-            value={values.description}
-            onChange={(e) => {
-              set('description', e.target.value)
+              setDraftFilters({ ...draftFilters, startDate: e.target.value })
             }}
             className={inputClass}
           />
         </Field>
-      </div>
-
-      <div className="mt-gap-5">
-        <ImageManager
-          images={values.images}
-          onChange={(next) => {
-            set('images', next)
-          }}
-          onUploaded={(path) => {
-            setUploaded((current) => [...current, path])
-          }}
-        />
-      </div>
-
-      <div className="mt-gap-5 grid gap-gap-4 sm:grid-cols-2">
-        <CheckboxGroup
-          legend="設施"
-          options={vocabulary.data?.amenities ?? []}
-          selected={values.amenities}
-          onChange={(next) => {
-            set('amenities', next)
-          }}
-        />
-        <CheckboxGroup
-          legend="房型特色"
-          options={vocabulary.data?.features ?? []}
-          selected={values.features}
-          onChange={(next) => {
-            set('features', next)
-          }}
-        />
-      </div>
-
-      {error != null && (
-        <p role="alert" className="mt-gap-4 text-small text-danger">
-          {messageFor(error).detail}
-        </p>
-      )}
-
-      <div className="mt-gap-5 flex flex-wrap gap-gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-pill bg-brand px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-brand-strong disabled:opacity-50"
-        >
-          {saving ? '儲存中…' : '儲存'}
-        </button>
+        <Field label="房態迄日" htmlFor={`${ids}-end`} className="w-40" hint="含頭含尾">
+          <input
+            id={`${ids}-end`}
+            type="date"
+            value={draftFilters.endDate ?? ''}
+            onChange={(e) => {
+              setDraftFilters({ ...draftFilters, endDate: e.target.value })
+            }}
+            className={inputClass}
+          />
+        </Field>
         <button
           type="button"
+          className={buttonClass}
           onClick={() => {
-            // FR-050f：取消時清掉本次上傳但未保存的檔案
-            discardUnused([])
-            onCancel()
+            setFilters(draftFilters)
           }}
-          className="rounded-pill border border-line-strong px-gap-4 py-gap-2 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
         >
-          取消
+          套用
         </button>
-      </div>
-    </form>
-  )
-}
+      </FilterBar>
 
-/**
- * 詞彙表的多選。
- *
- * ⚠️ **選項為現有詞彙表與目前值的聯集。** 只列詞彙表的話，管理員在系統參數裡
- * 移除某個設施之後，所有還掛著它的房源一編輯就會安靜地掉掉那一項——
- * 沒有提示，儲存後才發現少了東西。
- */
-function CheckboxGroup({
-  legend,
-  options,
-  selected,
-  onChange,
-}: {
-  legend: string
-  options: readonly string[]
-  selected: string[]
-  onChange: (next: string[]) => void
-}) {
-  const all = useMemo(() => [...new Set([...options, ...selected])], [options, selected])
+      {message !== null && <Notice tone="ok">{message}</Notice>}
 
-  return (
-    <fieldset className="rounded-lg border border-line-soft p-gap-3">
-      <legend className="px-gap-1 text-small text-ink-muted">{legend}</legend>
-      {all.length === 0 ? (
-        <p className="text-tiny text-ink-muted">
-          尚未設定可選項目。可於「系統與參數設定」新增。
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-gap-3">
-          {all.map((item) => (
-            <label key={item} className="flex items-center gap-gap-1 text-small text-ink">
-              <input
-                type="checkbox"
-                checked={selected.includes(item)}
-                onChange={(e) => {
-                  onChange(
-                    e.target.checked ? [...selected, item] : selected.filter((v) => v !== item),
-                  )
-                }}
-                className="accent-brand"
-              />
-              {item}
-            </label>
-          ))}
-        </div>
+      {editing !== null && (
+        <RoomForm
+          room={editing === 'new' ? null : editing}
+          onDone={finish}
+          onCancel={() => {
+            setEditing(null)
+          }}
+        />
       )}
-    </fieldset>
-  )
-}
 
-// ---------------------------------------------------------------------------
-// 刪除
-// ---------------------------------------------------------------------------
-/**
- * 刪除前的影響範圍與二次確認（FR-052）。
- *
- * ⚠️ 這個畫面**不是**安全機制。後端不帶 `confirm=true` 一律拒絕，
- * 因此就算有人直接呼叫 API 也不會誤刪——這裡負責的是「讓人看得到代價」。
- */
-function DeletePanel({
-  room,
-  onCancel,
-  onDeleted,
-}: {
-  room: AdminRoom
-  onCancel: () => void
-  onDeleted: () => void
-}) {
-  const affected = useAsync<AffectedOrder[]>(
-    (signal) => api.admin.rooms.affectedOrders(room.id, signal),
-    [room.id],
-  )
-  const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState<unknown>(null)
+      {deleting !== null && (
+        <DeletePanel
+          room={deleting}
+          onDone={finish}
+          onCancel={() => {
+            setDeleting(null)
+          }}
+        />
+      )}
 
-  async function confirm() {
-    setDeleting(true)
-    setError(null)
-    try {
-      await api.admin.rooms.remove(room.id, true)
-      onDeleted()
-    } catch (cause) {
-      // 例如 `ROOM_HAS_ORDER_HISTORY`：有歷史訂單時二次確認也沒有用，
-      // 後端會說明理由並建議改設為「整理中」
-      setError(cause)
-      setDeleting(false)
-    }
-  }
-
-  return (
-    <section className="rounded-lg border border-danger/20 bg-danger-soft p-gap-5">
-      <h2 className="font-display text-h3 text-danger">刪除房源：{room.name}</h2>
-
-      {affected.loading ? (
-        <LoadingState label="檢查影響範圍…" />
-      ) : affected.error ? (
-        <ErrorState error={affected.error} onRetry={affected.reload} />
-      ) : affected.data && affected.data.length > 0 ? (
-        <>
-          <p className="mt-gap-3 text-body text-ink">
-            此房源尚有 {affected.data.length} 筆未結束的訂單。刪除後這些訂單將失去對應房源。
-          </p>
-          <ul className="mt-gap-3 space-y-gap-1">
-            {affected.data.map((order) => (
-              <li key={order.id} className="text-small text-ink-muted">
-                <span className="font-mono">{order.orderNo}</span>
-                {` ${order.contactName}／`}
-                {formatDisplayDate(order.checkIn)} – {formatDisplayDate(order.checkOut)}
-                {`／${labelOf(ORDER_STATUS_LABELS, order.status)}`}
-              </li>
+      {status === 'error' ? (
+        <ErrorState error={error} onRetry={reload} />
+      ) : data === null ? (
+        <LoadingState label="載入房源…" />
+      ) : rooms.length === 0 ? (
+        <EmptyState
+          title="沒有符合條件的房源"
+          hint="放寬價格或關鍵字後再試一次，或直接新增一間房源。"
+        />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <Th>房名</Th>
+              <Th>房型</Th>
+              <Th align="right">每晚房價</Th>
+              <Th align="right">可住</Th>
+              <Th>營運狀態</Th>
+              <Th>所查區間房態</Th>
+              <Th>操作</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rooms.map((room) => (
+              <tr key={room.id}>
+                <Td>
+                  <span className="font-medium text-ink">{room.name}</span>
+                  <span className="ml-gap-2 text-tiny text-ink-muted">
+                    {room.images.length} 張照片
+                  </span>
+                </Td>
+                <Td>{room.type}</Td>
+                <Td align="right">{formatTWD(room.nightlyPrice)}</Td>
+                <Td align="right">{room.maxGuests}</Td>
+                <Td>{roomStatusLabel(room.status)}</Td>
+                <Td>
+                  <Badge tone={availabilityTone(room.availability)}>
+                    {availabilityLabel(room.availability)}
+                  </Badge>
+                </Td>
+                <Td>
+                  <div className="flex flex-wrap gap-gap-1">
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={() => {
+                        setDeleting(null)
+                        setEditing(room)
+                      }}
+                    >
+                      編輯
+                    </button>
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={() => {
+                        void toggleStatus(room)
+                      }}
+                    >
+                      {room.status === 'maintenance' ? '恢復開放' : '設為維護中'}
+                    </button>
+                    <button
+                      type="button"
+                      className={dangerButtonClass}
+                      onClick={() => {
+                        setEditing(null)
+                        setDeleting(room)
+                      }}
+                    >
+                      刪除
+                    </button>
+                  </div>
+                </Td>
+              </tr>
             ))}
-          </ul>
-        </>
-      ) : (
-        <p className="mt-gap-3 text-body text-ink">
-          此房源目前沒有未結束的訂單。刪除後無法復原。
-        </p>
+          </tbody>
+        </TableShell>
       )}
-
-      {error != null && (
-        <p role="alert" className="mt-gap-3 text-small text-danger">
-          {messageFor(error).detail}
-        </p>
-      )}
-
-      <div className="mt-gap-5 flex flex-wrap gap-gap-3">
-        <button
-          type="button"
-          onClick={() => void confirm()}
-          disabled={deleting}
-          className="rounded-pill bg-danger px-gap-5 py-gap-2 text-small text-ink-invert transition-colors hover:bg-danger/90 disabled:opacity-50"
-        >
-          {deleting ? '刪除中…' : '確認刪除'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-pill border border-line-strong bg-surface px-gap-4 py-gap-2 text-small text-ink-muted transition-colors hover:border-brand hover:text-brand-strong"
-        >
-          取消
-        </button>
-      </div>
-    </section>
+    </div>
   )
 }

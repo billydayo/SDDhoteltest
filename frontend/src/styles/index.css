@@ -137,6 +137,15 @@
   }
 
   body {
+    /*
+     * T142／FR-061a：滿版主視覺以 `100vw` 破出內容欄，而 `100vw` **含捲軸
+     * 寬度**——在有捲軸的視窗上會多出約 15px，形成橫向捲動，而 FR-061a
+     * 明訂 MUST NOT 產生橫向捲動。
+     *
+     * ⚠️ 用 `clip` 而不是 `hidden`：`hidden` 會建立捲動容器，而那會讓頁首的
+     * `position: sticky` 失效——症狀是往下捲時導覽列跟著跑掉。
+     */
+    overflow-x: clip;
     background-color: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-body);

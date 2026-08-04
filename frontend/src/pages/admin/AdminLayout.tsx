@@ -1,126 +1,98 @@
 /**
  * T125：後台佈局與十二個模組的導覽。
  *
- * ## 十二個模組
+ * ⚠️ **這個佈局不是安全邊界。** 它掛在 `RequireAdmin` 之下，而那個守衛只改變
+ * 畫面呈現——真正的存取邊界在 FastAPI 的 `require_admin`（憲章原則 VI）。
+ * 任何人改掉前端狀態或直接對 API 送請求都會落在後端那道上。
  *
- * 模組清單見 spec.md 開頭的「後台模組數量」。與企劃書的三處出入都是刻意的：
+ * ## 為什麼 `h1` 是「後台」而不是各模組的名稱
  *
- * - **沒有「報表匯出」分頁**。匯出要匯的是「該頁當前的篩選結果」（FR-058），
- *   而獨立分頁取不到其他頁面的篩選條件。因此匯出鈕嵌在各資料頁面裡（T140）。
- *   ⚠️ 有人想「補上」這個模組時，補的會是一個只能匯出全表的按鈕——
- *   看起來功能更完整，實際上違反 FR-058 且 SC-033 會失敗。
- * - **多了「房源品質檢測」**：管理員要為房源產生公開的檢測結果，需要介面。
- * - **多了「會員訊息」**（2026-08-03 新增，FR-123 ~ FR-128）。
+ * 後台是**一個主控台的十二個區塊**，不是十二個彼此無關的頁面：導覽、身分、
+ * 麵包屑都不隨模組改變。因此標題層級為「後台（h1）＞ 模組（h2）」，
+ * 由各模組頁自行提供 h2。
  *
- * ## 導覽只是導覽
+ * 分頁標題（`document.title`）則**必須**跟著模組走——瀏覽器分頁上只看得到
+ * 那一行字，十二個分頁全都叫「後台」的話使用者無從分辨（憲章原則 V）。
  *
- * ⚠️ **這裡的十二個連結 MUST NOT 被當成權限控制。** 使用者看不看得到入口，
- * 與他呼不呼叫得動端點是兩回事——後者由 FastAPI 的 `require_admin` 決定
- * （憲章原則 VI）。`RequireAdmin` 守衛擋的是「畫面上不該出現的東西」。
+ * ## 導覽從哪裡來
  *
- * ## 尚未建立的模組
- *
- * 十二個模組分屬 US6 ~ US12，不會同時完成。未完成的一律指向 `Placeholder`
- * 並標明由哪個任務接手——**導覽從第一天就是完整的十二項**。少列幾項再回頭補，
- * 會讓「這個功能到底有沒有」變成要翻任務清單才答得出來的問題。
+ * `modules.tsx` 的同一份陣列同時產生這裡的連結與 router.tsx 的路由。
+ * 兩份分開維護時最常見的分歧是「路由存在但導覽沒有」，而那不會有任何錯誤。
  */
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
-interface AdminModule {
-  /** 相對於 `/admin` 的路徑；空字串為索引頁（儀表板）。 */
-  path: string
-  label: string
-}
+import { ADMIN_MODULES } from './modules'
 
-/**
- * 十二個模組，依「日常使用頻率」而非功能相似度排序。
- *
- * 儀表板打頭、房源與訂單次之——業者一天裡有九成的時間只用這三項。
- * 日誌與參數設定放最後：重要，但一週不見得會開一次。
- */
-const ADMIN_MODULES: readonly AdminModule[] = [
-  { path: '', label: '儀表板' },
-  { path: 'rooms', label: '房源管理' },
-  { path: 'orders', label: '訂單管理' },
-  { path: 'users', label: '用戶管理' },
-  { path: 'reviews', label: '評論審核' },
-  { path: 'refunds', label: '退款審核' },
-  { path: 'messages', label: '會員訊息' },
-  { path: 'room-risk', label: '房源品質檢測' },
-  { path: 'content', label: '內容編輯' },
-  { path: 'channel', label: '渠道比價與控價' },
-  { path: 'logs', label: '操作日誌' },
-  { path: 'settings', label: '系統與參數設定' },
-]
+const BASE = '/admin'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'block rounded-xs px-gap-3 py-gap-2 text-small whitespace-nowrap transition-colors',
+    'block rounded-xs px-gap-3 py-gap-2 text-small transition-colors',
     isActive
-      ? 'bg-brand-soft font-medium text-brand-strong'
+      ? 'bg-brand-soft text-brand-strong font-medium'
       : 'text-ink-muted hover:bg-surface-alt hover:text-ink',
   ].join(' ')
 
-export function AdminLayout() {
-  return (
-    <div className="flex flex-col gap-gap-5 lg:flex-row lg:gap-gap-6">
-      {/*
-        側欄。窄螢幕時改為頂端的橫向捲動列——十二個項目在手機上直排會把
-        內容推到第一屏之外，使用者每次進後台都要先捲過一整排導覽（SC-012）。
-      */}
-      <nav
-        aria-label="後台模組"
-        className="shrink-0 overflow-x-auto border-b border-line-soft pb-gap-2 lg:w-56 lg:overflow-visible lg:border-r lg:border-b-0 lg:pr-gap-4 lg:pb-0"
-      >
-        <ul className="flex gap-gap-1 lg:flex-col">
-          {ADMIN_MODULES.map((mod) => (
-            <li key={mod.path}>
-              <NavLink
-                to={mod.path === '' ? '/admin' : `/admin/${mod.path}`}
-                // `end` 只給索引頁：否則 `/admin` 在任何子頁面上都會維持選取態，
-                // 使用者會同時看到兩個「目前所在」的標示。
-                end={mod.path === ''}
-                className={linkClass}
-              >
-                {mod.label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {/* `min-w-0`：沒有它，子頁面裡的寬表格會把 flex 項目撐開而超出視窗，
-          `TableScroll` 的橫向捲動就失效了（flex 項目的最小寬度預設是內容寬度）。 */}
-      <div className="min-w-0 flex-1">
-        <Outlet />
-      </div>
-    </div>
-  )
+/** 目前落在哪一個模組。找不到時回索引頁——網址錯了也還有一個導覽可用。 */
+function useCurrentModule() {
+  const { pathname } = useLocation()
+  const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length).replace(/^\//, '') : ''
+  const segment = rest.split('/')[0] ?? ''
+  return ADMIN_MODULES.find((m) => m.path === segment) ?? ADMIN_MODULES[0]
 }
 
-/**
- * 後台頁面的共用標題列。
- *
- * 每個模組都有「標題 + 一句說明 + 右上角的操作」這個形狀。抽出來不是為了
- * 省行數，而是為了讓十二個模組的標題不會各長各的——後台頁面是同一個人在
- * 同一次工作階段裡連續切換的，版面每頁不同會讓他每次都要重新找東西。
- */
-export function AdminPageHeader({
-  title,
-  description,
-  actions,
-}: {
-  title: string
-  description?: string
-  actions?: React.ReactNode
-}) {
+export function AdminLayout() {
+  const current = useCurrentModule()
+  const label = current?.label ?? '後台'
+
+  // 分頁標題。**只在後台之內覆寫**——離開時還原，否則使用者回到前台後
+  // 分頁上仍寫著「訂單管理」。
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${label} — 後台 — Sunny`
+    return () => {
+      document.title = previous
+    }
+  }, [label])
+
   return (
-    <div className="mb-gap-5 flex flex-wrap items-start justify-between gap-gap-3">
+    <div className="grid gap-gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <div>
-        <h1 className="font-display text-h2 text-ink">{title}</h1>
-        {description && <p className="mt-gap-1 text-small text-ink-muted">{description}</p>}
+        <h1 className="font-display text-h2 text-ink">後台</h1>
+        <p className="mt-gap-1 text-small text-ink-muted">{current?.hint}</p>
+
+        {/*
+          `aria-label` 是必要的：頁首已經有一個 `nav`（主要導覽），
+          兩個同名的地標對讀屏使用者等於沒有名字（憲章原則 V）。
+        */}
+        <nav aria-label="後台模組" className="mt-gap-4">
+          <ul className="flex gap-gap-1 overflow-x-auto pb-gap-2 lg:flex-col lg:overflow-visible lg:pb-0">
+            {ADMIN_MODULES.map((module) => (
+              <li key={module.path} className="shrink-0 lg:shrink">
+                {/*
+                  `end` 只給索引頁。少了它，「營運總覽」在十二個模組底下
+                  全部都會顯示為選中狀態——使用者永遠看不出自己在哪一頁。
+                */}
+                <NavLink
+                  to={module.path ? `${BASE}/${module.path}` : BASE}
+                  end={module.path === ''}
+                  className={linkClass}
+                  title={module.hint}
+                >
+                  {module.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-gap-2">{actions}</div>}
+
+      {/* `min-w-0`：格線子項的預設 `min-width: auto` 會讓寬表格把整個版面撐開，
+          症狀是整頁出現橫向捲動而不是表格自己捲（T172a 的稽核項目）。 */}
+      <section className="min-w-0">
+        <Outlet />
+      </section>
     </div>
   )
 }

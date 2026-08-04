@@ -31,19 +31,19 @@ import { LoadingState } from './components/LoadingState'
 import { Account } from './pages/Account'
 import { AuthCallback } from './pages/AuthCallback'
 import { Booking } from './pages/Booking'
+import { Favorites } from './pages/Favorites'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
+import { Messages } from './pages/Messages'
 import { Forbidden, NotFound } from './pages/NotFound'
 import { OrderConfirm } from './pages/OrderConfirm'
 import { Placeholder } from './pages/Placeholder'
 import { Register } from './pages/Register'
+import { RiskCheck } from './pages/RiskCheck'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
 import { AdminLayout } from './pages/admin/AdminLayout'
-import { Dashboard } from './pages/admin/Dashboard'
-import { AdminOrders } from './pages/admin/Orders'
-import { AdminRooms } from './pages/admin/Rooms'
-import { AdminUsers } from './pages/admin/Users'
+import { ADMIN_MODULES } from './pages/admin/modules'
 import { useAuth } from './state/AuthContext'
 
 /**
@@ -150,6 +150,9 @@ export function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* T146：照片安全檢測。**公開**——照片全程留在瀏覽器內，沒有任何
+            資料會被送到後端，因此不需要身分（FR-062、FR-066、SC-030）。 */}
+        <Route path="/risk-check" element={<RiskCheck />} />
         {/*
           Google 回程的落點。**公開**——抵達這裡的人正是還沒有身分的那個人，
           掛上 RequireAuth 會把他導去登入頁，而他手上的 token 就這樣掉了。
@@ -194,11 +197,34 @@ export function AppRoutes() {
             </RequireAuth>
           }
         />
+        {/* T153：我的收藏。⚠️ 網址上沒有 `userId`——收藏的擁有者由 token 判定，
+            「看別人的收藏」在介面上不可表達（`routers/favorites.py`）。 */}
+        <Route
+          path="/favorites"
+          element={
+            <RequireAuth>
+              <Favorites />
+            </RequireAuth>
+          }
+        />
+        {/* T169：會員的客服訊息。⚠️ 網址上沒有討論串 id——每位會員只有一串，
+            由 token 決定是哪一串（`routers/messages.py`）。 */}
+        <Route
+          path="/messages"
+          element={
+            <RequireAuth>
+              <Messages />
+            </RequireAuth>
+          }
+        />
 
         {/* -- 僅管理員 ---------------------------------------------------
-            十二個模組共用 `AdminLayout` 的側欄與版面（T125）。守衛掛在父路由
-            上，子路由因此不必各自重複——**漏掉一個子路由就是一個沒有守衛的
-            後台頁面**，而那不會有任何測試失敗。
+            T125：十二個模組掛在同一個 `AdminLayout` 之下，路由由
+            `pages/admin/modules.tsx` 的同一份陣列展開——導覽與路由因而
+            不可能分歧（見該檔說明）。
+
+            ⚠️ 守衛包在外層一次，而非逐個模組包一次。逐個包的問題是新增模組時
+            會忘記包，而忘記的那一個不會有任何測試失敗。
 
             ⚠️ 守衛只決定畫面呈現。真正的存取邊界在 FastAPI 的 `require_admin`
             （見本檔開頭）。 */}
@@ -210,19 +236,14 @@ export function AppRoutes() {
             </RequireAdmin>
           }
         >
-          <Route index element={<Dashboard />} />
-          <Route path="rooms" element={<AdminRooms />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="users" element={<AdminUsers />} />
-          {/* 以下模組分屬 US7–US12，導覽從第一天就完整列出（AdminLayout 的說明） */}
-          <Route path="reviews" element={<Placeholder title="評論審核" task="T134" />} />
-          <Route path="refunds" element={<Placeholder title="退款審核" task="T135" />} />
-          <Route path="messages" element={<Placeholder title="會員訊息" task="T170" />} />
-          <Route path="room-risk" element={<Placeholder title="房源品質檢測" task="T148" />} />
-          <Route path="content" element={<Placeholder title="內容編輯" task="T142" />} />
-          <Route path="channel" element={<Placeholder title="渠道比價與控價" task="T159" />} />
-          <Route path="logs" element={<Placeholder title="操作日誌" task="T164" />} />
-          <Route path="settings" element={<Placeholder title="系統與參數設定" task="T165" />} />
+          {ADMIN_MODULES.map((module) =>
+            module.path === '' ? (
+              <Route key="index" index element={module.element} />
+            ) : (
+              <Route key={module.path} path={module.path} element={module.element} />
+            ),
+          )}
+          {/* 後台底下打錯的網址仍留在後台，導覽還在手邊。 */}
           <Route path="*" element={<NotFound />} />
         </Route>
 

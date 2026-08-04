@@ -60,13 +60,17 @@ function rel(path: string): string {
  * `遇`／`逃`／`部` 本來就是繁體字——把它們列進來，這支測試會在正確的文字上
  * 失敗，而那種測試最後一定被刪掉。
  */
-const SIMPLIFIED = [
-  ...'们个这么对开关说认请确显单订间数员录时户页网载应试验详价项类',
-  ...'图银钱买卖车长门问马鸟龙东书见观觉学会体医术华汉讯语谢议论设',
-  ...'计记访评该读谁课调边过还进远连运达迟选适递邮阳阴陆队险难双发',
-  ...'变济营销费质检测归绝纪级红约结给统绿维绍经继续缩纸练组织终',
-  ...'现规视证识译谈诉词诚让训讨讲许转轮软输较辆违遗邻郑释',
-]
+const SIMPLIFIED_SOURCE =
+  '们个这么对开关说认请确显单订间数员录时户页网载应试验详价项类' +
+  '图银钱买卖车长门问马鸟龙东书见观觉学会体医术华汉讯语谢议论设' +
+  '计记访评该读谁课调边过还进远连运达迟选适递邮阳阴陆队险难双发' +
+  '变济营销费质检测归绝纪级红约结给统绿维绍经继续缩纸练组织终' +
+  '现规视证识译谈诉词诚让训讨讲许转轮软输较辆违遗邻郑释'
+
+// ⚠️ 用 `for...of` 逐字取而不是展開運算子：後者對代理對（surrogate pair）
+// 的處理不安全，而 ESLint 的 `no-misused-spread` 正是為此而設。
+const SIMPLIFIED: string[] = []
+for (const ch of SIMPLIFIED_SOURCE) SIMPLIFIED.push(ch)
 
 describe('繁體中文（FR-069）', () => {
   it('簡體字表本身是有效的（防止空表空轉通過）', () => {
@@ -91,7 +95,7 @@ describe('金額只有一個出口且不出現小數（FR-070）', () => {
     const offenders = FILES.filter(
       (path) => !path.replaceAll('\\', '/').endsWith('/lib/money.ts'),
     )
-      .filter((path) => /NT\$/.test(readFileSync(path, 'utf8')))
+      .filter((path) => readFileSync(path, 'utf8').includes('NT$'))
       .map(rel)
       // 測試檔會斷言畫面上的 `NT$ 6,400`，那是在驗結果而不是在自己排版
       .filter((path) => !/\.(test|spec)\.tsx?$/.test(path) && !path.startsWith('test/'))

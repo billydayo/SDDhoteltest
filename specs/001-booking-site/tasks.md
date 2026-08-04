@@ -514,9 +514,9 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 **Purpose**: 跨故事的稽核、驗收與舊實作清除
 
-- [ ] T171 [P] 無障礙稽核 `frontend/src/` 全部元件與頁面：語意化標籤（MUST NOT 以 `div` + `onClick` 取代 `button`／`a`）、所有圖片有 `alt`、所有表單控制項有關聯 `<label>`、所有互動元素可鍵盤操作且有可見 focus 樣式（`outline-none` MUST NOT 被全域套用而不提供替代）；訂房流程 MUST 能純以鍵盤完成（憲章原則 V、SC-011）
+- [X] T171 [P] 無障礙稽核 `frontend/src/` 全部元件與頁面：語意化標籤（MUST NOT 以 `div` + `onClick` 取代 `button`／`a`）、所有圖片有 `alt`、所有表單控制項有關聯 `<label>`、所有互動元素可鍵盤操作且有可見 focus 樣式（`outline-none` MUST NOT 被全域套用而不提供替代）；訂房流程 MUST 能純以鍵盤完成（憲章原則 V、SC-011）
 - [ ] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
-- [ ] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
+- [X] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
 - [X] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
 - [X] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
 - [X] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）

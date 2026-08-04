@@ -71,11 +71,11 @@ async function tabTo(
 
 function describeElement(el: HTMLElement): string {
   const name = el.getAttribute('name') ?? el.getAttribute('id') ?? ''
-  return `<${el.tagName.toLowerCase()}${name ? ` ${name}` : ''}> ${(el.textContent ?? '').trim().slice(0, 20)}`
+  return `<${el.tagName.toLowerCase()}${name ? ` ${name}` : ''}> ${el.textContent.trim().slice(0, 20)}`
 }
 
 const byName = (name: string) => (el: HTMLElement) => el.getAttribute('name') === name
-const byText = (text: string) => (el: HTMLElement) => (el.textContent ?? '').trim() === text
+const byText = (text: string) => (el: HTMLElement) => el.textContent.trim() === text
 
 beforeEach(() => {
   setToken(null)

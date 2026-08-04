@@ -26,15 +26,23 @@ SQL，稽核日誌就悄悄變得可以竄改（憲章資料庫約束、SC-027�
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote_plus
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#: `backend/`。`env_file` MUST 為絕對路徑：相對的 `".env"` 由 pydantic 對**當前工作
+#: 目錄**解析，於是從專案根目錄啟動時會讀到根目錄那個同名檔（若存在），而不是
+#: `backend/.env`。而佔位值不見得會被驗證器擋下——應用照常啟動，直到第一次查詢
+#: 才因連到錯的主機而失敗，錯誤訊息看起來與設定檔毫無關係。
+#: 憑證一律只存在於 `backend/.env`（憲章後端約束、FR-085、SC-022）。
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_BACKEND_ROOT / ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

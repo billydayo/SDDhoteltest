@@ -26,9 +26,9 @@
 
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import AsyncIterator
+from urllib.parse import quote_plus
 
 import pytest
 import pytest_asyncio
@@ -37,14 +37,26 @@ from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from sunny.config import get_settings
+from tests.conftest import _test_database_url
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("SUNNY_TEST_DATABASE_URL") is None,
+    _test_database_url() is None,
     reason="未設定 SUNNY_TEST_DATABASE_URL，跳過需要資料庫的測試",
 )
 
 #: PostgreSQL 的權限不足錯誤碼。
 INSUFFICIENT_PRIVILEGE = "42501"
+
+
+def _sqlstate(error: Exception) -> str | None:
+    """取出 PostgreSQL 的 SQLSTATE。
+
+    **不能改用 `"42501" in str(error)`。** SQLAlchemy 的例外字串只有訊息本文
+    （`permission denied for table admin_logs`），錯誤碼在被包起來的 asyncpg
+    例外的 `sqlstate` 屬性上。以字串比對會**永遠找不到**，於是「REVOKE 有沒有
+    生效」這件事實際上沒有被驗證——測試紅著，但紅的原因與稽核日誌無關。
+    """
+    return getattr(getattr(error, "orig", None), "sqlstate", None)
 
 
 def _app_role_url() -> str | None:
@@ -53,7 +65,7 @@ def _app_role_url() -> str | None:
     測試資料庫的位置取自 `SUNNY_TEST_DATABASE_URL`，但角色換成
     `DB_APP_USER`／`DB_APP_PASSWORD`——正式路徑用的就是這一組。
     """
-    base = os.environ.get("SUNNY_TEST_DATABASE_URL")
+    base = _test_database_url()
     if not base:
         return None
 
@@ -67,7 +79,11 @@ def _app_role_url() -> str | None:
     if not location:
         # URL 未帶憑證，無從替換
         return None
-    return f"{scheme}://{settings.db_app_user}:{settings.db_app_password}@{location}"
+    # 憑證一律 quote_plus——理由同 config.py：密碼裡的 @ 會讓主機名稱悄悄變成
+    # 別的東西，而錯誤訊息是 DNS 失敗，看起來跟密碼毫無關係。
+    user = quote_plus(settings.db_app_user)
+    password = quote_plus(settings.db_app_password)
+    return f"{scheme}://{user}:{password}@{location}"
 
 
 @pytest_asyncio.fixture
@@ -131,7 +147,7 @@ async def test_update_is_denied(app_session) -> None:
             text("update public.admin_logs set action = 'tampered' where id = :id"),
             {"id": log_id},
         )
-    assert INSUFFICIENT_PRIVILEGE in str(exc.value), (
+    assert _sqlstate(exc.value) == INSUFFICIENT_PRIVILEGE, (
         "UPDATE MUST 因權限不足而被拒——若是別的錯誤，代表擋下它的不是 REVOKE，那道保證可能並未生效"
     )
     await app_session.rollback()
@@ -145,7 +161,7 @@ async def test_delete_is_denied(app_session) -> None:
         await app_session.execute(
             text("delete from public.admin_logs where id = :id"), {"id": log_id}
         )
-    assert INSUFFICIENT_PRIVILEGE in str(exc.value)
+    assert _sqlstate(exc.value) == INSUFFICIENT_PRIVILEGE
     await app_session.rollback()
 
 
@@ -157,7 +173,7 @@ async def test_truncate_is_denied(app_session) -> None:
     """
     with pytest.raises((ProgrammingError, DBAPIError)) as exc:
         await app_session.execute(text("truncate public.admin_logs"))
-    assert INSUFFICIENT_PRIVILEGE in str(exc.value)
+    assert _sqlstate(exc.value) == INSUFFICIENT_PRIVILEGE
     await app_session.rollback()
 
 

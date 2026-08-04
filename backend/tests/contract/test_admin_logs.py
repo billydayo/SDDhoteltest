@@ -168,7 +168,10 @@ async def test_admin_can_read_logs(client, session, admin, admin_token: str) -> 
             target_table="rooms",
             summary={"index": i},
         )
-    await session.commit()
+        # ⚠️ 每一筆各自提交。`created_at` 的預設是 `now()`，而 `now()` 是**交易
+        # 開始的時間**——三筆寫在同一個交易裡會拿到完全相同的時間戳，「由新到舊」
+        # 於是無序可言，排序結果隨執行計畫變動。真實情況本來就是一次請求一筆。
+        await session.commit()
 
     res = await client.get("/admin/logs", headers=auth_header(admin_token))
     assert res.status_code == 200

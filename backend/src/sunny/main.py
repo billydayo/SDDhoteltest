@@ -163,7 +163,33 @@ def create_app() -> FastAPI:
         return _error_response("系統發生內部錯誤，請稍後再試。", "INTERNAL_ERROR", 500)
 
     _register_routers(app)
+    _mount_uploads(app)
     return app
+
+
+def _mount_uploads(app: FastAPI) -> None:
+    """對外提供已上傳的房源照片。
+
+    `room_photos.save()` 回傳的是 `/uploads/<檔名>`，而那個路徑要真的能被瀏覽器
+    取到，才有房源照片可看。少了這一段，上傳會成功、`images` 會寫進去、
+    後台與前台各顯示一張破圖——**沒有任何錯誤訊息**，因為每一步都成功了。
+
+    ⚠️ **公開，不需登入。** 房源詳情頁對訪客開放（US1），照片自然也是。
+    這裡不是存取控制的位置：真正需要保護的是「誰能上傳」，而那由
+    `admin_rooms.photos_router` 的 `require_admin` 把關（FR-050e）。
+
+    路徑前綴取自 `room_photos.PUBLIC_PREFIX`，目錄取自 `room_photos.upload_root()`
+    ——兩者都只有一個來源。在這裡寫死 `"/uploads"` 會與存檔端各自演化。
+    """
+    from fastapi.staticfiles import StaticFiles
+
+    from sunny.services import room_photos
+
+    app.mount(
+        room_photos.PUBLIC_PREFIX.rstrip("/"),
+        StaticFiles(directory=room_photos.upload_root()),
+        name="uploads",
+    )
 
 
 def _register_routers(app: FastAPI) -> None:

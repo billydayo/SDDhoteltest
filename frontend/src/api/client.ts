@@ -23,18 +23,32 @@
  * `VITE_API_BASE_URL` 是一個 URL 路徑，不是憑證。
  */
 import type {
+  AdminOrder,
+  AdminOrderSearchParams,
+  AdminRoom,
+  AdminRoomSearchParams,
+  AdminUser,
+  AffectedOrder,
   ApiErrorBody,
+  DashboardStats,
   LoginInput,
   Order,
   OrderCreateInput,
+  OrderStats,
+  OrderStatusInput,
+  PhotoUpload,
   Profile,
   ProfileUpdateInput,
   RegisterInput,
+  Role,
   Room,
   RoomDetail,
   RoomSearchParams,
+  RoomStatus,
+  RoomWriteInput,
   SiteContent,
   TokenResponse,
+  UserUpdateInput,
   Vocabulary,
 } from './types'
 
@@ -215,6 +229,39 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await res.json()) as T
 }
 
+/**
+ * 上傳檔案。**與 `request` 分開，因為 header 的處理正好相反。**
+ *
+ * ⚠️ `multipart/form-data` 的 `Content-Type` **MUST NOT 手動設定**。
+ * 它必須帶一段 boundary（`multipart/form-data; boundary=----xyz`），而那串
+ * 值只有瀏覽器在序列化 `FormData` 時才知道。自己填一個沒有 boundary 的
+ * `multipart/form-data`，後端會解析出零個欄位——回應是「缺少 file 欄位」，
+ * 而畫面上檔案明明選好了。
+ *
+ * 因此這裡刻意不呼叫 `request()`：那裡對 `body !== undefined` 會補上
+ * `application/json`，正是不能發生的事。
+ */
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  const token = getToken()
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: form })
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+    throw new NetworkError(cause)
+  }
+
+  if (res.status === 401 && token) {
+    setToken(null)
+    onUnauthorized?.()
+  }
+  if (!res.ok) throw new ApiError(res.status, await readErrorBody(res))
+  return (await res.json()) as T
+}
+
 // ---------------------------------------------------------------------------
 // 端點
 // ---------------------------------------------------------------------------
@@ -277,6 +324,119 @@ export const api = {
       request<Order>('/orders', { method: 'POST', body: input }),
     /** 模擬付款。**沒有任何請求內容**——不接收卡號、有效期限、CVV（FR-028）。 */
     pay: (orderId: string) => request<Order>(`/orders/${orderId}/pay`, { method: 'POST' }),
+  },
+
+  // =========================================================================
+  // 後台（US6）。⚠️ 本段以下只 append、不重排（assignments.md「交界處」）。
+  //
+  // 全部端點皆在後端的 `require_admin` 之後。前端的 `RequireAdmin` 守衛只
+  // 決定畫面呈現，**不是存取邊界**（憲章原則 VI）——這裡列出它們不代表
+  // 非管理員呼叫得動。
+  // =========================================================================
+  admin: {
+    /** 營運總覽（FR-049）。 */
+    dashboard: (signal?: AbortSignal) =>
+      request<DashboardStats>('/admin/dashboard', signal ? { signal } : {}),
+
+    rooms: {
+      list: (params: AdminRoomSearchParams = {}, signal?: AbortSignal) =>
+        request<AdminRoom[]>('/admin/rooms', {
+          query: {
+            keyword: params.keyword,
+            type: params.type,
+            minPrice: params.minPrice,
+            maxPrice: params.maxPrice,
+            startDate: params.startDate,
+            endDate: params.endDate,
+            status: params.status,
+          },
+          ...(signal ? { signal } : {}),
+        }),
+      get: (roomId: string, signal?: AbortSignal) =>
+        request<AdminRoom>(`/admin/rooms/${roomId}`, signal ? { signal } : {}),
+      create: (input: RoomWriteInput) =>
+        request<AdminRoom>('/admin/rooms', { method: 'POST', body: input }),
+      update: (roomId: string, input: RoomWriteInput) =>
+        request<AdminRoom>(`/admin/rooms/${roomId}`, { method: 'PUT', body: input }),
+      /** 只接受 `available` 與 `maintenance`——「已預訂」由訂單推導（FR-051）。 */
+      setStatus: (roomId: string, status: RoomStatus) =>
+        request<AdminRoom>(`/admin/rooms/${roomId}/status`, {
+          method: 'PATCH',
+          body: { status },
+        }),
+      /**
+       * 刪除。**兩段式**（FR-052）：不帶 `confirm` 時後端回 409 並說明影響範圍，
+       * 不執行刪除。二次確認因此由伺服器端落實，而不是只有前端跳個對話框——
+       * 那種確認直接呼叫 API 就繞過去了。
+       */
+      // 204 無內容。型別寫 `undefined` 而非 `void`——`request` 對 204 回的
+      // 就是 `undefined`，而 `void` 在型別位置上不表示「沒有值」。
+      remove: (roomId: string, confirm = false) =>
+        request<undefined>(`/admin/rooms/${roomId}`, {
+          method: 'DELETE',
+          query: { confirm },
+        }),
+      /** 刪除前的影響範圍：該房源尚未結束的訂單（FR-052）。 */
+      affectedOrders: (roomId: string, signal?: AbortSignal) =>
+        request<AffectedOrder[]>(
+          `/admin/rooms/${roomId}/affected-orders`,
+          signal ? { signal } : {},
+        ),
+    },
+
+    photos: {
+      /**
+       * 上傳一張照片，回傳**尚未掛到任何房源上**的路徑。
+       *
+       * ⚠️ 送進來的 `File` MUST 已在瀏覽器內縮圖轉檔（FR-050c）——
+       * 縮圖由 `ImageManager` 負責，這裡只管送。
+       */
+      upload: (file: File) => {
+        const form = new FormData()
+        form.append('file', file)
+        return upload<PhotoUpload>('/admin/room-photos', form)
+      },
+      /** 捨棄本次上傳但未保存的檔案（FR-050f 的「取消」路徑）。 */
+      discard: (path: string) =>
+        request<undefined>('/admin/room-photos', { method: 'DELETE', query: { path } }),
+    },
+
+    orders: {
+      list: (params: AdminOrderSearchParams = {}, signal?: AbortSignal) =>
+        request<AdminOrder[]>('/admin/orders', {
+          query: {
+            orderNo: params.orderNo,
+            status: params.status,
+            roomId: params.roomId,
+            startDate: params.startDate,
+            endDate: params.endDate,
+          },
+          ...(signal ? { signal } : {}),
+        }),
+      /** 營運指標（FR-053）。⚠️ 無訂單時兩個比值為 `null`，不是 0。 */
+      stats: (signal?: AbortSignal) =>
+        request<OrderStats>('/admin/orders/stats', signal ? { signal } : {}),
+      setStatus: (orderId: string, input: OrderStatusInput) =>
+        request<AdminOrder>(`/admin/orders/${orderId}/status`, { method: 'PATCH', body: input }),
+    },
+
+    users: {
+      list: (params: { keyword?: string; role?: string } = {}, signal?: AbortSignal) =>
+        request<AdminUser[]>('/admin/users', {
+          query: { keyword: params.keyword, role: params.role },
+          ...(signal ? { signal } : {}),
+        }),
+      update: (userId: string, input: UserUpdateInput) =>
+        request<AdminUser>(`/admin/users/${userId}`, { method: 'PATCH', body: input }),
+      /**
+       * 角色升降（FR-055）。
+       *
+       * 與 `update` 分開是後端的設計，前端照著走：合併成一個端點就會出現一條
+       * 不留稽核紀錄的升權路徑。
+       */
+      setRole: (userId: string, role: Role) =>
+        request<AdminUser>(`/admin/users/${userId}/role`, { method: 'PATCH', body: { role } }),
+    },
   },
 }
 

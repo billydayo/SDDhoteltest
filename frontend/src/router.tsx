@@ -28,12 +28,20 @@ import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
-import { LoginReasonNotice } from './components/LoginReasonNotice'
+import { Account } from './pages/Account'
+import { AuthCallback } from './pages/AuthCallback'
 import { Home } from './pages/Home'
+import { Login } from './pages/Login'
 import { Forbidden, NotFound } from './pages/NotFound'
 import { Placeholder } from './pages/Placeholder'
+import { Register } from './pages/Register'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
+import { AdminLayout } from './pages/admin/AdminLayout'
+import { Dashboard } from './pages/admin/Dashboard'
+import { AdminOrders } from './pages/admin/Orders'
+import { AdminRooms } from './pages/admin/Rooms'
+import { AdminUsers } from './pages/admin/Users'
 import { useAuth } from './state/AuthContext'
 
 /**
@@ -138,24 +146,20 @@ export function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/rooms/:roomId" element={<RoomDetail />} />
         <Route path="/terms" element={<Terms />} />
-        <Route
-          path="/login"
-          element={
-            <>
-              {/* FR-019：MUST 說明他為什麼被送到這裡。T073 的真實登入頁沿用 */}
-              <LoginReasonNotice />
-              <Placeholder title="登入" task="T073" />
-            </>
-          }
-        />
-        <Route path="/register" element={<Placeholder title="註冊" task="T074" />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        {/*
+          Google 回程的落點。**公開**——抵達這裡的人正是還沒有身分的那個人，
+          掛上 RequireAuth 會把他導去登入頁，而他手上的 token 就這樣掉了。
+        */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* -- 需登入 ----------------------------------------------------- */}
         <Route
           path="/account"
           element={
             <RequireAuth>
-              <Placeholder title="帳戶設定" task="T076" />
+              <Account />
             </RequireAuth>
           }
         />
@@ -176,15 +180,36 @@ export function AppRoutes() {
           }
         />
 
-        {/* -- 僅管理員 --------------------------------------------------- */}
+        {/* -- 僅管理員 ---------------------------------------------------
+            十二個模組共用 `AdminLayout` 的側欄與版面（T125）。守衛掛在父路由
+            上，子路由因此不必各自重複——**漏掉一個子路由就是一個沒有守衛的
+            後台頁面**，而那不會有任何測試失敗。
+
+            ⚠️ 守衛只決定畫面呈現。真正的存取邊界在 FastAPI 的 `require_admin`
+            （見本檔開頭）。 */}
         <Route
-          path="/admin/*"
+          path="/admin"
           element={
             <RequireAdmin>
-              <Placeholder title="後台" task="T126" />
+              <AdminLayout />
             </RequireAdmin>
           }
-        />
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="rooms" element={<AdminRooms />} />
+          <Route path="orders" element={<AdminOrders />} />
+          <Route path="users" element={<AdminUsers />} />
+          {/* 以下模組分屬 US7–US12，導覽從第一天就完整列出（AdminLayout 的說明） */}
+          <Route path="reviews" element={<Placeholder title="評論審核" task="T134" />} />
+          <Route path="refunds" element={<Placeholder title="退款審核" task="T135" />} />
+          <Route path="messages" element={<Placeholder title="會員訊息" task="T170" />} />
+          <Route path="room-risk" element={<Placeholder title="房源品質檢測" task="T148" />} />
+          <Route path="content" element={<Placeholder title="內容編輯" task="T142" />} />
+          <Route path="channel" element={<Placeholder title="渠道比價與控價" task="T159" />} />
+          <Route path="logs" element={<Placeholder title="操作日誌" task="T164" />} />
+          <Route path="settings" element={<Placeholder title="系統與參數設定" task="T165" />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>

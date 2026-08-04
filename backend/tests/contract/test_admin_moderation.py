@@ -185,7 +185,13 @@ async def test_approving_a_refund_releases_the_interval(
     測試照樣全綠。
     """
     check_in, check_out = _stay()
-    params = {"checkIn": check_in.isoformat(), "checkOut": check_out.isoformat()}
+    # guestCount MUST 一併帶上：FR-010 規定填了日期就要填人數，少了它 `/rooms`
+    # 回 400，而「400 的回應裡當然找不到這個房源」會讓下面那句斷言看起來通過。
+    params = {
+        "checkIn": check_in.isoformat(),
+        "checkOut": check_out.isoformat(),
+        "guestCount": 2,
+    }
 
     before = await client.get("/rooms", params=params)
     assert before.status_code == 200
@@ -228,8 +234,16 @@ async def test_rejecting_a_refund_keeps_the_interval_occupied(
     assert order.status == STATUS_CONFIRMED, "駁回後訂單 MUST 回到已確認，而非停在退款申請中"
 
     after = await client.get(
-        "/rooms", params={"checkIn": check_in.isoformat(), "checkOut": check_out.isoformat()}
+        "/rooms",
+        params={
+            "checkIn": check_in.isoformat(),
+            "checkOut": check_out.isoformat(),
+            # 同上：沒有 guestCount 會拿到 400，而 400 的 body 裡自然沒有這個
+            # 房源，斷言便會以錯誤的理由通過（FR-010）。
+            "guestCount": 2,
+        },
     )
+    assert after.status_code == 200, after.text
     assert str(room.id) not in [r["id"] for r in after.json()]
 
 

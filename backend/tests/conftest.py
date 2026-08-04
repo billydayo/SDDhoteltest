@@ -31,6 +31,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from sunny.models import Base, Profile
 from sunny.models.profile import ROLE_ADMIN, ROLE_MEMBER
@@ -39,7 +40,23 @@ from sunny.services.auth import create_access_token, hash_password
 
 
 def _test_database_url() -> str | None:
-    return os.environ.get("SUNNY_TEST_DATABASE_URL") or None
+    """測試資料庫位址：環境變數優先，其次 `backend/.env`。
+
+    只讀 `os.environ` 的話，寫在 `.env` 裡的值不會被看到——應用讀得到、測試讀
+    不到，於是「明明設了卻整批跳過」，而跳過是**綠的**，沒有人會發現。
+    `.env` 已由 pydantic-settings 載入，這裡沿用同一份來源。
+
+    設定不完整（缺 JWT_SECRET 等）時 `get_settings()` 會拋錯，此時退回「未設定」
+    ——那些測試本來就需要完整設定才跑得起來。
+    """
+    if url := os.environ.get("SUNNY_TEST_DATABASE_URL"):
+        return url
+    try:
+        from sunny.config import get_settings
+
+        return get_settings().sunny_test_database_url or None
+    except Exception:
+        return None
 
 
 requires_db = pytest.mark.skipif(
@@ -54,7 +71,7 @@ async def engine() -> AsyncIterator:
     if url is None:
         pytest.skip("未設定 SUNNY_TEST_DATABASE_URL")
 
-    eng = create_async_engine(url, connect_args={"timeout": 20})
+    eng = create_async_engine(url, connect_args={"timeout": 20}, poolclass=NullPool)
 
     # gist 排除約束需要 btree_gist 才能建立。缺了會讓所有房況測試以
     # 「約束不存在」的形式靜默通過——那是最糟的失敗方式。

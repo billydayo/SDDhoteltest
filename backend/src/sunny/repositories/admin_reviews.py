@@ -91,6 +91,12 @@ class AdminReviewRepository(Repository):
         review.admin_reply = reply
         review.admin_reply_by = admin_id if reply is not None else None
         await self.session.flush()
+
+        # ⚠️ MUST 明確取回 `admin_reply_at`。它是 trigger 在資料庫端寫的，ORM 對
+        # 那次賦值一無所知——不取回的話回應裡的 `adminReplyAt` 永遠是舊值（新回覆
+        # 時為 null），前端拿不到「何時回覆的」而只能顯示空白。資料庫裡是對的，
+        # 只有 API 回應是錯的，因此不會有任何錯誤浮現。
+        await self.session.refresh(review, ["admin_reply_at"])
         return review
 
     async def delete(self, review: Review) -> None:

@@ -78,6 +78,18 @@ select = [
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# 事件迴圈的範圍 MUST 與 conftest 的 `engine` fixture 同為 session。
+#
+# 預設是「每個測試一個新迴圈」，而 asyncpg 的連線綁在建立它的迴圈上：
+# session 範圍的引擎在第一個測試的迴圈裡建好連線池，第二個測試換了迴圈，
+# 於是每一個需要資料庫的測試都以
+# `RuntimeError: got Future attached to a different loop` 收場——訊息看起來
+# 像非同步程式寫錯，實際上只是設定沒對齊。
+#
+# 另一個方向（把引擎改成 function 範圍）也能解，但每個測試都要對遠端 pooler
+# 重新連線與建擴充，兩百多個測試的往返成本沒有理由付。
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [

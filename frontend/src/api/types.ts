@@ -220,3 +220,194 @@ export interface OrderCreateInput {
   email: string
   paymentMethod: PaymentMethod
 }
+
+// ===========================================================================
+// 後台（US6）
+//
+// ⚠️ 本段以下**只 append，不重排**（assignments.md「交界處」）。
+// 這個檔案由兩條線共同維護，重排會讓原本可自動合併的 diff 變成整段衝突。
+// ===========================================================================
+
+/** `GET /admin/dashboard`（FR-049）。 */
+export interface DashboardStats {
+  totalOrders: number
+  todayCheckIns: number
+  todayCheckOuts: number
+
+  /** ⚠️ 房態為**當日推導**，不是 `rooms.status` 的分組計數（FR-015）。 */
+  roomsAvailable: number
+  roomsBooked: number
+  roomsMaintenance: number
+
+  pendingReviews: number
+  pendingRefunds: number
+  /**
+   * 未處理的賤賣預警筆數（FR-111）。
+   *
+   * ⚠️ 來自**模擬資料**。顯示此數字的地方 MUST 一併標示（FR-110）——
+   * 儀表板上一個沒有標示的數字會被當成真實的市場情報。
+   */
+  pendingChannelAlerts: number
+
+  /** 本月營收，整數新臺幣元 */
+  monthRevenue: number
+}
+
+/**
+ * `GET /admin/orders/stats`（FR-053）。
+ *
+ * ⚠️ **`conversionRate` 與 `averageOrderValue` 在無訂單時為 `null`，
+ * MUST NOT 當成 0 顯示。** 0 會被讀成「一筆都沒成交」，而實際上是還沒有人
+ * 下過單——前者是營運警訊，後者是新站台的正常狀態（T117 的驗收條件）。
+ */
+export interface OrderStats {
+  totalOrders: number
+  placedOrders: number
+  paidOrders: number
+  unpaidCancelledOrders: number
+  revenue: number
+  conversionRate: number | null
+  averageOrderValue: number | null
+}
+
+/**
+ * 後台的房源檢視。
+ *
+ * `availability` 依**所查日期區間**推導（FR-051b），與 `status` 是兩件事：
+ * 後者是不分日期的營運狀態，只有 `available` 與 `maintenance`。
+ */
+export interface AdminRoom extends Room {
+  availability: Availability
+}
+
+/**
+ * 新增與編輯房源的輸入。
+ *
+ * ⚠️ **`status` 只接受 `available` 與 `maintenance`**——「已預訂」由當日訂單
+ * 推導，MUST NOT 開放人工設定（FR-051）。型別在這裡就擋掉，不必等後端拒絕。
+ */
+export interface RoomWriteInput {
+  name: string
+  type: string
+  maxGuests: number
+  /** 整數新臺幣元 */
+  nightlyPrice: number
+  description: string
+  /** 上限 8 張，第一張為封面（FR-050a） */
+  images: string[]
+  amenities: string[]
+  features: string[]
+  status: RoomStatus
+}
+
+/** 刪除房源前列出的受影響訂單（FR-052）。 */
+export interface AffectedOrder {
+  id: string
+  orderNo: string
+  /** `YYYY-MM-DD` */
+  checkIn: string
+  /** `YYYY-MM-DD` */
+  checkOut: string
+  status: OrderStatus
+  contactName: string
+}
+
+/** 後台的房源查詢條件（FR-051b、FR-053a）。 */
+export interface AdminRoomSearchParams {
+  keyword?: string
+  type?: string
+  minPrice?: number
+  maxPrice?: number
+  /** `YYYY-MM-DD`。只填一端視為單日。 */
+  startDate?: string
+  endDate?: string
+  /** `available` / `booked` / `maintenance`；篩「已預訂」須先選日期 */
+  status?: string
+}
+
+/**
+ * 後台的訂單檢視。含聯絡資訊——業者要有它才能聯繫客人。
+ *
+ * 這與會員端的越權防護不衝突：此端點在 `require_admin` 之後。
+ */
+export interface AdminOrder {
+  id: string
+  orderNo: string
+  userId: string
+  roomId: string
+  roomName: string | null
+  /** `YYYY-MM-DD` */
+  checkIn: string
+  /** `YYYY-MM-DD` */
+  checkOut: string
+  nights: number
+  guestCount: number
+  contactName: string
+  phone: string
+  email: string
+  paymentMethod: string
+  /** 整數新臺幣元 */
+  totalAmount: number
+  status: OrderStatus
+  expiresAt: string
+  cancelReason: CancelReason | null
+  createdAt: string
+}
+
+export interface AdminOrderSearchParams {
+  orderNo?: string
+  status?: string
+  roomId?: string
+  /** `YYYY-MM-DD` */
+  startDate?: string
+  endDate?: string
+}
+
+/** 變更訂單狀態（FR-054）。變更由後端寫入 `admin_logs`。 */
+export interface OrderStatusInput {
+  status: OrderStatus
+  note?: string
+}
+
+/**
+ * 後台的會員檢視。
+ *
+ * ⚠️ **沒有密碼雜湊，也沒有 `googleSub`**——後端明列欄位而非把 ORM 物件
+ * 全欄位倒出去。前端的型別跟著明列，多出來的欄位會在編譯期就被發現。
+ */
+export interface AdminUser {
+  id: string
+  email: string
+  role: Role
+  displayName: string
+  phone: string | null
+  createdAt: string
+}
+
+/**
+ * 編輯會員資料。
+ *
+ * ⚠️ **刻意沒有 `role`。** 角色變更走 `setRole` 的獨立端點，才能保證每一次
+ * 變更都留下稽核紀錄（FR-055）。混進這裡就會有一條不留紀錄的升權路徑。
+ */
+export interface UserUpdateInput {
+  displayName?: string
+  phone?: string
+}
+
+export interface UserRoleInput {
+  role: Role
+}
+
+/**
+ * 照片上傳的結果（FR-050b）。
+ *
+ * 回傳的是**尚未掛到房源上**的檔案路徑。要真正生效必須由儲存房源時把它寫進
+ * `images`——這個兩段式是 FR-050f 的前提：按下取消時，本次上傳但未保存的
+ * 檔案才有辦法被清掉。
+ */
+export interface PhotoUpload {
+  path: string
+  bytes: number
+  contentType: string
+}

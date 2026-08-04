@@ -175,7 +175,9 @@ async def test_member_gets_403(
 ) -> None:
     """案例二：以他人身分——一般會員。**SC-008 的直接對應。**"""
     res = await _call(client, path, route, method, json={}, headers=_auth(member_token))
-    assert res.status_code == 403, f"{method} {path} 回了 {res.status_code}"
+    # 訊息帶上回應主體：只印狀態碼的話，401 與 403 之外的意外（例如 500）
+    # 得再跑一次才知道原因，而這份測試跑一次要一分多鐘。
+    assert res.status_code == 403, f"{method} {path} 回了 {res.status_code}：{res.text}"
     assert res.json()["code"] == "FORBIDDEN"
 
 

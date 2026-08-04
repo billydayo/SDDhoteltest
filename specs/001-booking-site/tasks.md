@@ -348,11 +348,11 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T122 [US6] 建立 `backend/src/sunny/routers/admin_orders.py`：訂單搜尋與篩選（訂單編號、狀態、日期區間）與狀態變更；狀態變更 MUST 經 T034 寫入 `admin_logs`（FR-053、FR-054）
 - [X] T123 [US6] 建立 `backend/src/sunny/routers/admin_users.py`：會員資料檢視編輯與角色升降；**`role` 變更 MUST 只能由此端點執行且 MUST 進稽核日誌**（原 `prevent_role_escalation()` trigger 的職責移至此）（FR-055、data-model.md）
 - [X] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
-- [ ] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
-- [ ] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
-- [ ] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
-- [ ] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
-- [ ] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
+- [X] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
+- [X] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
+- [X] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
+- [X] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
+- [X] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
 
 **Checkpoint**: 後台核心可用；前後台資料互相反映
 

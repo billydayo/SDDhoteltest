@@ -27,6 +27,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      /*
+       * 已上傳的房源照片。後端回的是 `/uploads/<檔名>`——那是一個**同源的
+       * 絕對路徑**，不帶 `/api` 前綴，因此不會被上面那條規則接到。
+       *
+       * 少了這一條，開發時每一張上傳的照片都會被 Vite 當成前端路由而回傳
+       * `index.html`，畫面上是一張破圖。正式環境由後端自己提供這個路徑
+       * （`main.py` 的 `_mount_uploads`），只有開發用的兩個 port 需要它。
+       */
+      '/uploads': {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
     },
   },
 })

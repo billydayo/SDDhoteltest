@@ -61,6 +61,17 @@ def _upload_root() -> Path:
     return root
 
 
+def upload_root() -> Path:
+    """上傳檔的實際目錄。供 `main.py` 掛載靜態路由使用。
+
+    ⚠️ **存檔與供檔必須指向同一個目錄，因此兩邊都經過這裡。**
+    `main.py` 若自己讀一次 `settings.upload_dir` 並解析路徑，兩份解析邏輯就會
+    分歧——而分歧的症狀是上傳成功、回應 200、房源詳情頁一張破圖，
+    沒有任何錯誤訊息。
+    """
+    return _upload_root()
+
+
 def is_managed(path: str) -> bool:
     """該路徑是否為本系統管理的上傳檔。
 

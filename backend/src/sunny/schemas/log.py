@@ -24,7 +24,12 @@ class AdminLogOut(CamelModel):
     actor_id: uuid.UUID
     #: 操作者顯示名稱。**不含其電子郵件**——那是個資，而日誌是所有管理員
     #: 都讀得到的（FR-118）。
-    actor_name: str | None
+    #:
+    #: 預設值 MUST 保留。這個欄位不在 `AdminLog` 模型上（它來自 join 出來的
+    #: `profiles.display_name`），而 `of()` 是先 `model_validate(log)` 再
+    #: `model_copy` 補上——沒有預設值時驗證會在補值**之前**就以
+    #: 「Field required」失敗，`GET /admin/logs` 因而整個 500。
+    actor_name: str | None = None
     action: str
     target_table: str
     target_id: str | None

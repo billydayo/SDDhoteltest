@@ -288,6 +288,10 @@ async def test_paying_an_expired_order_is_rejected(session, clean_tables, member
     assert await repo.expire_stale_orders() >= 1
     await session.commit()
 
-    refreshed = await session.scalar(select(Order).where(Order.id == stale.id))
-    assert refreshed is not None
-    assert refreshed.status == STATUS_CANCELLED, "已逾期的訂單 MUST NOT 仍處於待付款"
+    # ⚠️ 讀「欄位」而不是讀 ORM 實體。逾期清理是資料庫函式裡的 UPDATE，ORM 的
+    # 識別映射對它一無所知；而測試用的 sessionmaker 是 `expire_on_commit=False`，
+    # 提交後屬性也不會失效。`select(Order)` 會原封不動地把記憶體裡那份
+    # `pending-payment` 的舊值交回來——**看起來像逾期沒生效，實際上是快取**。
+    # 只選欄位就沒有實體可快取，拿到的一定是資料庫現在的值。
+    status = await session.scalar(select(Order.status).where(Order.id == stale.id))
+    assert status == STATUS_CANCELLED, "已逾期的訂單 MUST NOT 仍處於待付款"

@@ -71,7 +71,11 @@ class AdminMessageOut(CamelModel):
     thread_user_id: uuid.UUID
     sender_id: uuid.UUID
     sender_role: str
-    sender_name: str | None
+    #: 預設值 MUST 保留：這個欄位不在 `Message` 模型上（來自 join 出來的
+    #: `profiles.display_name`），而路由是先 `model_validate(message)` 再
+    #: `model_copy` 補上——沒有預設值時驗證會在補值**之前**就以「Field required」
+    #: 失敗，整個管理員訊息端點因而 500（同 `AdminOrderOut.room_name`）。
+    sender_name: str | None = None
     body: str
     read_at: datetime | None
     created_at: datetime

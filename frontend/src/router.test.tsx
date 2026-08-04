@@ -117,12 +117,12 @@ describe('僅管理員的路由', () => {
     expect(screen.queryByRole('heading', { level: 1, name: '登入' })).not.toBeInTheDocument()
   })
 
-  it('管理員正常進入', async () => {
+  it('管理員正常進入，落在儀表板', async () => {
     setToken('fake-token')
     mockMe(ADMIN)
     renderAt('/admin')
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: '後台' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: '儀表板' })).toBeInTheDocument()
     })
   })
 })

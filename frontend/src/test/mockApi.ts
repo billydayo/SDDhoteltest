@@ -11,7 +11,19 @@
  */
 import { vi } from 'vitest'
 
-import type { Profile, RiskCheck, Room, RoomDetail, SiteContent, Vocabulary } from '../api/types'
+import type {
+  AdminOrder,
+  AdminRoom,
+  AdminUser,
+  DashboardStats,
+  OrderStats,
+  Profile,
+  RiskCheck,
+  Room,
+  RoomDetail,
+  SiteContent,
+  Vocabulary,
+} from '../api/types'
 
 export const MEMBER: Profile = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -79,6 +91,35 @@ export const SITE_CONTENT: SiteContent = {
   updatedAt: '2026-08-01T00:00:00Z',
 }
 
+export const DASHBOARD: DashboardStats = {
+  totalOrders: 12,
+  todayCheckIns: 2,
+  todayCheckOuts: 1,
+  roomsAvailable: 6,
+  roomsBooked: 3,
+  roomsMaintenance: 1,
+  pendingReviews: 2,
+  pendingRefunds: 1,
+  pendingChannelAlerts: 4,
+  monthRevenue: 96000,
+}
+
+/**
+ * 有訂單時的指標。
+ *
+ * ⚠️ 「**無**訂單」的那一組（兩個比值為 `null`）刻意不在這裡放預設值——
+ * 那是每個相關測試都該自己明確寫出來的前提，而不是可以順手繼承的背景設定。
+ */
+export const ORDER_STATS: OrderStats = {
+  totalOrders: 12,
+  placedOrders: 12,
+  paidOrders: 9,
+  unpaidCancelledOrders: 3,
+  revenue: 96000,
+  conversionRate: 0.75,
+  averageOrderValue: 10667,
+}
+
 /** 一則要回給前端的錯誤。`body` 的形狀與後端的 `DomainError` 一致。 */
 export interface MockError {
   status: number
@@ -91,8 +132,23 @@ export interface MockOptions {
   roomDetail?: RoomDetail
   vocabulary?: Vocabulary
   siteContent?: SiteContent
+  /** 後台儀表板（`GET /admin/dashboard`）。 */
+  dashboard?: DashboardStats
+  /** 後台訂單指標。⚠️ 兩個比值可為 `null`，那是要驗的行為之一。 */
+  orderStats?: OrderStats
+  adminOrders?: AdminOrder[]
+  adminRooms?: AdminRoom[]
+  adminUsers?: AdminUser[]
   /** 每次 `/rooms` 查詢的完整網址，供斷言「送出了哪些參數」。 */
   roomQueries?: string[]
+  /** `POST /auth/login`。回 `MockError` 代表拒絕；預設成功並回 `profile`。 */
+  onLogin?: (body: unknown) => MockError | null
+  /** `POST /auth/register`。 */
+  onRegister?: (body: unknown) => MockError | null
+  /** `PATCH /me`。回傳更新後的 profile，或 `MockError`。 */
+  onProfileUpdate?: (body: unknown) => MockError | Profile
+  /** 送出過的請求，供斷言「送了什麼、送了幾次」。 */
+  calls?: { method: string; path: string; body: unknown }[]
   /**
    * 依查詢字串決定這一次 `/rooms` 要不要改回錯誤；回 `null` 走正常結果。
    *
@@ -109,13 +165,40 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
-/** 安裝假後端。回傳的物件會累積被呼叫過的 `/rooms` 查詢字串。 */
+/** 安裝假後端。回傳的物件會累積被呼叫過的 `/rooms` 查詢字串與所有請求。 */
 export function mockApi(options: MockOptions = {}) {
   const roomQueries: string[] = options.roomQueries ?? []
+  const calls: { method: string; path: string; body: unknown }[] = options.calls ?? []
 
-  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+  /** 登入成功後回的身分。未指定 `profile` 時給一個一般會員。 */
+  const loggedIn = () => options.profile ?? MEMBER
+
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
     const [path = '', query = ''] = raw.split('?')
+    const method = init?.method ?? 'GET'
+    const body: unknown =
+      typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined
+    calls.push({ method, path, body })
+
+    if (path.endsWith('/auth/login') || path.endsWith('/auth/register')) {
+      const reject = path.endsWith('/auth/login')
+        ? options.onLogin?.(body)
+        : options.onRegister?.(body)
+      if (reject) return Promise.resolve(json(reject.body, reject.status))
+      return Promise.resolve(
+        json(
+          { accessToken: 'fake-token', tokenType: 'bearer', profile: loggedIn() },
+          path.endsWith('/register') ? 201 : 200,
+        ),
+      )
+    }
+
+    if (path.endsWith('/me') && method === 'PATCH') {
+      const result = options.onProfileUpdate?.(body)
+      if (result && 'status' in result) return Promise.resolve(json(result.body, result.status))
+      return Promise.resolve(json(result ?? loggedIn()))
+    }
 
     if (path.endsWith('/me')) {
       return Promise.resolve(
@@ -124,6 +207,29 @@ export function mockApi(options: MockOptions = {}) {
           : json({ detail: '請先登入。', code: 'NOT_AUTHENTICATED' }, 401),
       )
     }
+    /*
+     * ⚠️ 後台路徑 MUST 在前台之前判斷。
+     *
+     * `/api/admin/rooms` 的結尾**就是** `/rooms`——順序反過來的話，後台的
+     * 房源查詢會安靜地拿到前台那份假資料，測試照樣通過，而斷言驗的其實是
+     * 另一個端點的回應。
+     */
+    if (path.endsWith('/admin/dashboard')) {
+      return Promise.resolve(json(options.dashboard ?? DASHBOARD))
+    }
+    if (path.endsWith('/admin/orders/stats')) {
+      return Promise.resolve(json(options.orderStats ?? ORDER_STATS))
+    }
+    if (path.endsWith('/admin/orders')) {
+      return Promise.resolve(json(options.adminOrders ?? []))
+    }
+    if (path.endsWith('/admin/rooms')) {
+      return Promise.resolve(json(options.adminRooms ?? []))
+    }
+    if (path.endsWith('/admin/users')) {
+      return Promise.resolve(json(options.adminUsers ?? []))
+    }
+
     if (path.endsWith('/vocabulary')) {
       return Promise.resolve(json(options.vocabulary ?? VOCABULARY))
     }
@@ -144,5 +250,5 @@ export function mockApi(options: MockOptions = {}) {
     return Promise.resolve(json({ detail: `測試未預期的呼叫：${raw}`, code: 'NOT_MOCKED' }, 404))
   })
 
-  return { roomQueries }
+  return { roomQueries, calls }
 }

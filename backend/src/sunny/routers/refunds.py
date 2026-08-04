@@ -82,9 +82,7 @@ async def request_refund(
     order = await orders.get_fresh(payload.order_id)
 
     if order is None:
-        raise DomainError(
-            "查無此訂單。", code="ORDER_NOT_FOUND", status_code=404, field="orderId"
-        )
+        raise DomainError("查無此訂單。", code="ORDER_NOT_FOUND", status_code=404, field="orderId")
     # ⚠️ 越權申請比越權讀取更嚴重：核准之後那個人的住宿就沒了，
     # 而他從頭到尾不會知道發生什麼事。
     if order.user_id != user.id:
@@ -106,9 +104,7 @@ async def request_refund(
     amount = refund_rules.refund_amount(order.total_amount, order.check_in)
 
     try:
-        refund = await repo.create(
-            order=order, user_id=user.id, reason=reason, amount=amount
-        )
+        refund = await repo.create(order=order, user_id=user.id, reason=reason, amount=amount)
         await session.commit()
     except (IntegrityError, DBAPIError) as exc:
         # ⚠️ MUST 先 rollback。PostgreSQL 的交易在錯誤後進入 aborted 狀態，

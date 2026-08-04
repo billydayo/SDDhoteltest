@@ -122,9 +122,7 @@ async def test_the_owner_sees_their_own_order(client, owned_order, member_token)
     assert [o["id"] for o in orders] == [owned_order["id"]]
 
 
-async def test_the_list_is_sorted_by_check_in_date(
-    client, room_factory, member_token
-) -> None:
+async def test_the_list_is_sorted_by_check_in_date(client, room_factory, member_token) -> None:
     """FR-033：**依入住日排序。**
 
     以建立時間排序看起來很像對的——多數情況下兩者順序相同，直到有人補訂一個

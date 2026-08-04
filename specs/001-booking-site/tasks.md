@@ -520,7 +520,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
 - [X] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
 - [X] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
-- [ ] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
+- [X] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
 - [X] T177 錯誤處理稽核 `backend/src/sunny/` 與 `frontend/src/`：後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑回傳給用戶端；前端所有失敗操作 MUST 顯示可理解訊息並保留使用者已填內容；後端未啟動時 MUST 顯示可理解訊息而非無限轉圈或空白（FR-074、FR-075、FR-083、FR-084）
 - [X] T178 驗證版本控制與前端建置產物中的憑證與秘鑰數為 0：確認 `backend/.env` 未進版控、`frontend/dist/` 不含 `JWT_SECRET`／`DATABASE_URL`／Google client secret，且 `VITE_` 前綴變數僅承載公開資訊（FR-085、SC-022）
 - [ ] T179 重寫 `specs/001-booking-site/checklists/browser-acceptance.md`：舊清單的 15 項係為「開啟 index.html／示範模式橫幅」等已作廢的架構而寫；新清單 MUST 覆蓋前後端各自啟動、需人眼判斷的版面與對比，以及**需要真實 Google 帳密的登入往返**（FR-088、SC-025）

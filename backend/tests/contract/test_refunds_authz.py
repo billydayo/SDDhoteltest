@@ -210,9 +210,7 @@ async def test_the_list_contains_only_my_own_refunds(
     含別人的訂單編號與退款原因，而退款原因往往寫著私事。
     """
     mine = await _confirmed_order(client, await room_factory(), member_token, days_ahead=40)
-    theirs = await _confirmed_order(
-        client, await room_factory(), other_member_token, days_ahead=50
-    )
+    theirs = await _confirmed_order(client, await room_factory(), other_member_token, days_ahead=50)
 
     assert (
         await client.post(

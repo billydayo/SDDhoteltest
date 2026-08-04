@@ -25,9 +25,9 @@
   --color-line-soft: rgba(27, 42, 36, 0.055);
   --color-line-strong: rgba(27, 42, 36, 0.22);
 
-  /* 文字 */
-  --color-ink: #1b2a24; /* 對 bg 15.8:1 ✅ */
-  --color-ink-muted: #4a5852; /* 對 bg  7.3:1 ✅ */
+  /* 文字。⚠️ 註解裡的比值由 `contrast.test.ts` 重算並比對——改色時它會紅。 */
+  --color-ink: #1b2a24; /* 對 bg 14.1:1 ✅ */
+  --color-ink-muted: #4a5852; /* 對 bg  7.0:1 ✅ */
   --color-ink-invert: #ffffff;
 
   /* ⚠️ 舊 `--c-text-faint`（#7C8883，對 bg 3.4:1）**未移植**。
@@ -44,23 +44,32 @@
 
      色相與彩度幾乎沒動，只降了明度——並排看得出深一點，單獨看認不出差別。 */
   --color-brand: #7a6132; /* 填色。白字於其上 5.9:1 ✅ */
-  --color-brand-strong: #634e28; /* hover／pressed。白字 8.2:1 ✅ */
+  --color-brand-strong: #634e28; /* hover／pressed。白字 7.9:1 ✅ */
   --color-brand-soft: #f3ede0; /* 淡底，不承載文字 */
-  --color-brand-accent: #96793f; /* **裝飾專用**：圓點、分隔線。MUST NOT 承載文字。 */
+
+  /* ⚠️ **裝飾專用**：圓點、分隔線、`aria-hidden` 的星號。
+     對 surface 只有 4.1:1、對 bg 3.9:1——**MUST NOT 承載文字**（AA 要 4.5:1）。
+     它仍高於圖形的 3:1 門檻（WCAG 1.4.11），因此當星號可以，當字不行。
+     `components/Rating.tsx` 是唯一的用法：星號 `aria-hidden`，資訊在數字裡。 */
+  --color-brand-accent: #96793f;
 
   /* 深林綠。次要按鈕與選取態。 */
-  --color-forest: #2c4a3c; /* 白字 9.6:1 ✅ */
+  --color-forest: #2c4a3c; /* 白字 9.8:1 ✅ */
   --color-forest-strong: #223b2f;
   --color-forest-soft: #e7ede9;
 
-  /* 語意色與品牌色分開，避免「成功」被誤讀為「品牌」。 */
-  --color-ok: #2f6b4f;
+  /* 語意色與品牌色分開，避免「成功」被誤讀為「品牌」。
+
+     ⚠️ 這四個都**承載文字**——`lib/labels.ts` 的 `TONE_CLASS` 把它們配成
+     `text-X` + `bg-X-soft` 的徽章，行內訊息也直接用 `text-danger`。
+     因此每一個都要標對比度，配對逐組列在 `contrast.test.ts` 裡。 */
+  --color-ok: #2f6b4f; /* 對 ok-soft 5.4:1、對 bg 5.9:1 ✅ */
   --color-ok-soft: #e6f0ea;
-  --color-warn: #8a6420;
+  --color-warn: #8a6420; /* 對 warn-soft 4.7:1、對 bg 5.0:1 ✅ 全站最低的一組 */
   --color-warn-soft: #faf0dc;
-  --color-danger: #8c3f35;
+  --color-danger: #8c3f35; /* 對 danger-soft 6.2:1、對 bg 6.9:1 ✅ */
   --color-danger-soft: #f8e9e6;
-  --color-info: #2d5c7f;
+  --color-info: #2d5c7f; /* 對 info-soft 6.1:1、對 bg 6.7:1 ✅ */
   --color-info-soft: #e4eef5;
 
   /* ---- 字體 ---------------------------------------------------------

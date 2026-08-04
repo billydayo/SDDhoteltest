@@ -181,21 +181,21 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 2
 
-- [ ] T062 [P] [US2] 契約測試註冊與登入於 `backend/tests/contract/test_auth.py`：email 已存在回 409、密碼少於 6 字元回 400、**帳號不存在與密碼錯誤的訊息與狀態碼一律相同**（FR-002、FR-004、FR-009b）
-- [ ] T063 [P] [US2] 單元測試帳號列舉防護於 `backend/tests/unit/test_auth_timing.py`：帳號不存在時 MUST 仍對虛設值執行一次雜湊比對，確認兩種失敗的回應時間無顯著差異
-- [ ] T064 [P] [US2] 契約測試 Google 登入於 `backend/tests/contract/test_google_auth.py`：以既有電子郵件的 Google 帳號登入時 MUST 進入既有帳號且**帳號總數不變**（FR-088、SC-025）
+- [X] T062 [P] [US2] 契約測試註冊與登入於 `backend/tests/contract/test_auth.py`：email 已存在回 409、密碼少於 6 字元回 400、**帳號不存在與密碼錯誤的訊息與狀態碼一律相同**（FR-002、FR-004、FR-009b）
+- [X] T063 [P] [US2] 單元測試帳號列舉防護於 `backend/tests/unit/test_auth_timing.py`：帳號不存在時 MUST 仍對虛設值執行一次雜湊比對，確認兩種失敗的回應時間無顯著差異
+- [X] T064 [P] [US2] 契約測試 Google 登入於 `backend/tests/contract/test_google_auth.py`：以既有電子郵件的 Google 帳號登入時 MUST 進入既有帳號且**帳號總數不變**（FR-088、SC-025）
 - [X] T065 [P] [US2] 單元測試密碼保管於 `backend/tests/unit/test_password.py`：argon2id 雜湊可驗證；`password_hash` MUST NOT 出現在任何 Pydantic 回應模型的欄位中（FR-009a）
-- [ ] T065a [P] [US2] 契約測試個人檔案端點於 `backend/tests/contract/test_profile_authz.py`：`GET`／`PATCH /me` 的三案例（未認證 401／他人 token 只能取得自己的資料／正確身分 200）；會員 MUST NOT 能讀取或修改他人的個人檔案（FR-081）
+- [X] T065a [P] [US2] 契約測試個人檔案端點於 `backend/tests/contract/test_profile_authz.py`：`GET`／`PATCH /me` 的三案例（未認證 401／他人 token 只能取得自己的資料／正確身分 200）；會員 MUST NOT 能讀取或修改他人的個人檔案（FR-081）
 
 ### Implementation for User Story 2
 
 - [ ] T066 [US2] 於 Google Cloud Console 建立 OAuth 2.0 client，將 client id／secret／redirect URI 填入 `backend/.env` 並更新 `backend/.env.example`；**client secret MUST 只存在於後端環境變數**
-- [ ] T067 [US2] 建立 `backend/src/sunny/repositories/profiles.py`：以 email 與 `google_sub` 查詢、建立與更新 profile
-- [ ] T068 [P] [US2] 建立 `backend/src/sunny/schemas/auth.py` 與 `backend/src/sunny/schemas/profile.py`：`ProfileOut` **MUST 明列輸出欄位**，MUST NOT 用 `from_attributes` 把 ORM 物件全欄位倒出去（data-model.md）
-- [ ] T069 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/register`：argon2id 雜湊、6 字元下限、email 重複回 409；回應 MUST NOT 包含 `password_hash`
-- [ ] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
-- [ ] T071 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `GET /auth/google` 與 `GET /auth/google/callback`：Authorization Code Flow，**code 交換由後端執行**；以 email 比對既有 profile 並補上 `google_sub`；使用者取消時導回登入頁且 MUST NOT 建立任何帳號（FR-087、FR-088、FR-090）
-- [ ] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
+- [X] T067 [US2] 建立 `backend/src/sunny/repositories/profiles.py`：以 email 與 `google_sub` 查詢、建立與更新 profile
+- [X] T068 [P] [US2] 建立 `backend/src/sunny/schemas/auth.py` 與 `backend/src/sunny/schemas/profile.py`：`ProfileOut` **MUST 明列輸出欄位**，MUST NOT 用 `from_attributes` 把 ORM 物件全欄位倒出去（data-model.md）
+- [X] T069 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/register`：argon2id 雜湊、6 字元下限、email 重複回 409；回應 MUST NOT 包含 `password_hash`
+- [X] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
+- [X] T071 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `GET /auth/google` 與 `GET /auth/google/callback`：Authorization Code Flow，**code 交換由後端執行**；以 email 比對既有 profile 並補上 `google_sub`；使用者取消時導回登入頁且 MUST NOT 建立任何帳號（FR-087、FR-088、FR-090）
+- [X] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
 - [ ] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
 - [ ] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
 - [ ] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除

@@ -19,6 +19,9 @@ dependencies = [
     "alembic>=1.14",
     # 設定（憲章後端約束：所有設定 MUST 由環境變數讀取）
     "pydantic-settings>=2.7",
+    # EmailStr 的驗證後端。Pydantic 不內建——沒有它，任何含 EmailStr 的模型
+    # 會在**類別定義時**就拋 ImportError，而非在驗證時，因此整個應用起不來。
+    "pydantic[email]>=2.13",
     # 密碼雜湊（research R5：argon2id）
     "argon2-cffi>=23.1",
     # JWT（research R6）

@@ -114,9 +114,11 @@ def _register_routers(app: FastAPI) -> None:
 
     移除 RLS 後這是唯一的存取邊界。
     """
-    from sunny.routers import rooms
+    from sunny.routers import auth, profiles, rooms
 
-    app.include_router(rooms.router)
+    app.include_router(rooms.router)  # 公開：瀏覽與搜尋
+    app.include_router(auth.router)  # 公開：登入前沒有身分
+    app.include_router(profiles.router)  # 需登入
 
 
 app: Any = create_app()

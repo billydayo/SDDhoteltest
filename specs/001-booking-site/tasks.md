@@ -319,18 +319,18 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 6
 
-- [ ] T116 [P] [US6] 契約測試後台授權於 `backend/tests/contract/test_admin_authz.py`：**每個 `/admin/*` 端點皆需三案例**（未認證 401／一般會員 403／管理員 200）；僅測 happy path MUST NOT 被視為已覆蓋（FR-009、SC-008、憲章自動化測試節）
-- [ ] T117 [P] [US6] 單元測試儀表板除零於 `backend/tests/unit/test_dashboard.py`：系統中無任何訂單時，成交率與平均客單價 MUST 顯示為「—」而非 0 或除以零錯誤
+- [X] T116 [P] [US6] 契約測試後台授權於 `backend/tests/contract/test_admin_authz.py`：**每個 `/admin/*` 端點皆需三案例**（未認證 401／一般會員 403／管理員 200）；僅測 happy path MUST NOT 被視為已覆蓋（FR-009、SC-008、憲章自動化測試節）
+- [X] T117 [P] [US6] 單元測試儀表板除零於 `backend/tests/unit/test_dashboard.py`：系統中無任何訂單時，成交率與平均客單價 MUST 顯示為「—」而非 0 或除以零錯誤
 
 ### Implementation for User Story 6
 
-- [ ] T118 [US6] 建立 `backend/src/sunny/routers/admin_dashboard.py`：`GET /admin/dashboard` 回傳總訂單數、今日入住與退房數、各房態房源數、待審核評論與退款筆數、本月營收（FR-049）
-- [ ] T119 [US6] 建立 `backend/src/sunny/routers/admin_rooms.py`：房源 CRUD；刪除仍有未來有效訂單的房源 MUST 提出警告並列出受影響訂單、需二次確認（`on delete restrict` 保護）（FR-050、FR-052）
-- [ ] T120 [US6] 於 `backend/src/sunny/routers/admin_rooms.py` 實作房態調整：**可人工設定的僅有 `available` 與 `maintenance`**，「已預訂」MUST NOT 開放人工設定（FR-051）
-- [ ] T121 [US6] 於 `backend/src/sunny/repositories/rooms.py` 實作房態的日期**區間**查詢（含頭含尾，期間內任一天有有效訂單即視為已預訂）；只填一端視為單日；起始晚於結束 MUST 明確提示而非回傳空清單；篩選「已預訂」MUST 要求先選定日期（FR-051b、FR-053a）
-- [ ] T122 [US6] 建立 `backend/src/sunny/routers/admin_orders.py`：訂單搜尋與篩選（訂單編號、狀態、日期區間）與狀態變更；狀態變更 MUST 經 T034 寫入 `admin_logs`（FR-053、FR-054）
-- [ ] T123 [US6] 建立 `backend/src/sunny/routers/admin_users.py`：會員資料檢視編輯與角色升降；**`role` 變更 MUST 只能由此端點執行且 MUST 進稽核日誌**（原 `prevent_role_escalation()` trigger 的職責移至此）（FR-055、data-model.md）
-- [ ] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
+- [X] T118 [US6] 建立 `backend/src/sunny/routers/admin_dashboard.py`：`GET /admin/dashboard` 回傳總訂單數、今日入住與退房數、各房態房源數、待審核評論與退款筆數、本月營收（FR-049）
+- [X] T119 [US6] 建立 `backend/src/sunny/routers/admin_rooms.py`：房源 CRUD；刪除仍有未來有效訂單的房源 MUST 提出警告並列出受影響訂單、需二次確認（`on delete restrict` 保護）（FR-050、FR-052）
+- [X] T120 [US6] 於 `backend/src/sunny/routers/admin_rooms.py` 實作房態調整：**可人工設定的僅有 `available` 與 `maintenance`**，「已預訂」MUST NOT 開放人工設定（FR-051）
+- [X] T121 [US6] 於 `backend/src/sunny/repositories/rooms.py` 實作房態的日期**區間**查詢（含頭含尾，期間內任一天有有效訂單即視為已預訂）；只填一端視為單日；起始晚於結束 MUST 明確提示而非回傳空清單；篩選「已預訂」MUST 要求先選定日期（FR-051b、FR-053a）
+- [X] T122 [US6] 建立 `backend/src/sunny/routers/admin_orders.py`：訂單搜尋與篩選（訂單編號、狀態、日期區間）與狀態變更；狀態變更 MUST 經 T034 寫入 `admin_logs`（FR-053、FR-054）
+- [X] T123 [US6] 建立 `backend/src/sunny/routers/admin_users.py`：會員資料檢視編輯與角色升降；**`role` 變更 MUST 只能由此端點執行且 MUST 進稽核日誌**（原 `prevent_role_escalation()` trigger 的職責移至此）（FR-055、data-model.md）
+- [X] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
 - [ ] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
 - [ ] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
 - [ ] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
@@ -349,13 +349,13 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 7
 
-- [ ] T130 [P] [US7] 契約測試審核端點於 `backend/tests/contract/test_admin_moderation.py`：三案例授權；核准退款後該房源該區間 MUST 於下一次搜尋重新出現（SC-006）
+- [X] T130 [P] [US7] 契約測試審核端點於 `backend/tests/contract/test_admin_moderation.py`：三案例授權；核准退款後該房源該區間 MUST 於下一次搜尋重新出現（SC-006）
 
 ### Implementation for User Story 7
 
-- [ ] T131 [US7] 建立 `backend/src/sunny/routers/admin_reviews.py`：通過／駁回／**覆寫自動審核結果**／刪除已公開評論；四者皆 MUST 寫入 `admin_logs`；刪除後平均評分 MUST 重新計算（FR-056、FR-103b、FR-103c）
-- [ ] T132 [US7] 於 `backend/src/sunny/routers/admin_reviews.py` 實作業者回覆的撰寫、修改與收回：清空內容等同收回；**待審核與已駁回的評論 MUST NOT 提供回覆入口**；三種操作皆寫入 `admin_logs`（FR-103d）
-- [ ] T133 [US7] 建立 `backend/src/sunny/routers/admin_refunds.py`：核准／駁回；核准後訂單轉 `refunded` 並**立即釋回該區間**；駁回後回到 `confirmed` 且會員可再次申請（FR-038、FR-039、FR-057）
+- [X] T131 [US7] 建立 `backend/src/sunny/routers/admin_reviews.py`：通過／駁回／**覆寫自動審核結果**／刪除已公開評論；四者皆 MUST 寫入 `admin_logs`；刪除後平均評分 MUST 重新計算（FR-056、FR-103b、FR-103c）
+- [X] T132 [US7] 於 `backend/src/sunny/routers/admin_reviews.py` 實作業者回覆的撰寫、修改與收回：清空內容等同收回；**待審核與已駁回的評論 MUST NOT 提供回覆入口**；三種操作皆寫入 `admin_logs`（FR-103d）
+- [X] T133 [US7] 建立 `backend/src/sunny/routers/admin_refunds.py`：核准／駁回；核准後訂單轉 `refunded` 並**立即釋回該區間**；駁回後回到 `confirmed` 且會員可再次申請（FR-038、FR-039、FR-057）
 - [ ] T134 [P] [US7] 建立 `frontend/src/pages/admin/Reviews.tsx`：依送出時間顯示待審核評論，含房源、會員、評分、內容、自動審核判定與觸發規則；無待審核項目時顯示引導性空狀態
 - [ ] T135 [P] [US7] 建立 `frontend/src/pages/admin/Refunds.tsx`：顯示對應訂單、申請人、退款原因、申請時間與分級後的退款金額；無待審核項目時顯示引導性空狀態
 
@@ -371,13 +371,13 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 8
 
-- [ ] T136 [P] [US8] 單元測試匯出於 `backend/tests/unit/test_export.py`：0 筆時 MUST NOT 產生檔案且提示無資料；用戶匯出 MUST NOT 包含電子郵件與密碼欄位；匯出日誌 MUST NOT 含任何一列的實際內容（FR-058、FR-058a、FR-060、FR-118）
+- [X] T136 [P] [US8] 單元測試匯出於 `backend/tests/unit/test_export.py`：0 筆時 MUST NOT 產生檔案且提示無資料；用戶匯出 MUST NOT 包含電子郵件與密碼欄位；匯出日誌 MUST NOT 含任何一列的實際內容（FR-058、FR-058a、FR-060、FR-118）
 
 ### Implementation for User Story 8
 
-- [ ] T137 [US8] 建立 `backend/src/sunny/services/export.py`：涵蓋七個模組（房源、訂單、用戶、評論、退款、渠道比價、操作日誌）的資料組裝
-- [ ] T138 [US8] 於 `backend/src/sunny/services/export.py` 實作匯出的稽核紀錄：每次成功匯出寫入模組、筆數與檔案格式；**匯出操作日誌本身同樣 MUST 被記錄**；零筆而未產生檔案時 MUST NOT 記錄（FR-058a）
-- [ ] T139 [US8] 建立 `backend/src/sunny/routers/admin_content.py`：`GET`／`PUT /admin/site-content` 與主圖上傳；上傳後尚未儲存就離開或改選其他圖片時該檔案 MUST 被清除（FR-061）
+- [X] T137 [US8] 建立 `backend/src/sunny/services/export.py`：涵蓋七個模組（房源、訂單、用戶、評論、退款、渠道比價、操作日誌）的資料組裝
+- [X] T138 [US8] 於 `backend/src/sunny/services/export.py` 實作匯出的稽核紀錄：每次成功匯出寫入模組、筆數與檔案格式；**匯出操作日誌本身同樣 MUST 被記錄**；零筆而未產生檔案時 MUST NOT 記錄（FR-058a）
+- [X] T139 [US8] 建立 `backend/src/sunny/routers/admin_content.py`：`GET`／`PUT /admin/site-content` 與主圖上傳；上傳後尚未儲存就離開或改選其他圖片時該檔案 MUST 被清除（FR-061）
 - [ ] T140 [US8] 建立 `frontend/src/components/ExportButton.tsx` 並嵌入七個資料頁面；**匯出範圍 MUST 為該頁當前的篩選結果**，MUST NOT 另設獨立的「報表匯出」分頁（FR-058、SC-033）
 - [ ] T141 [US8] 於 `frontend/src/components/ExportButton.tsx` 實作 xlsx 函式庫無法載入或離線時**自動退回 CSV 並顯示「目前離線，已改用 CSV 格式」**，MUST NOT 中斷或無回應（FR-059、SC-010）
 - [ ] T142 [US8] 建立 `frontend/src/pages/admin/Content.tsx`，並於 `frontend/src/pages/Home.tsx` 實作滿版主視覺：隨視窗寬度連續縮放、MUST NOT 產生橫向捲動、標題 MUST 與頁面其餘內容對齊同一條量測線（FR-061、FR-061a）
@@ -404,9 +404,9 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 - [ ] T145 [US9] 建立 `frontend/src/lib/riskScore.ts`：純函式，以 Canvas 計算亮度、雜亂度、對比三項指標；兩條路徑共用「計算」
 - [ ] T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`：**只 import `riskScore.ts`**；顯示預覽與亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級（FR-064）、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；照片僅於瀏覽器內處理、MUST NOT 送往任何外部服務或長期儲存（FR-066、FR-086）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；前台與後台皆提供此功能（FR-062）
-- [ ] T147 [US9] 於 `backend/src/sunny/routers/admin_rooms.py` 實作 `POST /admin/rooms/{id}/risk-checks`（需管理員）：**這是系統中唯一接收檢測圖片的端點**；MUST 檢查檔案大小與 MIME 類型（FR-104、FR-107）
+- [X] T147 [US9] 於 `backend/src/sunny/routers/admin_rooms.py` 實作 `POST /admin/rooms/{id}/risk-checks`（需管理員）：**這是系統中唯一接收檢測圖片的端點**；MUST 檢查檔案大小與 MIME 類型（FR-104、FR-107）
 - [ ] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
-- [ ] T149 [US9] 於 `backend/src/sunny/services/room_photos.py` 實作重新檢測後**舊圖片不再對外可讀取**；房源詳情頁僅顯示最新一筆（FR-106、FR-107）
+- [X] T149 [US9] 於 `backend/src/sunny/services/room_photos.py` 實作重新檢測後**舊圖片不再對外可讀取**；房源詳情頁僅顯示最新一筆（FR-106、FR-107）
 
 **Checkpoint**: 差異化功能完成，且前台照片的禁令由結構而非紀律保證
 
@@ -420,11 +420,11 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 10
 
-- [ ] T150 [P] [US10] 契約測試於 `backend/tests/contract/test_favorites.py`：會員 A 讀取會員 B 的收藏清單 MUST 被拒；三案例授權皆需覆蓋（FR-094）
+- [X] T150 [P] [US10] 契約測試於 `backend/tests/contract/test_favorites.py`：會員 A 讀取會員 B 的收藏清單 MUST 被拒；三案例授權皆需覆蓋（FR-094）
 
 ### Implementation for User Story 10
 
-- [ ] T151 [US10] 建立 `backend/src/sunny/routers/favorites.py`：`GET`／`POST`／`DELETE /favorites`（需登入）；複合主鍵 `(user_id, room_id)`，依 `created_at` 由新到舊排序（FR-091、FR-092）
+- [X] T151 [US10] 建立 `backend/src/sunny/routers/favorites.py`：`GET`／`POST`／`DELETE /favorites`（需登入）；複合主鍵 `(user_id, room_id)`，依 `created_at` 由新到舊排序（FR-091、FR-092）
 - [ ] T152 [US10] 建立 `frontend/src/components/FavoriteButton.tsx`：未登入時導向登入頁，**登入後 MUST 回到原本的房源並完成收藏**（FR-093）
 - [ ] T153 [US10] 建立 `frontend/src/pages/Favorites.tsx`：已下架或被刪除的房源 MUST 自動消失或標示為已下架，MUST NOT 顯示錯誤或空白卡片；尚無收藏時顯示引導性空狀態（FR-095）
 
@@ -442,14 +442,14 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 11
 
-- [ ] T154 [P] [US11] 測試於 `backend/tests/unit/test_channel_prices.py`：模組運作期間**連向外部訂房平台的網路請求數為 0**；回應 MUST 帶有標示其為模擬資料的欄位（FR-109、FR-110、SC-028）
+- [X] T154 [P] [US11] 測試於 `backend/tests/unit/test_channel_prices.py`：模組運作期間**連向外部訂房平台的網路請求數為 0**；回應 MUST 帶有標示其為模擬資料的欄位（FR-109、FR-110、SC-028）
 
 ### Implementation for User Story 11
 
-- [ ] T155 [US11] 建立 `backend/src/sunny/routers/admin_channel.py`：`GET /admin/channel-prices`（需管理員）依房源列出官網價與各平台售價、價差金額與價差百分比；資料來自 `channel_prices` 種子表（FR-108）
-- [ ] T156 [US11] 建立 `backend/src/sunny/services/channel.py`：預警判定（外部售價低於官網價）並將未處理筆數併入儀表板（FR-111）
-- [ ] T157 [US11] 於 `backend/src/sunny/services/channel.py` 實作申訴郵件範本組裝（房源、平台、官網價、對方售價、價差）；**MUST NOT 發送任何郵件**（FR-112）
-- [ ] T158 [US11] 於 `backend/src/sunny/routers/admin_channel.py` 實作標記已處理，並寫入 `admin_logs`（FR-113）
+- [X] T155 [US11] 建立 `backend/src/sunny/routers/admin_channel.py`：`GET /admin/channel-prices`（需管理員）依房源列出官網價與各平台售價、價差金額與價差百分比；資料來自 `channel_prices` 種子表（FR-108）
+- [X] T156 [US11] 建立 `backend/src/sunny/services/channel.py`：預警判定（外部售價低於官網價）並將未處理筆數併入儀表板（FR-111）
+- [X] T157 [US11] 於 `backend/src/sunny/services/channel.py` 實作申訴郵件範本組裝（房源、平台、官網價、對方售價、價差）；**MUST NOT 發送任何郵件**（FR-112）
+- [X] T158 [US11] 於 `backend/src/sunny/routers/admin_channel.py` 實作標記已處理，並寫入 `admin_logs`（FR-113）
 - [ ] T159 [US11] 建立 `frontend/src/pages/admin/Channel.tsx` 與 `frontend/src/components/SimulatedBadge.tsx`：頁面頂端**常駐**「模擬資料：此模組不連線至任何外部平台」；郵件範本畫面 MUST 明確告知系統不會代為寄送；尚無資料時顯示引導性空狀態（FR-110、FR-112）
 
 **Checkpoint**: 營運輔助模組完成，模擬性質已明確標示
@@ -464,17 +464,17 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Tests for User Story 12
 
-- [ ] T160 [P] [US12] 測試日誌不可竄改於 `backend/tests/unit/test_admin_logs_append_only.py`：以應用連線角色對 `admin_logs` 執行 UPDATE 與 DELETE **MUST 全數失敗**，含以管理員身分；此測試直接驗證 T019 的 `REVOKE`（FR-116、SC-027）
-- [ ] T161 [P] [US12] 契約測試於 `backend/tests/contract/test_admin_logs.py`：非管理員讀取操作日誌 MUST 取不到任何紀錄；日誌內容 MUST NOT 含密碼、金鑰或真實個資（FR-117、FR-118）
-- [ ] T161a [P] [US12] 完整性測試於 `backend/tests/contract/test_audit_completeness.py`：**列舉 FastAPI 路由表中所有 `/admin/*` 的寫入端點**（POST／PUT／PATCH／DELETE），逐一呼叫後斷言 `admin_logs` 筆數 +1。此測試驗證的是 SC-026 的 100% 宣稱，且會在**日後新增後台端點卻忘記寫日誌時失敗**——這正是稽核覆蓋率會靜默退化的方式（FR-114、SC-026）
+- [X] T160 [P] [US12] 測試日誌不可竄改於 `backend/tests/unit/test_admin_logs_append_only.py`：以應用連線角色對 `admin_logs` 執行 UPDATE 與 DELETE **MUST 全數失敗**，含以管理員身分；此測試直接驗證 T019 的 `REVOKE`（FR-116、SC-027）
+- [X] T161 [P] [US12] 契約測試於 `backend/tests/contract/test_admin_logs.py`：非管理員讀取操作日誌 MUST 取不到任何紀錄；日誌內容 MUST NOT 含密碼、金鑰或真實個資（FR-117、FR-118）
+- [X] T161a [P] [US12] 完整性測試於 `backend/tests/contract/test_audit_completeness.py`：**列舉 FastAPI 路由表中所有 `/admin/*` 的寫入端點**（POST／PUT／PATCH／DELETE），逐一呼叫後斷言 `admin_logs` 筆數 +1。此測試驗證的是 SC-026 的 100% 宣稱，且會在**日後新增後台端點卻忘記寫日誌時失敗**——這正是稽核覆蓋率會靜默退化的方式（FR-114、SC-026）
 
 ### Implementation for User Story 12
 
-- [ ] T162 [US12] 建立 `backend/src/sunny/routers/admin_logs.py`：`GET /admin/logs` 依時間由新到舊，支援依操作者、動作類型與日期區間篩選；**MUST NOT 提供任何 UPDATE 或 DELETE 端點**（FR-114、FR-115、contracts/README.md）
-- [ ] T163 [US12] 建立 `backend/src/sunny/routers/admin_settings.py`：系統參數的讀取與更新；MUST 有範圍檢查、超出範圍 MUST 被拒絕並顯示可接受範圍、變更 MUST 進稽核日誌、**MUST NOT 回溯影響既有訂單的 `expires_at`**（FR-098、FR-101、FR-119、FR-120）
+- [X] T162 [US12] 建立 `backend/src/sunny/routers/admin_logs.py`：`GET /admin/logs` 依時間由新到舊，支援依操作者、動作類型與日期區間篩選；**MUST NOT 提供任何 UPDATE 或 DELETE 端點**（FR-114、FR-115、contracts/README.md）
+- [X] T163 [US12] 建立 `backend/src/sunny/routers/admin_settings.py`：系統參數的讀取與更新；MUST 有範圍檢查、超出範圍 MUST 被拒絕並顯示可接受範圍、變更 MUST 進稽核日誌、**MUST NOT 回溯影響既有訂單的 `expires_at`**（FR-098、FR-101、FR-119、FR-120）
 - [ ] T164 [P] [US12] 建立 `frontend/src/pages/admin/Logs.tsx`：篩選與唯讀呈現，畫面上 MUST NOT 出現編輯或刪除入口
 - [ ] T165 [P] [US12] 建立 `frontend/src/pages/admin/Settings.tsx`：未付款訂單保留分鐘數的調整與可接受範圍提示
-- [ ] T165a [US12] 於 `backend/src/sunny/routers/admin_settings.py` 實作 `POST /admin/reset-demo-data`（需管理員）並於 `frontend/src/pages/admin/Settings.tsx` 提供入口：呼叫 `sunny.seed` 將所有資料還原為初始種子狀態，需二次確認且 MUST 寫入 `admin_logs`。FR-072（可重複執行的種子機制，T036）與 FR-073（**還原入口**）是兩條需求——只有 CLI 腳本不構成使用者可及的入口（FR-073）
+- [X] T165a [US12] 於 `backend/src/sunny/routers/admin_settings.py` 實作 `POST /admin/reset-demo-data`（需管理員）並於 `frontend/src/pages/admin/Settings.tsx` 提供入口：呼叫 `sunny.seed` 將所有資料還原為初始種子狀態，需二次確認且 MUST 寫入 `admin_logs`。FR-072（可重複執行的種子機制，T036）與 FR-073（**還原入口**）是兩條需求——只有 CLI 腳本不構成使用者可及的入口（FR-073）
 
 **Checkpoint**: 十二個使用者故事全數完成
 
@@ -485,9 +485,9 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 **Purpose**: 後台十二個模組中的「會員訊息」。此模組於 2026-08-03 加入 spec，
 **未被任何既有 user story 涵蓋**，故獨立成一個階段而非硬塞進 US6。
 
-- [ ] T166 [P] 契約測試於 `backend/tests/contract/test_messages.py`：會員 MUST NOT 能讀寫他人的討論串；**發話者身分與角色 MUST 由伺服器判定**，前端送出的 `sender_role` MUST 被忽略（FR-125、FR-126）
-- [ ] T167 建立 `backend/src/sunny/repositories/messages.py` 與 `backend/src/sunny/routers/messages.py`：`GET`／`POST /messages`（需登入）；討論串以 `thread_user_id`（會員）為單位、不存收件者；`sender_id` 與 `sender_role` 由後端寫入（改寫後的 `stamp_message_sender()`）；送出後 MUST NOT 可修改內容，僅已讀時間可更新（FR-123、FR-124）
-- [ ] T168 建立 `backend/src/sunny/routers/admin_messages.py`：**任一管理員皆可讀取並回覆所有討論串**；MUST NOT 提供「指派給特定客服」的機制；每次回覆 MUST 寫入 `admin_logs` 且**日誌 MUST NOT 含訊息內容**（FR-118、FR-127、FR-128）
+- [X] T166 [P] 契約測試於 `backend/tests/contract/test_messages.py`：會員 MUST NOT 能讀寫他人的討論串；**發話者身分與角色 MUST 由伺服器判定**，前端送出的 `sender_role` MUST 被忽略（FR-125、FR-126）
+- [X] T167 建立 `backend/src/sunny/repositories/messages.py` 與 `backend/src/sunny/routers/messages.py`：`GET`／`POST /messages`（需登入）；討論串以 `thread_user_id`（會員）為單位、不存收件者；`sender_id` 與 `sender_role` 由後端寫入（改寫後的 `stamp_message_sender()`）；送出後 MUST NOT 可修改內容，僅已讀時間可更新（FR-123、FR-124）
+- [X] T168 建立 `backend/src/sunny/routers/admin_messages.py`：**任一管理員皆可讀取並回覆所有討論串**；MUST NOT 提供「指派給特定客服」的機制；每次回覆 MUST 寫入 `admin_logs` 且**日誌 MUST NOT 含訊息內容**（FR-118、FR-127、FR-128）
 - [ ] T169 [P] 建立 `frontend/src/pages/Messages.tsx` 與 `frontend/src/components/MessageThread.tsx`：前台的會員 MUST 只看到「客服人員」，MUST NOT 顯示管理員姓名（FR-127）
 - [ ] T170 [P] 建立 `frontend/src/pages/admin/Messages.tsx`：管理員端 MUST 看得出每則回覆出自哪一位管理員（FR-127）
 
@@ -502,9 +502,9 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [ ] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
 - [ ] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
 - [ ] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
-- [ ] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
+- [X] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
 - [ ] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
-- [ ] T177 錯誤處理稽核 `backend/src/sunny/` 與 `frontend/src/`：後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑回傳給用戶端；前端所有失敗操作 MUST 顯示可理解訊息並保留使用者已填內容；後端未啟動時 MUST 顯示可理解訊息而非無限轉圈或空白（FR-074、FR-075、FR-083、FR-084）
+- [X] T177 錯誤處理稽核 `backend/src/sunny/` 與 `frontend/src/`：後端 MUST NOT 將堆疊追蹤、SQL 語句或內部路徑回傳給用戶端；前端所有失敗操作 MUST 顯示可理解訊息並保留使用者已填內容；後端未啟動時 MUST 顯示可理解訊息而非無限轉圈或空白（FR-074、FR-075、FR-083、FR-084）
 - [ ] T178 驗證版本控制與前端建置產物中的憑證與秘鑰數為 0：確認 `backend/.env` 未進版控、`frontend/dist/` 不含 `JWT_SECRET`／`DATABASE_URL`／Google client secret，且 `VITE_` 前綴變數僅承載公開資訊（FR-085、SC-022）
 - [ ] T179 重寫 `specs/001-booking-site/checklists/browser-acceptance.md`：舊清單的 15 項係為「開啟 index.html／示範模式橫幅」等已作廢的架構而寫；新清單 MUST 覆蓋前後端各自啟動、需人眼判斷的版面與對比，以及**需要真實 Google 帳密的登入往返**（FR-088、SC-025）
 - [ ] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常

@@ -553,8 +553,16 @@ export const api = {
           `/admin/channel-prices/${priceId}/complaint`,
           signal ? { signal } : {},
         ),
+      /**
+       * 標記／取消標記已處理（FR-113）。
+       *
+       * ⚠️ 路徑結尾的 `/resolved` **不可省**。後端把它做成子資源
+       * （`admin_channel.py` 的 `PATCH /{price_id}/resolved`），而不是對整筆
+       * 紀錄的部分更新——因為這支端點只改得動一個欄位，且每一次都要寫稽核。
+       * 打到 `/admin/channel-prices/{id}` 會落在「沒有這條路由」而回 404。
+       */
       setResolved: (priceId: string, resolved: boolean, note?: string) =>
-        request<ChannelComparison>(`/admin/channel-prices/${priceId}`, {
+        request<ChannelComparison>(`/admin/channel-prices/${priceId}/resolved`, {
           method: 'PATCH',
           body: { resolved, note },
         }),

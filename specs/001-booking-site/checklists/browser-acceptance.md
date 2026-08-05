@@ -141,6 +141,21 @@ node specs/001-booking-site/checklists/t181-walkthrough.mjs
 > ✅ **2026-08-05 起可以執行了。** T066 已完成：Google Cloud Console 的 OAuth
 > 用戶端已建立，正式站的回呼網址
 > `https://sunny.odootpe.org/api/auth/google/callback` 已註冊並實測通過。
+>
+> ✅ **2026-08-05 於正式站驗畢**：A1 跳轉、A2 回原頁、A3 同 email 併帳、
+> A4 取消、A5 無秘鑰外洩，五項皆通過。
+>
+> ⚠️ **這一節 MUST 在正式站做，本機開發環境跑不了，而且失敗得很安靜。**
+> `backend/.env` 的 `GOOGLE_CLIENT_ID`／`GOOGLE_CLIENT_SECRET` 留空時，
+> `/auth/google` 直接回 303 導向 `/login#error=GOOGLE_NOT_CONFIGURED`——
+> 瀏覽器**從未離開本站**，畫面上只有一句「本站尚未啟用 Google 登入」。
+> 那是正確的行為（`routers/auth.py:141-155`：導覽中的失敗 MUST NOT 變成
+> 一頁 JSON），但它看起來很像「按了沒反應」，容易被記成缺陷。
+>
+> 佐證（2026-08-05 實測）：正式站 `GET /api/auth/google` 回 **307**，
+> `Location` 指向 `accounts.google.com/o/oauth2/v2/auth?client_id=…`，
+> 且該回應**只帶 client_id，不含 client secret**——client id 本來就是公開的，
+> secret 全程只存在於後端（FR-085）。本機同一支端點回 303 導回登入頁。
 
 **你需要準備**：一個你能登入的真實 Google 帳號。用你自己的就好，這個站不會拿到
 你的密碼——密碼是輸入在 Google 的網頁上，本站從頭到尾看不到。
@@ -216,16 +231,23 @@ node specs/001-booking-site/checklists/t181-walkthrough.mjs
 - [x] 房源列表在窄螢幕改為直向堆疊——實測 320／375px 每列 1 張、768px 2 張、
       1024px 以上 3 張
 - [x] 後台表格在窄螢幕可橫捲，且捲動的是**表格自己**，不是整頁
-- [ ] **⚠️ 未通過**：後台「內容編輯」的首頁主視覺預覽在 **1024／1440／1920px**
-      向右超出約 136px（`section.relative.left-1/2.w-screen.-translate-x-1/2`，
-      內含遮罩層與 `h1「Sunny 訂房平台」`），而該處**沒有任何可捲容器**——被
-      `body` 的 `overflow-x: clip` 裁掉且拿不回來。320／375／768px 正常。
-      原因是滿版主視覺以 `w-screen`（100vw）破出，但在後台被放進了比視窗窄的
-      內容欄（側欄 15rem + 間距），`left-1/2` 與 `-translate-x-1/2` 於是不再相消。
-      屬 T142 範圍。
+- [x] **已修正（2026-08-05）**：後台「內容編輯」的首頁主視覺預覽曾在
+      **1024／1440／1920px** 向右超出約 136px，且該處沒有任何可捲容器——被
+      `body` 的 `overflow-x: clip` 裁掉且拿不回來，標題左右各少一截。
+      320／375／768px 正常，因為側欄收起後父層又變回置中。
 
-      2026-08-05 重測仍在，且**只剩這一項**：126 次量測其餘全數乾淨。
-      數字由 129px 改為 136px，差的 7px 是捲軸——見下方「捲軸」。
+      成因：`w-screen` + `left-1/2` + `-translate-x-1/2` 這組滿版手法有一個
+      **沒有寫出來的前提——父層在視窗裡是置中的**。前台成立，後台不成立：
+      側欄把預覽框推向右邊。1425px 視窗實測，預覽框中心 849px、視窗中心
+      712.5px，差 136.5px，正好就是溢出量。`Content.tsx` 原有的
+      `overflow-hidden` 擋得住滿版外溢，擋不住偏移，而偏移才是問題。
+
+      修法：`HomeHero` 加上 `fullBleed` prop（預設 `true`，前台行為逐像素
+      不變），後台預覽傳 `false`。「父層是否置中」因此從藏在 class 名稱裡的
+      假設，變成呼叫端要明講的一件事。commit `7e8ef5f`。
+
+      驗證：`responsive-audit` **120／120 全數乾淨**（`/risk-check` 下架後
+      由 21 頁調整為 20 頁）。前台主視覺幾何逐像素不變：`left=0 right=1425`。
 
 #### ⚠️ 判準：問「有沒有內容拿不到」，不要問 scrollWidth
 
@@ -458,13 +480,27 @@ containing block 仍然扣掉了捲軸那 15px**。於是首頁主視覺被量�
 2. 按匯出
 3. - [ ] 提示「無資料可匯出」，而且**沒有下載任何檔案**
 
-**C3-5 離線時自動退回 CSV（FR-059、SC-010）**
+**C3-5 xlsx 載不到時退回 CSV（FR-059、SC-010）**
 
-1. F12 → **Network** 面板 → 把「No throttling」改成 **Offline**
-2. 回到有資料的頁面按匯出
-3. - [ ] **自動改成下載 CSV**，並顯示「目前離線，已改用 CSV 格式」
-4. - [ ] **不是**卡住、不是沒反應、不是一個看不懂的錯誤
-5. 記得把 Offline 改回來
+> ⚠️ **2026-08-05 修正本項的做法。** 原文寫「Network 面板切 Offline」，但那個
+> 情境不可達：`ExportButton` 決定格式之後**仍要打 API 取資料**
+> （`ExportButton.tsx:166`），真的斷網時連資料都拿不到，不會有檔案可退回，
+> 於是照著做只會看到一個錯誤，然後把它誤記成缺陷。
+>
+> 實作真正分辨的是兩件事（`ExportButton.tsx:26-29`、`180-182`），要分開驗：
+
+1. **瀏覽器回報離線**——F12 → Console 執行
+   `Object.defineProperty(navigator, 'onLine', { get: () => false })`，再按匯出
+2. - [ ] 下載的是 **CSV**，並顯示「目前離線，已改用 CSV 格式匯出 N 筆。」
+3. **元件載不到**——F12 → Network → 對 `lib/xlsx` 的請求按右鍵 Block request URL，
+   重新整理後按匯出
+4. - [ ] 下載的是 **CSV**，並顯示「**試算表元件無法載入**，已改用 CSV 格式匯出 N 筆。」
+5. - [ ] 兩句話**不一樣**。網路好好的卻被告知「離線」是不誠實的，使用者會去
+      重開路由器——`ExportButton.tsx:29` 就是在講這件事
+6. - [ ] 兩種情況都**不是**卡住、不是沒反應、不是一個看不懂的錯誤
+7. 記得把覆寫與 Block 清掉
+
+> 2026-08-05 已用 CDP 自動驗過這兩條，4／4 通過，兩句提示各自正確。
 
 ### C4. 重新整理與上一頁
 
@@ -730,6 +766,48 @@ containing block 仍然扣掉了捲軸那 15px**。於是首頁主視覺被量�
 | 訂房流程可純鍵盤完成 | `frontend/src/pages/__tests__/bookingKeyboard.test.tsx` |
 | 繁體中文、日期與金額格式一致 | `frontend/src/lib/__tests__/localeFormat.test.ts` |
 | 憑證未進版控、建置產物無秘鑰 | T178（`git log --all` + `dist/` 掃描） |
+
+---
+
+## 驗收紀錄：2026-08-05
+
+環境：本機前後端（Vite 5173 + uvicorn 8000），資料庫為 Supabase Session pooler。
+A 節於正式站 `https://sunny.odootpe.org/`。
+
+| 區塊 | 由誰驗 | 結果 |
+|---|---|---|
+| 第 0 關 後端沒開 | CDP 自動 | **14／14** |
+| A Google 登入 | 人工，正式站 | **5／5** |
+| B 版面與對比 | 人眼 | 8 項通過；**主視覺對比 1 項待驗**（見下） |
+| B 文案與表單驗證 | CDP 自動 | **10／10** |
+| C2 前台不索取照片 | CDP 自動 | **7／7** |
+| C3 匯出 | CDP 自動 | 12／14 + 補測 **4／4**（原 C3-5 敘述有誤，已改寫） |
+| C4 重整與上一頁 | CDP 自動 | **9／9** |
+| C5 跨裝置 | CDP 自動，兩個獨立 Chrome | **7／7** |
+| D1–D13 | 人工走訪 | 操作者回報無問題 |
+| B1 響應式 | `responsive-audit.mjs` | **120／120** |
+
+**待驗的一項**：B2「文字疊在照片上仍讀得清楚」。當時 `site_content.hero_image`
+指向 `/uploads/42c4f66c….jpg`，但 `backend/uploads/` 是空的，該檔 404，主視覺
+是純色底——那是最容易通過的情況，而這一項要防的正是「字壓在照片上讀不出來」。
+**有實際主圖之後要重驗。**
+
+### ⚠️ 用 Supabase pooler 跑本機驗收時會遇到的中斷
+
+驗收期間 `sunny_app` 的認證間歇失敗，表現為前台隨機出現「伺服器發生錯誤」、
+重新整理就好，後端日誌是 `InvalidPasswordError: password authentication failed
+for user "sunny_app"`。實測歸納：
+
+- **擁有者角色從未失敗，只有自訂角色會**——Supavisor 對租戶設定裡那個使用者
+  走的是另一條路。
+- `alter role` 之後 **+5 秒仍失敗、+35 秒起成功**，快取約 30 秒更新。
+- 快取一旦與資料庫對不上**不會自己修正**，要再寫入一組新密碼才會重抓。
+- 短時間內連開數十條連線會觸發 Supavisor 斷路器
+  （`ECIRCUITBREAKER: too many authentication failures`），此時**所有**新連線
+  被暫時封鎖，看起來比實際嚴重。量失敗率時務必放慢。
+
+`C1` 那一節記的 2026-08-05 那輪能一次走完 28 個步驟，差別就是換成了本機
+PostgreSQL。**要一口氣走完 D 節，本機 Postgres 仍是比較穩的選擇。**
 
 ---
 

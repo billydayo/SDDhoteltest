@@ -31,7 +31,7 @@ T066 完成；T183 由 `[X]` 改為 `[~]`；新增 Phase 17 的 T184 ~ T189。
 
 - 總任務數：**203**（Setup 10、Foundational 38、使用者故事 130、會員訊息 5、
   Polish 14、憲章同步 6）
-- 狀態：**193 完成**、4 作廢或條件未滿足（`[~]`）、6 待辦（`[ ]`）
+- 狀態：**199 完成**、4 作廢或條件未滿足（`[~]`）、0 待辦
 - 依故事分佈：US1 17、US2 19、US3 18、US4 12、US5 11、US6 14、US7 6、US8 7、
   US9 8、US10 4、US11 6、US12 8
 
@@ -539,7 +539,9 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
 - [X] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
 - [X] T173 [P] 對比度稽核 `frontend/src/styles/index.css` 的 `@theme` 區塊：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
-  （2026-08-05 更正路徑：原寫 `frontend/tailwind.config.ts`，**該檔從未存在**——T006 已決定 Tailwind v4 的 token 只留 CSS 這一份。稽核對象不存在卻標記完成，等於這項稽核的結論無從追溯，MUST 依新路徑重跑一次）
+  （2026-08-05 更正路徑：原寫 `frontend/tailwind.config.ts`，**該檔從未存在**——T006 已決定 Tailwind v4 的 token 只留 CSS 這一份。稽核對象不存在卻標記完成，等於這項稽核的結論無從追溯，因此依新路徑重跑了一次。
+  **重跑結論：通過。** 品牌色為 `#7a6132`（白字 5.9:1）、舊的 `#7c8883` 未移植、每個承載文字的 token 都標了對比度。唯一保留的 `#96793f` 是 `--color-brand-accent`，註解明訂「當星號可以，當字不行」——兩處使用（`components/Rating.tsx`、`pages/admin/Reviews.tsx`）皆為 `aria-hidden` 的裝飾星號且另有 `aria-label`，符合 WCAG 1.4.11 的 3:1 圖形門檻。
+  另發現 `frontend/src/styles/contrast.test.ts` **早已把本項全部自動化**，含「註解裡的數字 MUST 與實際相符」一組——那比人工稽核可靠得多。本任務的價值因此只剩「確認那支測試涵蓋的正是憲章要求的東西」）
 - [X] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
 - [X] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
 - [X] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
@@ -575,17 +577,28 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 ——實作都已存在，缺的是需求依據與能重跑的檢查。這個方向本身就是問題：
 沒有檢查的保證，會在下一次重構時無聲消失，而不會有任何測試變紅。
 
-- [ ] T184 [P] 複核嵌入式第三方元件的來源可追溯性與畫面標示（FR-129、FR-131）：於 `frontend/src/components/WithinReachFab.tsx` 檔頭確認已記錄**上游 repo、建置指令與來源 commit**（現為 `CHUN9701/within-reach`、`npm run build:widget`、`46341f1c`）；確認 `frontend/public/wr-widget.js` 已進版控且**未以 `<script src>` 指向外部主機**；確認浮窗內**明確標明該區塊由外部服務提供**
+**2026-08-05 完成。** 新增三支測試共 137 項斷言，全套件 **33 檔 635 項全綠**，
+`eslint` 與 `tsc -b --noEmit` 皆無錯誤。T188 為手動驗收項目，已寫入
+`checklists/browser-acceptance.md` 的 C5／C6 兩節。
+
+> ⚠️ **T187 的初版是錯的，記在這裡因為那個錯誤很值得記。**
+> 相依圖走訪把 `import type { LoginRedirectState } from '../router'` 算成一條邊，
+> 而 `router.tsx` import 了每一個頁面——於是 Login、Register、RoomDetail 三頁被
+> 判定為「相依於後台模組」。型別匯入在編譯後**完全消失**，執行期沒有那條邊。
+> 這種假陽性比沒有測試更糟：它會讓人相信測試抓到了東西，然後去「修好」一段
+> 本來就正確的程式碼。修法是先剝掉 `import type`（見該檔的 `stripTypeImports`）。
+
+- [X] T184 [P] 複核嵌入式第三方元件的來源可追溯性與畫面標示（FR-129、FR-131）：於 `frontend/src/components/WithinReachFab.tsx` 檔頭確認已記錄**上游 repo、建置指令與來源 commit**（現為 `CHUN9701/within-reach`、`npm run build:widget`、`46341f1c`）；確認 `frontend/public/wr-widget.js` 已進版控且**未以 `<script src>` 指向外部主機**；確認浮窗內**明確標明該區塊由外部服務提供**
   （2026-08-05：元件已由 `pages/WithinReach.tsx` 改為掛在 Layout 的浮球 `components/WithinReachFab.tsx`，本任務路徑同步更新。**初查該檔檔頭三項與畫面標示均已具備**，本任務因此是複核而非補建——但仍保留為待辦，因為浮窗的標示比整頁更容易在後續調版面時被當成雜訊移除）
-- [ ] T185 [P] 建立可重跑的相依圖查核於 `frontend/src/lib/__tests__/embeddedWidget.test.ts`（FR-130、SC-035）：掃描 `public/wr-widget.js` 建置產物，斷言 `fetch`／`XMLHttpRequest`／`WebSocket`／`sendBeacon` 與 `localStorage`／`sessionStorage`／`document.cookie` 的出現次數為 **0**
+- [X] T185 [P] 建立可重跑的相依圖查核於 `frontend/src/__tests__/embeddedWidget.test.ts`（FR-130、SC-035）：掃描 `public/wr-widget.js` 建置產物，斷言 `fetch`／`XMLHttpRequest`／`WebSocket`／`sendBeacon` 與 `localStorage`／`sessionStorage`／`document.cookie` 的出現次數為 **0**
   **這項的價值在於「更新版本時會自動失敗」**——憲章要求每次更新都重新查核，而人工查核在第三次更新時一定會被跳過。目前的查核結果寫在 `components/WithinReachFab.tsx` 的檔頭註解裡，那份紀錄正確但**是靜態的**：換掉 `wr-widget.js` 之後它不會自己變假。已知例外（指向 `images.unsplash.com` 的示範圖）MUST 以具名白名單放行，MUST NOT 放寬整條規則
-- [ ] T186 [P] 版面寬度稽核 `frontend/src/`（FR-132、SC-036）：確認頁首、主內容區、頁尾與主視覺內層**全部引用 `lib/surfaces.ts` 的同一個 `shellClass`**，全域搜尋確認外殼上無 `max-w-7xl` 之類的固定像素封頂；長文與單欄表單的區塊級 `max-w-*` 為正確用法，MUST NOT 一併移除
+- [X] T186 [P] 版面寬度稽核 `frontend/src/`（FR-132、SC-036）：確認頁首、主內容區、頁尾與主視覺內層**全部引用 `lib/surfaces.ts` 的同一個 `shellClass`**，全域搜尋確認外殼上無 `max-w-7xl` 之類的固定像素封頂；長文與單欄表單的區塊級 `max-w-*` 為正確用法，MUST NOT 一併移除
   （憲章 v3.2.0 新增了四條規範性條文，卻沒有任何 FR/SC 或任務承載，實作先於規格存在。本項與 FR-132 是同一次補正）
-- [ ] T187 [P] 前台無照片輸入的自動檢查於 `frontend/src/pages/__tests__/noPublicFileInput.test.tsx`（FR-086、SC-034）：走訪前台全部路由，斷言可接受使用者檔案輸入的元素（`input[type=file]`、拖放接收區、`capture` 屬性）數為 **0**；管理端路由排除
+- [X] T187 [P] 前台無照片輸入的自動檢查於 `frontend/src/__tests__/noPublicFileInput.test.ts`（FR-086、SC-034）：走訪前台全部路由，斷言可接受使用者檔案輸入的元素（`input[type=file]`、拖放接收區、`capture` 屬性）數為 **0**；管理端路由排除
   **取代已作廢的 T144 與 T144a。** 舊測試要證明「送出去的東西裡沒有照片」，本項只要證明「沒有地方能放照片進來」——後者更難繞過，也不會因為頁面改名就失效
-- [ ] T188 跨裝置與工作階段持久性的驗收綁定（FR-009c、SC-009、SC-021，並一併綁定 SC-001、SC-002）：**SC-001（3 次互動內看到房源詳情）與 SC-002（3 分鐘內完成訂房）同樣沒有任何任務指向**，它們量測的是人的操作而非程式的輸出，因此歸屬手動清單而非自動化測試；SC-013（5 位受測者中至少 4 位獨力完成）為使用性研究，本專案範圍內 MUST 標記為不驗證而非假裝有覆蓋。另於 `checklists/browser-acceptance.md` 補上具名項目——同一帳號於 A、B 兩個瀏覽器登入後個人資料／訂單／評論／退款一致，以及關閉並重開瀏覽器後登入狀態保留
+- [X] T188 跨裝置與工作階段持久性的驗收綁定（FR-009c、SC-009、SC-021，並一併綁定 SC-001、SC-002）：**SC-001（3 次互動內看到房源詳情）與 SC-002（3 分鐘內完成訂房）同樣沒有任何任務指向**，它們量測的是人的操作而非程式的輸出，因此歸屬手動清單而非自動化測試；SC-013（5 位受測者中至少 4 位獨力完成）為使用性研究，本專案範圍內 MUST 標記為不驗證而非假裝有覆蓋。另於 `checklists/browser-acceptance.md` 補上具名項目——同一帳號於 A、B 兩個瀏覽器登入後個人資料／訂單／評論／退款一致，以及關閉並重開瀏覽器後登入狀態保留
   **這三條是換堆疊後最該重驗、卻唯一沒有任何任務指向的一組**。它們無法自動化（需要兩個真實瀏覽器工作階段），因此更需要在手動清單上有名字
-- [ ] T189 [P] 負向需求稽核（FR-040、FR-076）：確認退款流程中不存在任何金錢移轉的程式路徑；確認全站無蒐集真實身分證字號、真實金融資訊的欄位或資料表
+- [X] T189 [P] 負向需求稽核（FR-040、FR-076）：確認退款流程中不存在任何金錢移轉的程式路徑；確認全站無蒐集真實身分證字號、真實金融資訊的欄位或資料表
   **負向需求最容易在重構中被靜默違反**——沒有人會因為「多做了一件不該做的事」而看到測試失敗
 
 ---

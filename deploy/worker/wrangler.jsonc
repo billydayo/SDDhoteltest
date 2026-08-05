@@ -1,4 +1,10 @@
 {
+  // ⚠️ **本專案已有自有網域（sunny.odootpe.org），這支 Worker 是多餘的，尚未部署。**
+  // 它存在的唯一理由是 `*.workers.dev` 的 DNS 不能用 A 記錄指到自己的機器；
+  // 能指了之後，它只是在每個請求（含每一張房源照片）上多一跳延遲與一份用量，
+  // 而且 workers.dev 是公共後綴網域，掛上去反而讓 Google 登入無法啟用。
+  // 留著是為了「網域到期或轉移」這類臨時情況。詳見 docs/deploy.md 步驟 5。
+
   // ⚠️ name 決定 workers.dev 的網址，也決定要覆蓋哪一個既有的 Worker。
   // `sddhotel` 就是目前跑著舊版靜態站的那一個——部署會取代它。
   "name": "sddhotel",
@@ -17,9 +23,9 @@
     // ⚠️ MUST 是 https:// 且 MUST 有有效憑證。Worker 發出的子請求會驗證憑證，
     // 失敗時瀏覽器拿到的是一個 5xx，看不出是後端憑證的問題。
     //
-    // ⚠️ 這個名稱只有 Worker 會用到，使用者永遠看不到它。因此沿用既有的
-    // `api.` 開頭沒有壞處，反而省下重新簽一張憑證（Let's Encrypt 對同一組
-    // 網域有每週上限，撞到要等一週）。名字現在有點名不符實，僅此而已。
-    "ORIGIN": "https://api.167-99-74-99.sslip.io"
+    // ⚠️ 這個值 MUST 跟著 ./.env 的 APP_HOSTNAME 走。兩者分歧時 Worker 會對著
+    // 一個 Caddy 已經不再服務的名稱發子請求，交握失敗 → 使用者拿到 5xx，而
+    // Droplet 直連完全正常，所以看起來像 Cloudflare 壞了。
+    "ORIGIN": "https://sunny.odootpe.org"
   }
 }

@@ -13,10 +13,11 @@
 ```
                               瀏覽器
                                  │ HTTPS
-                                 ▼
-                   （選用）Cloudflare Worker：只轉發，不做任何事
-                        sddhotel.<帳號>.workers.dev      ← 步驟 5
+                                 │   自有網域：Cloudflare 只做 DNS（灰雲）
+                                 │   sunny.odootpe.org  ── A ──▶ Reserved IP
                                  │
+                                 │   沒有網域才需要：Cloudflare Worker 轉發
+                                 │   sddhotel.<帳號>.workers.dev    ← 步驟 5
                                  ▼
                         DigitalOcean Droplet
                         Caddy :443（自動簽憑證）
@@ -103,8 +104,16 @@ Droplet 掛一個 Docker volume 就解決了，而且更便宜。
 `APP_HOSTNAME`、`backend/.env` 的 `FRONTEND_BASE_URL`、`CORS_ORIGINS`、
 `GOOGLE_REDIRECT_URI`，以及 Let's Encrypt 的憑證。先決定好可以少繞一圈。
 
-怎麼取名見步驟 3（還沒有網域就用 sslip.io）。以下都以
-`sunny.203-0-113-5.sslip.io` 為例。
+兩條路，詳見步驟 3：
+
+- **有自己的網域**（本專案的情況）→ 掛在 Cloudflare 上加一筆 A 記錄。
+- **沒有網域** → 用 sslip.io 這種把 IP 編進名稱裡的免費 DNS 頂著。
+
+以下都以本專案實際使用的 `sunny.odootpe.org` 為例。
+
+⚠️ **要用 Google 登入就 MUST 走第一條路。** Google 對 `sslip.io`、`workers.dev`、
+`pages.dev` 這類公共後綴網域的授權有額外限制，可能直接拒絕註冊回呼網址——
+那不是設定錯誤，是改設定也繞不過去的限制。
 
 ### (b) 後台要不要公開
 
@@ -372,6 +381,10 @@ Reserved IP 綁在執行中的 Droplet 上是免費的。
 
 記下這個 IP，以下以 `203.0.113.5` 為例。
 
+⚠️ **`203.0.113.5` 是 RFC 5737 保留給文件用的位址，不會路由到任何機器。**
+它在本文裡純粹是佔位符——每次看到它，都要換成你自己那個 Reserved IP。照抄的
+症狀是 DNS 查得到、Caddy 也在跑，但 TLS 交握直接被切斷。
+
 ### 2.3 防火牆
 
 控制台 → **Networking** → Firewalls → Create Firewall，套用到這台 Droplet：
@@ -436,31 +449,63 @@ swap 比記憶體慢很多，但這裡只在建置那幾分鐘用得到，平時
 站台需要一個公開可解析的主機名稱，Let's Encrypt 才簽得出憑證。**前端與 API
 共用這一個名稱**（步驟 0(a)）。
 
-你還沒有網域，所以用 **sslip.io**：它把 IP 編進主機名稱裡，
-免費、免註冊，而且是真實可解析的公開 DNS。把 IP 的點換成減號，前面接一個名字：
+### 3A：自己的網域（掛在 Cloudflare）
+
+先確認網域的 nameserver 已指到 Cloudflare（後台顯示 **Active**）。然後
+DNS → Records → **Add record**：
+
+| 欄位 | 值 |
+|---|---|
+| Type | `A` |
+| Name | `sunny`（要用根網域就填 `@`） |
+| IPv4 address | 步驟 2.2 那個 **Reserved IP** |
+| Proxy status | **DNS only（灰雲）** |
+| TTL | Auto |
+
+⚠️ **灰雲不是偏好問題。** 橘雲（Proxied）之後連線由 Cloudflare 代收，
+Let's Encrypt 的 HTTP-01 挑戰就打不到你的 Caddy，憑證永遠簽不下來——而日誌上
+只會反覆寫 `could not get certificate`，不會提到 proxy 狀態。
+
+⚠️ **MUST NOT 加 AAAA 記錄。** 這台 Droplet 沒有 global IPv6。加了之後，支援
+IPv6 的訪客會優先走那條路然後連不上，而你自己（走 IPv4）看到的網站完全正常
+——這種「只有一部分人壞掉」的故障最難查。
+
+想日後改走 Cloudflare 的 CDN／WAF，等憑證簽下來、站台跑順之後再開橘雲，
+並把 SSL/TLS 加密模式設成 **Full (strict)**（設成 Flexible 會變成 Cloudflare 用
+HTTP 回源、Caddy 又把它轉回 HTTPS，瀏覽器看到無窮轉址迴圈）。但續簽同樣走
+HTTP-01，六十天後可能悄悄失敗，所以維持灰雲是最省事的選擇。
+
+### 3B：還沒有網域（sslip.io）
+
+**sslip.io** 把 IP 編進主機名稱裡，免費、免註冊，而且是真實可解析的公開 DNS。
+把 IP 的點換成減號，前面接一個名字：
 
 ```
 Reserved IP 203.0.113.5  →  sunny.203-0-113-5.sslip.io
 ```
 
-驗證一下（在你自己的電腦上）：
+⚠️ 這條路**沒辦法用 Google 登入**（步驟 0(a)），而且 sslip.io 整個網域偶爾會撞到
+Let's Encrypt 的簽發配額——那時不是你的設定有問題，等一段時間或改用自有網域。
+
+### 驗證（兩條路都要做）
+
+在你自己的電腦上：
 
 ```powershell
-Resolve-DnsName sunny.203-0-113-5.sslip.io
+Resolve-DnsName sunny.odootpe.org -Type A -Server 1.1.1.1
 ```
 
-應該回傳 `203.0.113.5`。
+⚠️ **回傳的 IP 必須是你的 Reserved IP，否則不要往下做。** Caddy 會對著一個不會
+回應的位址反覆挑戰，而 Let's Encrypt 對**同一個主機名稱**有每小時 5 次驗證失敗
+的上限，撞到之後連設定改對了也要等。
 
-> **之後買了網域怎麼辦**
->
-> 把網域加進 Cloudflare，新增一筆 A 記錄指到 `203.0.113.5`，
-> **並把該筆記錄的 proxy 狀態設為 DNS only（灰雲）**——橘雲會讓 Cloudflare 代收
-> 連線，Let's Encrypt 的 HTTP-01 挑戰就打不到你的 Caddy 了。
-> 然後改 `./.env` 的 `APP_HOSTNAME`、`backend/.env` 的 `FRONTEND_BASE_URL`、
-> `CORS_ORIGINS`、`GOOGLE_REDIRECT_URI`（有設 Google 登入的話，Google Cloud
-> Console 那邊也要同步改），再 `docker compose up -d`。其餘不動。
->
-> 同源架構下要改的就是這一份清單——不會有「前端網址改了但後端不知道」的中間狀態。
+### 日後換名稱
+
+改 `./.env` 的 `APP_HOSTNAME`、`backend/.env` 的 `FRONTEND_BASE_URL`、
+`CORS_ORIGINS`、`GOOGLE_REDIRECT_URI`，再 `docker compose up -d`。有設 Google
+登入的話，Google Cloud Console 的「已授權的重新導向 URI」也要同步改。其餘不動。
+
+同源架構下要改的就是這一份清單——不會有「前端網址改了但後端不知道」的中間狀態。
 
 ---
 
@@ -501,7 +546,7 @@ nano .env
 填兩個值（第三個只有選了步驟 0(B) 才要）：
 
 ```ini
-APP_HOSTNAME=sunny.203-0-113-5.sslip.io
+APP_HOSTNAME=sunny.odootpe.org
 ACME_EMAIL=你會看的信箱@example.com
 # VITE_HIDE_ADMIN_DEMO=true
 ```
@@ -513,7 +558,7 @@ cp backend/.env.production.example backend/.env
 nano backend/.env
 ```
 
-範本裡每一欄都有說明，重點只有五個：
+範本裡每一欄都有說明，重點只有六個：
 
 - **連線那幾欄依你在步驟 1 選的路徑填**，兩者的值不同（host／port／database／
   使用者名稱），對照表在步驟 1 的「步驟 4.3 要填的值」。1A 是 `25060` /
@@ -526,8 +571,12 @@ nano backend/.env
 - `JWT_SECRET` 至少 32 字元，且不要跟開發環境同一組
 - `FRONTEND_BASE_URL` 與 `CORS_ORIGINS` 都填**瀏覽器看得到的那個來源**。
   沒有做步驟 5 就是 `https://<APP_HOSTNAME>`；做了步驟 5 就是那個
-  workers.dev 網址，**不是** Droplet 的主機名稱。同源所以只有一個值。
-  ⚠️ 有設 Google 登入的話，`GOOGLE_REDIRECT_URI` 是同一個來源**加上 `/api`**
+  workers.dev 網址，**不是** Droplet 的主機名稱。同源所以只有一個值
+- **Google 登入是全有或全無的：`GOOGLE_CLIENT_ID` 與 `GOOGLE_CLIENT_SECRET`
+  留空，那個按鈕就只會把使用者彈回登入頁。** 這是刻意的（`routers/auth.py` 的
+  `_require_google_config`），不是故障——但它**不會**寫進任何日誌，站台其餘部分
+  也完全正常，所以查起來很容易往網址設定的方向鑽。要開這項功能就三個值一起填：
+  ⚠️ `GOOGLE_REDIRECT_URI` 是上面那個來源**加上 `/api`**
   （`https://<那個來源>/api/auth/google/callback`），理由見範本裡的說明
 
 產生隨機值：
@@ -578,27 +627,44 @@ docker compose logs -f caddy
 
 ```bash
 # 前端（靜態檔）
-curl -sI https://sunny.203-0-113-5.sslip.io/ | head -1
+curl -sI https://sunny.odootpe.org/ | head -1
 
 # API（Caddy 剝掉 /api 後轉給 FastAPI）
-curl -sI https://sunny.203-0-113-5.sslip.io/api/rooms | head -1
+curl -sI https://sunny.odootpe.org/api/rooms | head -1
 
 # SPA fallback：這條路徑在磁碟上不存在，但 MUST 回 200 + HTML
-curl -sI https://sunny.203-0-113-5.sslip.io/rooms | head -1
+curl -sI https://sunny.odootpe.org/rooms | head -1
 ```
 
 三個都應該是 `HTTP/2 200`。第三個是最容易在正式環境才發現的一項——
 它回 404 就表示 `try_files` 沒生效，症狀是使用者一按 F5 網站就壞掉。
 
-在瀏覽器打開 `https://sunny.203-0-113-5.sslip.io/api/docs` 也應該看到互動式
+有設 Google 登入的話，這一條不必真的登入就能驗完整組設定：
+
+```bash
+curl -sI https://sunny.odootpe.org/api/auth/google | grep -i location
+```
+
+要看到 `accounts.google.com/o/oauth2/v2/auth?...`，而且裡面的 `redirect_uri`
+就是你填的那個（含 `/api`）。若導向的是 `/login#error=GOOGLE_NOT_CONFIGURED`，
+表示 client id/secret 是空的，見步驟 4.3。
+
+在瀏覽器打開 `https://sunny.odootpe.org/api/docs` 也應該看到互動式
 API 文件（那頁會去抓根目錄的 `/openapi.json`，Caddyfile 有一條規則專門接它）。
 
 ---
 
-## 步驟 5：Worker 前門（選用）
+## 步驟 5：Worker 前門（選用，走了步驟 3A 就跳過）
 
 做完步驟 4，站台已經完整可用了——網址是 `https://<APP_HOSTNAME>`。這一步只解決
 一件事：**想用一個好看的網址，而且還不想買網域。**
+
+⚠️ **有自己的網域（步驟 3A）就別做這一步。** 這支 Worker 存在的唯一理由是
+`*.workers.dev` 的 DNS 不能指到自己的機器；A 記錄能指了之後，它只是在每個請求
+（含每一張房源照片）上多加一跳延遲與一份 Cloudflare 用量。而且 `workers.dev`
+是公共後綴網域，掛了它反而讓 Google 登入無法啟用（步驟 0(a)）。
+
+本專案已走 3A，因此**不做這一步**；下面留著給沒有網域的情況。
 
 `*.workers.dev` 的 DNS 由 Cloudflare 掌控，**沒辦法用 A 記錄指到自己的 Droplet**。
 唯一的辦法是放一支 Worker，把收到的請求原封不動轉給 Droplet 再回傳。
@@ -686,6 +752,7 @@ docker compose up -d   # 重新載入環境變數
 | 6 | 回前台看該房源詳情頁 | ⚠️ **照片看得到，不是破圖** |
 | 7 | `docker compose restart api` 後重看該頁 | 照片還在（volume 有生效） |
 | 8 | 開發者工具 → Console | 沒有紅字（尤其是 CSP 擋下來的資源） |
+| 9 | 有設 Google 登入才做：登入頁按「以 Google 登入」 | 到 Google 授權頁，授權後回到首頁且已登入 |
 
 第 2 與第 6 項是最容易漏掉、又最容易只在正式環境出現的兩項——**從首頁點進去
 都是好的**，要按 F5 或真的去看一張上傳的照片才會發現。
@@ -746,9 +813,52 @@ docker run --rm -v sunny_uploads:/data -v $(pwd):/backup alpine \
 `docker compose logs caddy` 反覆出現逾時或 `could not get certificate`。
 
 1. 防火牆的 **80 port** 有沒有開？HTTP-01 挑戰走 80，即使最終服務在 443
-2. `APP_HOSTNAME` 解析到的 IP 是不是這台機器？`Resolve-DnsName` 確認
-3. 若之後接了自己的網域：Cloudflare 那筆 A 記錄是不是設成了橘雲（Proxied）？
-   MUST 改成 **DNS only**，否則挑戰打不到 Caddy
+2. `APP_HOSTNAME` 解析到的 IP 是不是這台機器？`Resolve-DnsName` 確認。
+   ⚠️ 特別確認它不是 `203.0.113.5`——那是本文的範例位址，照抄過的話 DNS 查得到
+   但沒有任何機器會回應
+3. Cloudflare 那筆 A 記錄是不是設成了橘雲（Proxied）？MUST 改成 **DNS only**，
+   否則挑戰打不到 Caddy
+4. **容器裡的 `APP_HOSTNAME` 跟檔案裡寫的是不是同一個？**
+
+   ```bash
+   docker compose exec caddy printenv APP_HOSTNAME
+   ```
+
+   不一致就表示上次是用 `docker compose restart` 套用的——它**不重讀 `env_file`**，
+   容器是新的、日誌是新的、環境變數還是舊的。改用 `docker compose up -d`
+
+判斷「Caddy 到底有沒有在嘗試簽這個名字」有一個很快的方法：從外面打挑戰路徑。
+
+```bash
+curl -sI http://<你的主機名稱>/.well-known/acme-challenge/probe
+```
+
+正在簽的 Caddy 會在 **port 80 直接回答**這個路徑（404 或 200 都算）。若它回
+**308 轉去 HTTPS**，表示這個主機名稱根本不在 Caddy 的設定裡——它沒有在簽任何
+東西，問題在 `APP_HOSTNAME`，不在 DNS 或防火牆。
+
+### 「以 Google 登入」按了就回到登入頁
+
+畫面上出現「本站尚未啟用 Google 登入，請以電子郵件與密碼登入」。
+
+**這不是故障，是 `GOOGLE_CLIENT_ID` 或 `GOOGLE_CLIENT_SECRET` 沒填。**
+`routers/auth.py` 的 `_require_google_config` 在兩者任一為空時就把使用者導回
+登入頁——**不寫日誌、不回錯誤碼**，站台其餘部分完全正常。
+
+```bash
+grep -E '^GOOGLE_CLIENT_(ID|SECRET)=' backend/.env | awk -F= '{print $1"= 長度 " length($2)}'
+```
+
+長度 0 就是這個原因。填好之後 `docker compose up -d`。
+
+其餘 Google 登入的症狀各自對應不同的地方：
+
+| 症狀 | 原因 |
+|---|---|
+| Google 顯示 `redirect_uri_mismatch` | Console 的「已授權的重新導向 URI」與 `GOOGLE_REDIRECT_URI` 不是逐字相同（scheme、`/api`、結尾斜線都算） |
+| 授權完卡在轉圈，**後端日誌一片空白** | `GOOGLE_REDIRECT_URI` 漏了 `/api`。那條路徑對外是 SPA 路由，Google 把人送回來時拿到的是 `index.html`，請求根本沒進後端 |
+| 登入成功卻被丟到另一個網域 | `FRONTEND_BASE_URL` 還是舊值 |
+| Console 不讓你存這個回呼網址 | 主機名稱是公共後綴網域（`sslip.io`／`workers.dev`／`pages.dev`）。改設定繞不過去，見步驟 0(a) |
 4. sslip.io 整個網域偶爾會撞到 Let's Encrypt 的週配額。若日誌明確寫 rate limit，
    那不是你的設定問題，等一段時間或改用自己的網域
 

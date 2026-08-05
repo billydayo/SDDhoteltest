@@ -257,7 +257,8 @@ try {
     ['收藏', '/favorites', '收藏'],
     ['客服訊息', '/messages', '客服'],
     ['帳戶設定', '/account', '帳戶'],
-    ['安全檢測', '/risk-check', '檢測'],
+    // 安全檢測已下架：`/risk-check` 路由移除後這一步會落到 404，
+    // `expectText(page, '檢測')` 隨即失敗。
     ['服務條款', '/terms', '服務條款'],
   ]) {
     setStep(`F 走訪「${name}」`)

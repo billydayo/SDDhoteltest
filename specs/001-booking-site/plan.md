@@ -20,6 +20,12 @@ RLS 全數移除，授權邊界移至 FastAPI。前一版計畫（v2.3.0 對應�
   同日由獨立頁面改為掛在 Layout 的浮球）。
   本計畫原有的「兩條照片路徑」設計要點與 Complexity Tracking 第 2 項因此失效，
   已於下方改寫。
+- **v4.1.0（嵌入形式改為跨來源 iframe）**：上一條的 `public/wr-widget.js` 已移除。
+  該元件改為 `<iframe src="https://within-reach-phi.vercel.app">`，外部程式因此跑在
+  對方的 origin 上而非我們的 document 裡——原則 VI 拆成形式 A／形式 B，形式 A
+  一字未改。⚠️ **同時放棄了一項保障**：內容隨對方部署即時改變，我們無從得知也
+  無法回退。另需注意 `deploy/Caddyfile` 的 CSP MUST 有對應的 `frame-src`，
+  否則正式站上浮窗會是空白而本機完全正常。見 FR-129a 與 T190。
 
 ## Summary
 

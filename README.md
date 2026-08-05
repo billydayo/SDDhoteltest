@@ -276,11 +276,16 @@ PostgreSQL（DO Managed 或 Supabase 二選一）。完整步驟見
    前端不持有任何資料庫憑證——不是「不該用」，是根本沒有。
 2. **前台沒有使用者照片這回事。** 原本自建的照片安全檢測靠「相依圖裡沒有出口」
    來保證私人照片不外流；憲章 v4.0.0 改為嵌入外部的無障礙檢測元件
-   （`frontend/src/pages/WithinReach.tsx`），該元件不接受上傳，於是那條需要被
+   （`frontend/src/components/WithinReachFab.tsx`），該元件不接受上傳，於是那條需要被
    守住的路徑不再存在。只有管理員的房源檢測會存圖，且該圖明示會公開。
 
-   嵌入的 `frontend/public/wr-widget.js` 為自行 host 的建置產物，不指向外部主機。
-   來源與相依圖查核結果記於 `WithinReach.tsx` 的檔頭與憲章 v4.0.0 的 Sync Impact Report。
+   該元件自憲章 v4.1.0 起改為**跨來源 sandboxed iframe**，指向上游的線上部署
+   （`https://within-reach-phi.vercel.app`）。外部程式因此跑在對方的 origin 上，
+   碰不到我們存在 `localStorage` 的 JWT——原本靠「逐檔查核相依圖」換來的保障，
+   改由瀏覽器的同源政策強制。⚠️ **代價是換的，不是省的**：內容隨對方部署即時
+   改變，我們無從得知也無法回退；訪客的 IP 也會到達對方主機。放棄了什麼記於
+   該檔檔頭與憲章 v4.1.0 的 Sync Impact Report，護欄在
+   `frontend/src/__tests__/embeddedWidget.test.ts`。
 3. **操作日誌只能新增。** `backend/src/sunny/repositories/admin_logs.py` 沒有
    update 或 delete 函式，資料庫端也已對應用角色 `REVOKE UPDATE, DELETE`。
    應用連線 MUST 為非擁有者（`sunny_app`）——REVOKE 只對非擁有者生效，

@@ -58,6 +58,18 @@
 	#                                         （RiskCheck.tsx、admin/RoomRisk.tsx）
 	#   img-src https:                      → 後台可以貼任意外部圖片網址
 	#                                         （ImageManager.tsx、admin/Content.tsx）
+	#   frame-src within-reach-phi…         → 無障礙檢測浮球的跨來源 iframe
+	#                                         （WithinReachFab.tsx，憲章 v4.1.0）
+	#
+	# ⚠️ **`frame-src` 這一條是必要的，不是保險。** 沒有它時 `frame-src` 會依序
+	# 回退到 `child-src`、再回退到 `default-src 'self'`，於是那個 iframe 在正式站
+	# 上直接被擋掉——而本機 `vite dev` 沒有 CSP，所以症狀是「本機好好的、正式站
+	# 浮窗一片空白」，最難聯想到的那一種。
+	#
+	# ⚠️ 這裡 MUST 維持具名單一來源，MUST NOT 寫成 `frame-src https:`。
+	# 這條的整個作用就是「只有那一個網域的內容能被嵌進我們的頁面」，
+	# 放寬成通配等於把它刪掉。換嵌入對象時，這裡與 `WithinReachFab.tsx` 的
+	# `WIDGET_ORIGIN` MUST 一起改——只改一邊的症狀同樣是正式站上一片空白。
 	#
 	# ⚠️ script-src 刻意**沒有** 'unsafe-inline'。若某天畫面整片空白而
 	# Console 出現 CSP 擋下 inline script，那表示建置產物開始內嵌腳本了，
@@ -69,7 +81,7 @@
 	# 這裡。CSP 是給「會被當成 HTML 頁面執行」的回應用的，API 的 JSON 與
 	# /uploads 的圖片都不是。
 	@html not path /api/* /uploads/*
-	header @html Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	header @html Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://within-reach-phi.vercel.app; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 	# -------------------------------------------------------------------------
 	# API

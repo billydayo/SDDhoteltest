@@ -590,8 +590,10 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 - [X] T184 [P] 複核嵌入式第三方元件的來源可追溯性與畫面標示（FR-129、FR-131）：於 `frontend/src/components/WithinReachFab.tsx` 檔頭確認已記錄**上游 repo、建置指令與來源 commit**（現為 `CHUN9701/within-reach`、`npm run build:widget`、`46341f1c`）；確認 `frontend/public/wr-widget.js` 已進版控且**未以 `<script src>` 指向外部主機**；確認浮窗內**明確標明該區塊由外部服務提供**
   （2026-08-05：元件已由 `pages/WithinReach.tsx` 改為掛在 Layout 的浮球 `components/WithinReachFab.tsx`，本任務路徑同步更新。**初查該檔檔頭三項與畫面標示均已具備**，本任務因此是複核而非補建——但仍保留為待辦，因為浮窗的標示比整頁更容易在後續調版面時被當成雜訊移除）
+  （**2026-08-05 第二次修訂**：改為形式 B 之後，「建置指令與來源 commit」不再適用——沒有建置產物可以釘住版本。可追溯性改由**單一具名 origin 常數**承載，見 T190。畫面標示的部分不但保留，還加了一項：MUST 反映內容為即時載入）
 - [X] T185 [P] 建立可重跑的相依圖查核於 `frontend/src/__tests__/embeddedWidget.test.ts`（FR-130、SC-035）：掃描 `public/wr-widget.js` 建置產物，斷言 `fetch`／`XMLHttpRequest`／`WebSocket`／`sendBeacon` 與 `localStorage`／`sessionStorage`／`document.cookie` 的出現次數為 **0**
   **這項的價值在於「更新版本時會自動失敗」**——憲章要求每次更新都重新查核，而人工查核在第三次更新時一定會被跳過。目前的查核結果寫在 `components/WithinReachFab.tsx` 的檔頭註解裡，那份紀錄正確但**是靜態的**：換掉 `wr-widget.js` 之後它不會自己變假。已知例外（指向 `images.unsplash.com` 的示範圖）MUST 以具名白名單放行，MUST NOT 放寬整條規則
+  （**2026-08-05 已由 T190 取代**：嵌入形式改為跨來源 iframe 之後，`public/wr-widget.js` 已從版控移除，本項掃描的對象不存在。⚠️ 這不是「查核放寬了」而是「量測對象換了」——改回形式 A 時 MUST 一併恢復本項）
 - [X] T186 [P] 版面寬度稽核 `frontend/src/`（FR-132、SC-036）：確認頁首、主內容區、頁尾與主視覺內層**全部引用 `lib/surfaces.ts` 的同一個 `shellClass`**，全域搜尋確認外殼上無 `max-w-7xl` 之類的固定像素封頂；長文與單欄表單的區塊級 `max-w-*` 為正確用法，MUST NOT 一併移除
   （憲章 v3.2.0 新增了四條規範性條文，卻沒有任何 FR/SC 或任務承載，實作先於規格存在。本項與 FR-132 是同一次補正）
 - [X] T187 [P] 前台無照片輸入的自動檢查於 `frontend/src/__tests__/noPublicFileInput.test.ts`（FR-086、SC-034）：走訪前台全部路由，斷言可接受使用者檔案輸入的元素（`input[type=file]`、拖放接收區、`capture` 屬性）數為 **0**；管理端路由排除
@@ -600,6 +602,10 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
   **這三條是換堆疊後最該重驗、卻唯一沒有任何任務指向的一組**。它們無法自動化（需要兩個真實瀏覽器工作階段），因此更需要在手動清單上有名字
 - [X] T189 [P] 負向需求稽核（FR-040、FR-076）：確認退款流程中不存在任何金錢移轉的程式路徑；確認全站無蒐集真實身分證字號、真實金融資訊的欄位或資料表
   **負向需求最容易在重構中被靜默違反**——沒有人會因為「多做了一件不該做的事」而看到測試失敗
+- [X] T190 嵌入式第三方元件改為跨來源 iframe（憲章 v4.1.0 形式 B、FR-129、FR-129a、FR-130、FR-131、SC-035）：`frontend/src/components/WithinReachFab.tsx` 由注入 `<script src="/wr-widget.js">` 改為 `<iframe src="https://within-reach-phi.vercel.app">`，`sandbox` 為 `allow-scripts allow-same-origin allow-forms allow-popups`（**無 `allow-top-navigation`**）；移除 `frontend/public/wr-widget.js`；`__tests__/embeddedWidget.test.ts` 改守新邊界（來源白名單、sandbox 旗標、無 script 注入路徑、舊 bundle 已不存在）
+  **⚠️ 本項放棄了一項既有保障，MUST NOT 被記成單純的升級**：內容隨對方部署即時改變，我們無從得知也無法回退——那正是 FR-129 形式 A 那條規則原本在擋的事。接受它的理由是爆炸半徑換小了（從「拿得到我們的 JWT」縮成「那塊畫面顯示什麼」），不是風險消失了
+  兩項已知的功能退讓，MUST NOT 在後續被當成 bug 修掉：**（1）無法深連到單一飯店**——上游線上版沒有路由也不讀 query string，舊的 `data-hotel="sunmoon-hanguang"` 沒有等價物；**（2）焦點在 frame 內時 Esc 關不掉浮窗**——鍵盤事件由對方的 document 接走，這是跨來源隔離的直接後果，沒有繞法
+  手動驗收見 `checklists/browser-acceptance.md` C2：**測試只看得到 `sandbox` 字串寫對了，看不到瀏覽器有沒有照做**，「點外連連結後我們的整頁沒有被導走」MUST 手動確認
 
 ---
 

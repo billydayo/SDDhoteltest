@@ -1,68 +1,64 @@
 /**
- * 無障礙檢測的浮球與浮窗。**外殼是我們的，內容是外部的。**
+ * 無障礙檢測的浮球與浮窗。**外殼是我們的，內容在對方的 origin 上。**
  *
  * 取代原本的 `/risk-check` 獨立頁面（憲章 4.0.0 起改嵌外部元件）。改成浮球之後
  * 檢測隨時可叫出來，不必離開正在看的房源——而「離開房源頁去查無障礙，回來時
  * 篩選條件還在不在」正是獨立頁面最容易出錯的地方。
  *
- * ## 為什麼外殼要自己寫
+ * ## 2026-08-05：從自行 host 的 bundle 改為跨來源 iframe
  *
- * 上游其實有一個浮動版本（`src/components/FloatingWidget.tsx`），但**它沒有進
- * embed 的打包**：`vite.widget.config.ts` 的進入點是 `src/embed/mount.tsx`，
- * 而那支渲染的是內嵌面板版的 `Widget`。要用上游的浮動版就得改上游的進入點，
- * 那是他們的檔案。
+ * 舊做法是把上游 `npm run build:widget` 的產物（`public/wr-widget.js`）進版控，
+ * 浮窗打開時插一個 `<script>` 讓它在**我們的 document 裡**渲染。那個做法換到的
+ * 是「這頁跑什麼程式由我們決定」，付出的是「那段程式跟我們的 JWT 在同一個
+ * `localStorage` 裡」——所以才需要每次更新都逐檔查核相依圖。
  *
- * 因此這裡只做外殼——浮球、浮窗、焦點管理、Esc 關閉——內容仍然原封不動地
- * 交給 `wr-widget.js`。這條界線 MUST 保持：**我們不改寫、不重新詮釋、也不
- * 遮蓋它的任何輸出**，包含它自己掛的免責聲明（那是它的 FR-006）。
+ * 現在指向對方的線上部署，兩邊都反過來了。**這不是升級，是換一種代價**，
+ * 兩個方向都要說清楚：
  *
- * ## 掛載時機與重複開關
+ * - 換到的：程式跑在 `within-reach-phi.vercel.app` 的 origin 上。同源政策讓它
+ *   碰不到我們的 `localStorage`、`document.cookie` 與 DOM。相依圖查核因此不再
+ *   是安全邊界所繫之處——邊界改由瀏覽器強制，而不是靠我們讀完他們的程式碼
+ * - 付出的：**內容會隨對方改版即時變動，我們無從得知也無法回退。** 舊註解裡
+ *   那句「MUST NOT 改成指向對方主機」講的正是這件事，而本次是刻意放棄它。
+ *   影響範圍被限縮成「那塊畫面顯示什麼」，不再是「我們的頁面跑什麼程式」——
+ *   代價變小了，但 MUST NOT 說成不存在
+ * - 一併付出的：訪客的 IP 與 referrer 會給到 Vercel 與該站載入的第三方
+ *   （目前為 Google Fonts 與 `images.unsplash.com`）。`referrerPolicy` 只擋得住
+ *   referrer，擋不住 IP
  *
- * 上游的 `boot()` 在 script 執行當下就掃 `[data-within-reach]`，掃到什麼掛
- * 什麼，**它不會等**。所以容器 MUST 先進 DOM，script 才能附加——也就是浮窗
- * 打開後才在 effect 裡插 script 的原因。
+ * 憲章原則 VI「嵌入的第三方元件」v4.1.0 起把這兩種形式分開規範；本檔屬形式 B。
  *
- * 關閉時把 script 元素移除；下次打開再插一個新的。同一個 src 的 script 元素
- * 重新插入會重新執行（檔案由瀏覽器快取供應），這正是重新掛載所需要的——上游
- * 沒有匯出任何可重複呼叫的 mount API。
+ * ## 上游
  *
- * ## 來源與查核（憲章原則 VI「嵌入的第三方元件」）
+ * repo：https://github.com/CHUN9701/within-reach
+ * 嵌入：https://within-reach-phi.vercel.app/ （上游自行部署於 Vercel）
  *
- * 上游：https://github.com/CHUN9701/within-reach
- * 建置：`npm run build:widget` → `dist-widget/wr-widget.js`
- * 落點：`frontend/public/wr-widget.js`(進版控，隨我們的站台一起部署)
- * 來源 commit：46341f1c93e0625ba916d460edeac7590d5267cc(2026-08-05)
- *
- * ⚠️ **MUST NOT 改成指向對方主機的網址。** `<script src>` 每次載入都抓當下
- * 最新的檔案，指向外部等於把「這頁跑什麼程式」的決定權長期讓出去。更新版本
- * 就重跑一次上游的 `build:widget`，換掉檔案並更新上面的 commit。
- *
- * 逐檔追過 `src/embed/mount.tsx` 的相依圖，**這一版**的事實：
- *
- * - 無 `fetch`／`XMLHttpRequest`／`WebSocket`／`sendBeacon`，評估資料全部打包
- *   在 bundle 裡（`data/hotels.ts`）
- * - 無 `localStorage`／`sessionStorage`／`document.cookie`。這點是關鍵：我們的
- *   JWT 存在 `localStorage`(`api/client.ts`)，同頁的第三方程式讀得到
- * - ⚠️ **但它會載入外部圖片。** 房源照片指向 `https://images.unsplash.com`，
- *   Unsplash 會拿到訪客的 IP 與 referrer。沒有資料被送出去，但有訪客被暴露，
- *   兩者不一樣。MUST NOT 把本元件描述為「零外部請求」
- *
- * 這些是這一版的事實，不是承諾。**每次更新版本 MUST 重跑一次這個查核**——
- * 「上一版是乾淨的」不構成略過的理由。真正的邊界仍然只有一道：它跟我們在
- * 同一個 document 裡，拿得到 `window`。要更強的隔離只能改成 sandboxed iframe，
- * 那是上游一旦開始送資料時 MUST 走的路。
+ * ⚠️ 那是**整個平台**，不是單一飯店的 widget。上游的線上版沒有路由、也不讀
+ * query string（打包產物裡 `URLSearchParams` 只用於組出站的訂房連結），因此
+ * **無法深連到某一間飯店**——舊做法的 `data-hotel="sunmoon-hanguang"` 沒有等
+ * 價物，使用者會落在平台首頁自己找。要恢復深連得等上游提供帶參數的網址。
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import { panelClass } from '../lib/surfaces'
 
-/** ⚠️ 絕對路徑。`./wr-widget.js` 會相對**當前網址**解析，在 `/rooms/:id`
- *  這種巢狀路由下會去要 `/rooms/wr-widget.js` 而 404。 */
-const WIDGET_SRC = '/wr-widget.js'
+/**
+ * ⚠️ 這個常數是本專案唯一允許被嵌入的外部來源（憲章原則 VI 形式 B 的具名白
+ * 名單）。改動它等於換掉一個信任對象，MUST 同步更新憲章與 `spec.md` 的 FR-129。
+ */
+const WIDGET_ORIGIN = 'https://within-reach-phi.vercel.app'
 
-/** 對應上游 `src/data/hotels.ts` 的 `id`。找不到時上游只在 console 記一筆並
- *  靜默返回，浮窗裡會是一片空白——因此這個值改動時 MUST 對照上游確認。 */
-const HOTEL_ID = 'sunmoon-hanguang'
+/**
+ * 逾時多久算「載不出來」。
+ *
+ * ⚠️ 跨來源 iframe **沒有可靠的失敗事件**：`onError` 幾乎不會觸發，而對方回
+ * 500 錯誤頁時 `onLoad` 照樣會觸發。所以偵測不到「載壞了」，只偵測得到
+ * 「到現在還沒載完」——這個逾時就是那條線。
+ *
+ * 12 秒偏長是刻意的：太短會讓行動網路上正常載入的人看到錯誤訊息，而那比多等
+ * 幾秒更糟——他會直接關掉，以為這個功能壞了。
+ */
+const LOAD_TIMEOUT_MS = 12_000
 
 /**
  * 無障礙標章（輪椅圖示）。
@@ -101,32 +97,47 @@ function AccessibilityMark() {
 
 export function WithinReachFab() {
   const [open, setOpen] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
   const closeRef = useRef<HTMLButtonElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const titleId = useId()
 
-  // --- 載入 widget。浮窗打開時才插，關閉時移除。
-  useEffect(() => {
-    if (!open) return
+  /** 關閉並把載入狀態歸零。⚠️ 三個 setter MUST 一起——少歸零 `timedOut` 的話，
+   *  逾時過一次之後再打開會直接顯示錯誤訊息，而那次其實還沒開始載。
+   *
+   *  用 `useCallback` 是因為下面的 Esc effect 要把它列進相依陣列。setter 本身
+   *  就是穩定的，所以 `[]` 是對的；寫成一般函式則每次渲染都是新的一個，
+   *  effect 會跟著重掛——而重掛的副作用是 `closeRef.current?.focus()` 再跑一次，
+   *  使用者正在浮窗裡操作時焦點會被拉回關閉鈕。 */
+  const close = useCallback(() => {
+    setOpen(false)
+    setLoaded(false)
+    setTimedOut(false)
+  }, [])
 
-    const script = document.createElement('script')
-    script.src = WIDGET_SRC
-    // 載不到時要說出來。靜靜留一塊空白，使用者只會看到浮窗壞了而不知道為什麼。
-    script.addEventListener('error', () => {
-      setFailed(true)
-    })
-    document.body.appendChild(script)
+  // --- 載入逾時。見 `LOAD_TIMEOUT_MS`：這裡量的是「還沒載完」，不是「載壞了」。
+  useEffect(() => {
+    if (!open || loaded) return
+
+    const timer = window.setTimeout(() => {
+      setTimedOut(true)
+    }, LOAD_TIMEOUT_MS)
 
     return () => {
-      script.remove()
+      window.clearTimeout(timer)
     }
-  }, [open])
+  }, [open, loaded])
 
   // --- Esc 關閉，並把焦點還給浮球（憲章原則 V）。
   //
   // ⚠️ 焦點 MUST 交還。少了這一步，鍵盤使用者關掉浮窗後焦點落在 `<body>`，
   // 下一次 Tab 會從整頁最上面重新開始——他得再走一次整排導覽才回得到原處。
+  //
+  // ⚠️ **已知限制：焦點進到 iframe 之後，Esc 不會傳到這裡。** 鍵盤事件由對方的
+  // document 接走，我們的 `document` 收不到。關閉鈕仍然按得到（Shift+Tab 退出
+  // frame 即可），但「Esc 隨時關得掉」這個期待在 frame 內不成立。這是跨來源
+  // 隔離的直接後果，MUST NOT 用 `allow-same-origin` 以外的方式繞——沒有繞法。
   useEffect(() => {
     if (!open) return
 
@@ -136,7 +147,7 @@ export function WithinReachFab() {
     const trigger = triggerRef.current
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') close()
     }
     document.addEventListener('keydown', onKeyDown)
 
@@ -146,7 +157,7 @@ export function WithinReachFab() {
       document.removeEventListener('keydown', onKeyDown)
       trigger?.focus()
     }
-  }, [open])
+  }, [open, close])
 
   return (
     <>
@@ -190,58 +201,91 @@ export function WithinReachFab() {
             正是擋這件事。讀屏使用者因此會多聽到一個關閉鈕——比起一個按不到
             的關閉方式，多一個是比較好的那一邊。
           */}
-          <button
-            type="button"
-            className="absolute inset-0 bg-ink/50"
-            onClick={() => {
-              setOpen(false)
-            }}
-          >
+          <button type="button" className="absolute inset-0 bg-ink/50" onClick={close}>
             <span className="sr-only">關閉無障礙檢測</span>
           </button>
 
+          {/*
+            ⚠️ `max-w-6xl` + `h-[90dvh]`，比舊版的 `max-w-3xl` 大一號。
+
+            舊版裝的是單一飯店的 widget，768px 綽綽有餘。現在裝的是對方的**整個
+            平台**（有自己的頁首、導覽與清單），塞進 768px 會讓它自己先進入手機
+            版排版，再被我們的浮窗夾一次。
+
+            高度改成固定的 `h-[90dvh]` 而非 `max-h-`：iframe 要有確定的高度才撐
+            得開，`max-h-` 之下內容高度由子元素決定，而跨來源的子元素量不到。
+          */}
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative flex max-h-[90dvh] w-full max-w-3xl flex-col ${panelClass}`}
+            className={`relative flex h-[90dvh] w-full max-w-6xl flex-col overflow-hidden ${panelClass}`}
           >
             <div className="flex items-center justify-between gap-gap-3 border-b border-line-soft p-gap-4">
               <div>
                 <h2 id={titleId} className="font-display text-md text-ink">
                   無障礙檢測
                 </h2>
-                {/* 憲章原則 VI「嵌入的第三方元件」：MUST 標明由外部服務提供。 */}
+                {/* 憲章原則 VI「嵌入的第三方元件」：MUST 標明由外部服務提供。
+                    ⚠️ 這行字現在還多擔一件事：下方畫面**即時來自對方站台**，
+                    我們沒有留存副本，內容可能隨時改變。 */}
                 <p className="mt-gap-1 text-tiny text-ink-muted">
-                  由 Within Reach 提供，檢測結果與量測標準由該服務負責。
+                  以下畫面即時載入自外部服務 Within Reach，檢測結果與量測標準由該服務負責。
                 </p>
               </div>
               <button
                 ref={closeRef}
                 type="button"
-                onClick={() => {
-                  setOpen(false)
-                }}
+                onClick={close}
                 className="rounded-xs px-gap-2 py-gap-1 text-small text-ink-muted hover:text-ink"
               >
                 關閉
               </button>
             </div>
 
-            {/* 內容可能很長（實測 1500px 以上），因此浮窗固定高度、內部自己捲。 */}
-            <div className="overflow-y-auto p-gap-4">
-              {failed ? (
-                <p role="alert" className="text-small text-ink">
-                  檢測元件載入失敗，請關閉後再試一次。
+            <div className="relative min-h-0 flex-1">
+              {timedOut && !loaded ? (
+                <p role="alert" className="p-gap-4 text-small text-ink">
+                  檢測服務目前連不上，請稍後再試。
                 </p>
               ) : (
-                /*
-                 * ⚠️ 這個 `<div>` 的內部由外部程式碼接管（它會在上面
-                 * `attachShadow`)。MUST NOT 給它 children，也 MUST NOT 讓
-                 * React 依狀態改寫它的內容——React 的 reconciler 與 Shadow DOM
-                 * 各自為政，兩邊同時動同一個節點會讓 widget 憑空消失。
-                 */
-                <div data-within-reach data-hotel={HOTEL_ID} />
+                <>
+                  {/*
+                   * ⚠️ `sandbox` 的每一項都是刻意的，MUST NOT 為了「先讓它動」
+                   * 而整個拿掉：
+                   *
+                   * - `allow-scripts`：對方是 SPA，沒有它是一片空白
+                   * - `allow-same-origin`：讓 frame 保有**它自己的** origin，
+                   *   它才用得了自己的儲存。⚠️ 這一項在**同源**內容上會等於
+                   *   完全解除沙箱，但這裡是跨來源，因此它給的仍然是對方的
+                   *   origin，碰不到我們
+                   * - `allow-forms`／`allow-popups`：站上有搜尋與外連的訂房連結
+                   * - **沒有** `allow-top-navigation`：這是本組裡最要緊的一項。
+                   *   少了它，frame 裡的程式可以把**我們的**整頁導去別處，而
+                   *   使用者看到的網址列從頭到尾都是我們的網域
+                   * - **沒有** `allow-modals`／`allow-downloads`
+                   *
+                   * `referrerPolicy`：不把使用者正在看哪一間房的網址交出去。
+                   * 擋不住 IP——那個沒有辦法，見檔頭。
+                   */}
+                  <iframe
+                    src={WIDGET_ORIGIN}
+                    title="Within Reach 無障礙檢測"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    referrerPolicy="no-referrer"
+                    className="size-full border-0"
+                    onLoad={() => {
+                      setLoaded(true)
+                    }}
+                  />
+                  {!loaded && (
+                    // 蓋在 iframe 上而不是取代它——取代的話 iframe 要等這個狀態
+                    // 變了才開始載，而它永遠不會變（`onLoad` 來自那個 iframe）。
+                    <p className="absolute inset-0 grid place-items-center bg-surface text-small text-ink-muted">
+                      載入中…
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -1037,9 +1037,11 @@ curl -s https://<你的主機名稱>/assets/index-<hash>.js | grep -c '某個新
    最常見的是正式機上有未提交的本機修改，腳本因此整輪放棄（見「自動部署」）
 4. 手動部署時漏了 `--build`——症狀完全一樣
 
-⚠️ 順帶一提，`public/` 底下的檔案（例如 `wr-widget.js`）沒部署到時**不會回
+⚠️ 順帶一提，`public/` 底下的檔案（`logo.png`、`gallery/` 等）沒部署到時**不會回
 404**：Caddyfile 的 SPA catch-all 會把 `index.html` 交出去。看到 `200` 別急著
 放心，要看 `Content-Type` 是不是 `text/html`。
+（2026-08-05 前這裡的例子是 `wr-widget.js`；該檔已隨嵌入形式改為跨來源 iframe
+而移除，但這個陷阱本身對其他靜態資產一樣成立。）
 
 ### 前端一片空白
 

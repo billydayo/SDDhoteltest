@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'rea
 
 import { shellClass } from '../lib/surfaces'
 
-type GalleryItem = {
+interface GalleryItem {
   /** `public/gallery/` 底下的檔名 */
   readonly file: string
   readonly caption: string
@@ -52,10 +52,9 @@ const GAP_PX = 16
  *  CSS 的 scroll-behavior 只在捲動請求沒有指定 behavior 時生效，而 JS 明寫
  *  `behavior: 'smooth'` 會蓋過它。所以要在 JS 這一側自己判斷。 */
 function scrollBehavior(): ScrollBehavior {
-  // ⚠️ optional call 不是防禦性冗詞：jsdom **沒有實作 `matchMedia`**，
-  // 直接呼叫會讓任何觸發捲動的測試以 TypeError 失敗，而訊息完全不會提到
-  // 「這是測試環境缺的東西」。
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true ? 'auto' : 'smooth'
+  // jsdom 沒有實作 `matchMedia`，缺的那一份補在 `test/setup.ts`——
+  // 測試環境的缺口不該讓正式碼多一道判斷。
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +373,7 @@ export function HomeGallery() {
           <div
             className="h-full origin-left bg-brand transition-transform duration-300 ease-brand"
             // 最低 0.08：進度條完全空掉時看起來像沒載入，而不是「在最前面」
-            style={{ transform: `scaleX(${Math.max(0.08, ratio)})` }}
+            style={{ transform: `scaleX(${Math.max(0.08, ratio).toFixed(3)})` }}
           />
         </div>
         {/* ⚠️ 刻意**沒有** aria-live。它每捲一點就變一次，宣告出來會變成讀屏

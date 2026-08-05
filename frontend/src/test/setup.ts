@@ -14,3 +14,26 @@ import { afterEach } from 'vitest'
 afterEach(() => {
   cleanup()
 })
+
+/**
+ * ⚠️ jsdom **沒有實作 `matchMedia`**，而 TypeScript 認為它一定存在
+ * （lib.dom 宣告它是必有的）。因此production 程式碼裡不該加防禦性判斷——
+ * 那會被 `no-unnecessary-condition` 擋下來，而且是為了測試環境去汙染正式碼。
+ * 缺的東西在這裡補。
+ *
+ * 回傳「不減少動態」：測試要看到的是預設行為。真的要測 reduce-motion 的分支，
+ * 由該測試自己覆寫這個 stub。
+ */
+if (typeof window !== 'undefined' && window.matchMedia === undefined) {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList
+}

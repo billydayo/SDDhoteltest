@@ -246,10 +246,14 @@ export function Content() {
       <p className="mt-gap-1 text-small text-ink-muted">
         以下是前台實際會渲染的元件，不是示意圖。
       </p>
-      {/* `overflow-hidden` 把破出視窗寬度的主視覺收在預覽框內，
-          否則這一塊會在後台頁面上真的滿版。 */}
+      {/* ⚠️ `fullBleed={false}` MUST 保留。主視覺的滿版手法（`w-screen` +
+          `left-1/2 -translate-x-1/2`）假設父層在視窗中置中——前台成立，這裡
+          不成立，側邊欄把預覽框推向右邊。開著它的話整塊會右移半個側邊欄的
+          寬度，標題左右各被裁掉約 136px（見 `HomeHero` 的說明）。
+
+          `overflow-hidden` 只是把圓角外的東西收乾淨，它擋不住那個偏移。 */}
       <div className="mt-gap-3 overflow-hidden rounded-base border border-line-soft">
-        <HomeHero content={preview} />
+        <HomeHero content={preview} fullBleed={false} />
       </div>
     </div>
   )

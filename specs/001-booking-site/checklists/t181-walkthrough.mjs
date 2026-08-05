@@ -3,6 +3,20 @@
  *   1. 瀏覽器 console 在**互動期間**零錯誤零警告（先前只驗過「載入」）
  *   2. 後端日誌沒有未處理的例外堆疊
  *
+ * 「載入」那一半由 `responsive-audit.mjs` 負責，兩支不重疊。
+ *
+ * ## 用法
+ *
+ * ```bash
+ * # 前後端都要先起來（見 quickstart.md）
+ * node specs/001-booking-site/checklists/t181-walkthrough.mjs
+ * ```
+ *
+ * 2026-08-05 改為零相依：原本 `require` 一個寫死的絕對路徑
+ * （`C:/Users/user/Desktop/0804/.../node_modules/puppeteer-core`）取得 puppeteer，
+ * 而那個資料夾已經不存在——腳本在任何機器上都跑不起來。現在走 `lib/cdp.mjs`，
+ * 只用 Node 內建的 WebSocket，不需要 `npm install`。
+ *
  * ## 這支腳本刻意做的三件事
  *
  * - **每一步都斷言。** `click()` 找不到那顆按鈕就丟例外。沉默不等於通過——
@@ -16,12 +30,10 @@
  * 這裡只走到「留空 → 可聚焦的錯誤」為止。
  */
 import fs from 'node:fs'
-import { createRequire } from 'node:module'
 
-const require = createRequire(import.meta.url)
-const puppeteer = require('C:/Users/user/Desktop/0804/SDDhoteltest/tests/node_modules/puppeteer-core')
+import { launch } from './lib/cdp.mjs'
 
-const BASE = process.env.SUNNY_BASE ?? 'http://localhost:5173'
+const BASE = (process.env.SUNNY_BASE ?? 'http://localhost:5173').replace(/\/$/, '')
 
 let step = '(尚未開始)'
 const noise = [] // { step, type, text }
@@ -35,6 +47,12 @@ const setStep = (s) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// ---------------------------------------------------------------------------
+// 在頁面裡跑的三支基本動作
+//
+// ⚠️ 傳給 `evaluate` 的函式會被字串化，**取用不到這個檔案裡的變數**。
+// ---------------------------------------------------------------------------
+
 /**
  * 找一個「可點的、文字是 text」的元素並點它。找不到就丟——這是斷言。
  *
@@ -43,25 +61,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  * 重新導向」，而錯誤訊息當然不會出現。
  */
 async function click(page, text, { optional = false, within = null } = {}) {
-  const handle = await page.evaluateHandle(
+  const hit = await page.evaluate(
     (t, scope) => {
       const root = scope ? document.querySelector(scope) : document
-      if (!root) return null
+      if (!root) return false
       const sel = 'button, a, [role="tab"], [role="button"]'
       for (const el of root.querySelectorAll(sel)) {
-        if ((el.textContent ?? '').trim() === t && el.getBoundingClientRect().width > 0) return el
+        if ((el.textContent ?? '').trim() === t && el.getBoundingClientRect().width > 0) {
+          el.scrollIntoView({ block: 'center' })
+          el.click()
+          return true
+        }
       }
-      return null
+      return false
     },
     text,
     within,
   )
-  const el = handle.asElement()
-  if (!el) {
+  if (!hit) {
     if (optional) return false
     throw new Error(`[${step}] 找不到可點的「${text}」`)
   }
-  await el.click()
   await sleep(450)
   return true
 }
@@ -97,35 +117,24 @@ async function expectText(page, text) {
     const h = await page.evaluate(() =>
       [...document.querySelectorAll('h1,h2')].map((x) => x.textContent.trim()).join('｜'),
     )
-    throw new Error(`[${step}] 頁面上找不到「${text}」（標題："${h}"，網址 ${page.url()}）`)
+    const url = await page.url()
+    throw new Error(`[${step}] 頁面上找不到「${text}」（標題："${h}"，網址 ${url}）`)
   }
 }
 
-const browser = await puppeteer.launch({
-  executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  headless: 'new',
-  args: ['--no-sandbox'],
-})
+// ---------------------------------------------------------------------------
+// 走查
+// ---------------------------------------------------------------------------
+const browser = await launch({ headless: !process.env.SUNNY_HEADFUL })
 const page = await browser.newPage()
-await page.setViewport({ width: 1280, height: 900 })
-
-page.on('console', (msg) => {
-  const type = msg.type()
-  if (type !== 'error' && type !== 'warning') return
-  noise.push({ step, type, text: msg.text().slice(0, 300) })
-})
-page.on('pageerror', (err) => {
-  noise.push({ step, type: 'pageerror', text: String(err).slice(0, 300) })
-})
-page.on('requestfailed', (req) => {
-  noise.push({ step, type: 'requestfailed', text: `${req.url()} ${req.failure()?.errorText ?? ''}` })
-})
+await page.setViewport(1280, 900)
+page.onNoise((n) => noise.push({ step, ...n }))
 
 let failure = null
 try {
   // ---- A. 登入：先走錯誤路徑 --------------------------------------------
   setStep('A1 開啟登入頁')
-  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/login`)
   await expectText(page, '登入')
 
   setStep('A2 密碼錯誤（預期 401，前端要顯示可讀的訊息）')
@@ -148,7 +157,7 @@ try {
 
   // ---- B. 首頁搜尋與篩選 --------------------------------------------------
   setStep('B1 首頁')
-  await page.goto(`${BASE}/`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/`)
   await sleep(700)
   await expectText(page, '房源')
 
@@ -181,13 +190,16 @@ try {
     return a ? a.getAttribute('href') : null
   })
   if (!roomHref) throw new Error('[C1] 首頁沒有任何房源連結')
-  await page.goto(`${BASE}${roomHref}`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}${roomHref}`)
   await sleep(800)
-  await expectText(page, '每晚')
+  // 訂房側欄的價格單位（RoomDetail.tsx:144 的 `<span> / 晚</span>`）。
+  // 原本斷言的是「每晚」，但詳情頁上沒有這兩個字——那是首頁篩選器的字樣。
+  // 2026-08-05 以前這一步從沒走到過（先前都停在 500），所以沒人發現。
+  await expectText(page, '/ 晚')
 
   // ---- D. 我的訂單：切分頁 -------------------------------------------------
   setStep('D1 我的訂單')
-  await page.goto(`${BASE}/orders`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/orders`)
   await sleep(900)
   await expectText(page, '我的訂單')
 
@@ -202,7 +214,7 @@ try {
     return a ? a.getAttribute('href') : null
   })
   if (orderHref) {
-    await page.goto(`${BASE}${orderHref}`, { waitUntil: 'networkidle2' })
+    await page.goto(`${BASE}${orderHref}`)
     await sleep(900)
     await expectText(page, '訂單')
 
@@ -217,11 +229,14 @@ try {
 
   // ---- E. 退款表單的錯誤路徑 -----------------------------------------------
   setStep('E1 退款表單：原因留空（預期可聚焦的 400）')
-  const refundable = await page.evaluate(() =>
-    [...document.querySelectorAll('a')].find((a) => a.textContent.trim() === '申請退款')?.getAttribute('href') ?? null,
+  const refundable = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('a')]
+        .find((a) => a.textContent.trim() === '申請退款')
+        ?.getAttribute('href') ?? null,
   )
   if (refundable) {
-    await page.goto(`${BASE}${refundable}`, { waitUntil: 'networkidle2' })
+    await page.goto(`${BASE}${refundable}`)
     await sleep(800)
     await click(page, '送出退款申請', { optional: true })
     await sleep(900)
@@ -238,32 +253,31 @@ try {
     ['服務條款', '/terms', '服務條款'],
   ]) {
     setStep(`F 走訪「${name}」`)
-    await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle2' })
+    await page.goto(`${BASE}${path}`)
     await sleep(800)
     await expectText(page, marker)
   }
 
   setStep('F2 帳戶設定：改顯示名稱後儲存')
-  await page.goto(`${BASE}/account`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/account`)
   await sleep(800)
   await fill(page, '顯示名稱', '住客小美')
   await click(page, '儲存變更', { optional: true })
   await sleep(1200)
 
   setStep('F3 客服訊息：送出一則')
-  await page.goto(`${BASE}/messages`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/messages`)
   await sleep(800)
-  const sent = await page
-    .evaluate(() => {
-      const ta = document.querySelector('textarea')
-      if (!ta) return false
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(
-        ta,
-        'T181 走查訊息',
-      )
-      ta.dispatchEvent(new Event('input', { bubbles: true }))
-      return true
-    })
+  const sent = await page.evaluate(() => {
+    const ta = document.querySelector('textarea')
+    if (!ta) return false
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(
+      ta,
+      'T181 走查訊息',
+    )
+    ta.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })
   if (sent) {
     await sleep(300)
     await click(page, '送出', { optional: true })
@@ -272,13 +286,11 @@ try {
 
   // ---- G. 404 與登出 -------------------------------------------------------
   setStep('G1 不存在的網址')
-  await page.goto(`${BASE}/no-such-page-xyz`, { waitUntil: 'networkidle2' })
+  await page.goto(`${BASE}/no-such-page-xyz`)
   await sleep(700)
 
   setStep('G2 不存在的房源 id（預期 404，前端要有可讀畫面）')
-  await page.goto(`${BASE}/rooms/00000000-0000-0000-0000-000000000000`, {
-    waitUntil: 'networkidle2',
-  })
+  await page.goto(`${BASE}/rooms/00000000-0000-0000-0000-000000000000`)
   await sleep(900)
 } catch (err) {
   failure = String(err)
@@ -312,7 +324,7 @@ for (const [k, list] of buckets) {
   for (const n of list.slice(0, 6)) console.log(`  [${n.type}] ${n.step}\n        ${n.text}`)
   if (list.length > 6) console.log(`  …另外 ${list.length - 6} 筆`)
 }
-const real = noise.filter((n) => !['預期中的 4xx'].includes(classify(n)))
+const real = noise.filter((n) => !['預期中的 4xx', '被取消的請求'].includes(classify(n)))
 if (real.length === 0 && !failure) console.log('\n互動期間全程乾淨（只剩刻意觸發的錯誤路徑）')
 
 fs.writeFileSync(
@@ -320,3 +332,5 @@ fs.writeFileSync(
   JSON.stringify({ trail, noise, failure }, null, 2),
   'utf8',
 )
+
+process.exit(failure || real.length > 0 ? 1 : 0)

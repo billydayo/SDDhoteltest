@@ -50,6 +50,26 @@ cd frontend && npm run dev                                 # http://localhost:51
 管理員 admin@sunny.com / admin123
 ```
 
+### 兩支稽核腳本（先跑它們，再開始用人眼看）
+
+```bash
+# 21 頁 × 6 個寬度：內容有沒有被裁掉、每次載入的 console
+node specs/001-booking-site/checklists/responsive-audit.mjs
+
+# 互動走查：登入錯誤路徑、篩選、訂單、退款表單、404
+node specs/001-booking-site/checklists/t181-walkthrough.mjs
+```
+
+**零 npm 相依**——只用 Node 內建的 WebSocket 驅動 Chrome（`lib/cdp.mjs`），
+不需要 `npm install`，也不需要 puppeteer。前提只有兩個：Node 22 以上、
+機器上有 Chrome（找不到時設 `SUNNY_CHROME` 指路）。
+
+兩支都以結束碼表示結果，各自把完整結果寫成同目錄的 JSON。
+`SUNNY_HEADFUL=1` 可以看著它跑。
+
+> 2026-08-05：這兩支原本一支在暫存目錄、一支寫死了別台機器的 puppeteer 路徑，
+> 因此都活不過一次關機。稽核腳本活得比工作副本久，就不能相依於工作副本裡的東西。
+
 ### 記錄方式
 
 發現問題時記下五件事：哪一頁、做了什麼、預期什麼、實際看到什麼、console 有無紅字。
@@ -90,6 +110,8 @@ cd frontend && npm run dev                                 # http://localhost:51
 > **2026-08-04 已用真實 Chrome 量過**：21 頁 × 6 個寬度 = 126 次量測，
 > 每一頁都先確認渲染成功才計數。結果見下方「已量到的」。
 > 剩下需要人眼的只有「內容不重疊、按鈕不擠成一團」——那是版面美感，量不出來。
+>
+> 重跑：`node specs/001-booking-site/checklists/responsive-audit.mjs`
 
 寬度：`320` / `375` / `768` / `1024` / `1440` / `1920`
 
@@ -98,10 +120,15 @@ cd frontend && npm run dev                                 # http://localhost:51
       1024px 以上 3 張
 - [x] 後台表格在窄螢幕可橫捲，且捲動的是**表格自己**，不是整頁
 - [ ] **⚠️ 未通過**：後台「內容編輯」的首頁主視覺預覽在 **1024／1440／1920px**
-      向右超出約 129px（`img.absolute inset-0`、遮罩層與 `h1「Sunny 訂房平台」`），
-      而該處**沒有任何可捲容器**——被 `body` 的 `overflow-x: clip` 裁掉且拿不回來。
-      320／375／768px 正常。原因是滿版主視覺以視窗寬度破出，但在後台被放進了
-      比視窗窄的內容欄（側欄 15rem + 間距）。屬 T142 範圍。
+      向右超出約 136px（`section.relative.left-1/2.w-screen.-translate-x-1/2`，
+      內含遮罩層與 `h1「Sunny 訂房平台」`），而該處**沒有任何可捲容器**——被
+      `body` 的 `overflow-x: clip` 裁掉且拿不回來。320／375／768px 正常。
+      原因是滿版主視覺以 `w-screen`（100vw）破出，但在後台被放進了比視窗窄的
+      內容欄（側欄 15rem + 間距），`left-1/2` 與 `-translate-x-1/2` 於是不再相消。
+      屬 T142 範圍。
+
+      2026-08-05 重測仍在，且**只剩這一項**：126 次量測其餘全數乾淨。
+      數字由 129px 改為 136px，差的 7px 是捲軸——見下方「捲軸」。
 
 #### ⚠️ 判準：問「有沒有內容拿不到」，不要問 scrollWidth
 
@@ -111,6 +138,18 @@ cd frontend && npm run dev                                 # http://localhost:51
 |---|---|
 | `scrollWidth > clientWidth` | **假陽性**。表格待在自己的 `overflow-x-auto` 裡橫捲是設計如此，`documentElement.scrollWidth` 照樣算進去。實測後台十二個模組全被誤報 |
 | `window.scrollX > 0` | **假陰性**。`body` 的 `overflow-x: clip` 會傳播到視窗層，頁面根本捲不動，於是「內容被裁掉且拿不回來」看起來跟沒事一樣 |
+
+#### ⚠️ 捲軸：稽核時 MUST NOT 用 `--hide-scrollbars`
+
+2026-08-05 踩到，值得寫下來。開著 `--hide-scrollbars` 跑，320px 會真的是
+320px，`innerWidth`、`clientWidth`、`100vw` 三者一致，看起來乾淨——但**版面的
+containing block 仍然扣掉了捲軸那 15px**。於是首頁主視覺被量成「向左偏 7px」
+（7 就是 15/2），六個寬度各報一筆，共 6 筆全是假的。
+
+關掉之後同一個元素是 `left: 0`、`width: clientWidth`，分毫不差。
+
+判準跟上面同一條：**要量的是使用者真正看到的版面，而使用者的瀏覽器有捲軸。**
+把捲軸藏起來等於在量一個沒有人會看到的版面。`lib/cdp.mjs` 因此預設不藏。
 
 正確的問法：某個元素超出視窗了嗎？若是，往上找有沒有一個**本身在視窗內**的
 可橫向捲動祖先。有 → 使用者捲得到；沒有 → 那段內容就是不見了。
@@ -157,7 +196,9 @@ cd frontend && npm run dev                                 # http://localhost:51
         **沒有指出是哪一欄錯**，符合 Login.tsx 的設計意圖與 FR-013。
       - 除了刻意觸發的那個 401 之外，前端沒有噴出任何自己寫的紅字或黃字。
       - 另有 9 筆 `ERR_ABORTED`，全部落在登入後與換頁時的 in-flight 請求上；
-        這是 React Query 在元件卸載時取消請求的正常行為，**不是錯誤**。
+        這是 `useAsync`／`AuthContext` 在元件卸載時 `controller.abort()` 的
+        正常行為，**不是錯誤**。（2026-08-05 更正：原文寫成 React Query，
+        但這個專案並沒有這個相依。）
 
       分類是必要的：Chrome 對任何非 2xx 都會自己印一行 "Failed to load
       resource"。把那一行算成「console 紅字」的話，任何錯誤路徑的測試都

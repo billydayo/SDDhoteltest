@@ -39,3 +39,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# 稽核腳本的執行產物。**結論寫在 browser-acceptance.md**，這兩份是給當次除錯用的
+# 原始資料：每跑一次就全部重寫，進版控只會是一長串讀不出意義的 diff。
+specs/001-booking-site/checklists/responsive-audit.json
+specs/001-booking-site/checklists/t181_flows.json

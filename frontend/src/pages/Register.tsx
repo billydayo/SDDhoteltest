@@ -26,7 +26,7 @@ import { GoogleButton } from '../components/GoogleButton'
 import { PasswordWarning } from '../components/PasswordWarning'
 import { messageFor } from '../lib/errors'
 import { inputClass, useFieldFocus } from '../lib/form'
-import { redirectTargetOf } from '../lib/redirect'
+import { pendingFavoriteOf, redirectTargetOf } from '../lib/redirect'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
 import { primaryButtonClass } from '../lib/surfaces'
@@ -53,6 +53,10 @@ export function Register() {
 
   const badField = useFieldFocus(formRef, error)
   const back = redirectTargetOf(location.state)
+  // FR-093：把「還沒做完的收藏」原樣轉交給目的地。少了它，使用者回到那間房
+  // 之後會發現它並沒有被收藏——而他確實按過了。
+  const pendingFavorite = pendingFavoriteOf(location.state)
+  const forward = pendingFavorite === null ? undefined : { pendingFavoriteRoomId: pendingFavorite }
 
   async function handleSubmit() {
     setError(null)
@@ -65,7 +69,7 @@ export function Register() {
     setBusy(true)
     try {
       await register({ email, password, displayName })
-      await navigate(back, { replace: true })
+      await navigate(back, { replace: true, state: forward })
     } catch (cause) {
       // ⚠️ **這裡只設錯誤，什麼都不清**（FR-083）。email 撞號時使用者要改的
       // 只有 email，把顯示名稱與兩次密碼一併清掉會讓他直接放棄。
@@ -75,7 +79,7 @@ export function Register() {
     }
   }
 
-  if (status === 'authenticated' && user) return <Navigate to={back} replace />
+  if (status === 'authenticated' && user) return <Navigate to={back} replace state={forward} />
 
   const message = error ? messageFor(error) : null
   const fieldError = (name: string) => (badField === name ? (message?.detail ?? null) : null)

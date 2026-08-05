@@ -31,7 +31,7 @@ import { LoginReasonNotice } from '../components/LoginReasonNotice'
 import { PasswordWarning } from '../components/PasswordWarning'
 import { messageFor } from '../lib/errors'
 import { inputClass } from '../lib/form'
-import { redirectTargetOf } from '../lib/redirect'
+import { pendingFavoriteOf, redirectTargetOf } from '../lib/redirect'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
 import { insetClass, primaryButtonClass } from '../lib/surfaces'
@@ -81,6 +81,10 @@ export function Login() {
   const [busy, setBusy] = useState(false)
 
   const back = redirectTargetOf(location.state)
+  // FR-093：把「還沒做完的收藏」原樣轉交給目的地。少了它，使用者回到那間房
+  // 之後會發現它並沒有被收藏——而他確實按過了。
+  const pendingFavorite = pendingFavoriteOf(location.state)
+  const forward = pendingFavorite === null ? undefined : { pendingFavoriteRoomId: pendingFavorite }
 
   async function handleSubmit() {
     setBusy(true)
@@ -89,7 +93,7 @@ export function Login() {
       await login({ email, password })
       // ⚠️ `replace`：登入頁不該留在返回堆疊裡。否則使用者登入後按上一頁
       // 又回到登入畫面，而他明明已經登入了。
-      await navigate(back, { replace: true })
+      await navigate(back, { replace: true, state: forward })
     } catch (cause) {
       // FR-083：**MUST 保留已填內容。** 這裡什麼都不清——email 留著，
       // 使用者只要改密碼就好。
@@ -101,7 +105,7 @@ export function Login() {
 
   // 已經登入的人不該再看到登入表單——他會以為自己被登出了。
   // 放在 hooks 之後才 return，順序才不會在兩次繪製之間改變。
-  if (status === 'authenticated' && user) return <Navigate to={back} replace />
+  if (status === 'authenticated' && user) return <Navigate to={back} replace state={forward} />
 
   const message = error ? messageFor(error) : null
 

@@ -16,21 +16,43 @@
  *
  * 也不要在卡片裡放兩個指向同一處的連結（圖片一個、標題一個）：讀屏使用者
  * 會聽到同一間房被念兩次。
+ *
+ * ## ⚠️ 收藏星號要蓋在那層可點區**之上**
+ *
+ * 上面那個 `after:inset-0` 撐滿整張卡，任何放在它之前的東西都會被它蓋住——
+ * 星號會看得到但按不到，而且**沒有任何錯誤**：點下去就是進房源詳情頁，
+ * 跟卡片其他地方一模一樣。使用者只會覺得「這個愛心壞了」。
+ *
+ * 因此星號 MUST 自己 `relative z-10`。覆蓋層沒有指定 `z-index`（auto），
+ * 一個定位過且 `z-10` 的兄弟元素就會贏。
  */
 import { Link } from 'react-router-dom'
 
 import type { Room } from '../api/types'
 import { formatTWD } from '../lib/money'
+import { useFavorites } from '../state/FavoritesContext'
+import { FavoriteButton } from './FavoriteButton'
 import { Rating } from './Rating'
 import { archPanelClass } from '../lib/surfaces'
 
 export function RoomCard({ room }: { room: Room }) {
   const cover = room.images[0]
+  const { isFavorited, setFavorited } = useFavorites()
 
   return (
     <article className={`group relative flex flex-col overflow-hidden ${archPanelClass} transition-shadow hover:shadow-card`}>
       {/* 圖片的上緣由 <article> 的 overflow-hidden 依拱形裁切，這裡不再重複裁一次 */}
-      <div className="overflow-hidden bg-surface-alt">
+      <div className="relative overflow-hidden bg-surface-alt">
+        <span className="absolute top-gap-2 right-gap-2 z-10">
+          <FavoriteButton
+            roomId={room.id}
+            favorited={isFavorited(room.id)}
+            variant="icon"
+            onChange={(favorited) => {
+              setFavorited(room.id, favorited)
+            }}
+          />
+        </span>
         {cover ? (
           <img
             src={cover}

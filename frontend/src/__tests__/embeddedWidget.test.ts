@@ -170,7 +170,7 @@ describe('⚠️ 正式站的 CSP 允許這個來源被嵌入', () => {
    * 那一段註解——測試於是在驗「註解寫對了嗎」，而 header 被刪掉照樣通過。
    */
   const csp = /Content-Security-Policy "([^"]*)"/.exec(caddyfile)?.[1] ?? ''
-  const frameSrc = /frame-src ([^;]+)/.exec(csp)?.[1].trim() ?? ''
+  const frameSrc = /frame-src ([^;]+)/.exec(csp)?.[1]?.trim() ?? ''
 
   it('Caddyfile 的 CSP 有 frame-src，且與元件的來源常數一致', () => {
     expect(csp).not.toBe('')

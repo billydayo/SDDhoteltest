@@ -16,6 +16,7 @@ import type {
   AdminRoom,
   AdminUser,
   DashboardStats,
+  FavoriteRoom,
   MyRefund,
   MyReview,
   Order,
@@ -234,6 +235,8 @@ export interface MockOptions {
    * 因此 `AuthContext` 必須分得出來（FR-084、FR-009d）。
    */
   meError?: MockError
+  /** `GET /favorites`。預設空清單——未登入或還沒收藏過都是這個狀態。 */
+  favorites?: FavoriteRoom[]
   rooms?: Room[]
   roomDetail?: RoomDetail
   vocabulary?: Vocabulary
@@ -444,6 +447,21 @@ export function mockApi(options: MockOptions = {}) {
     if (path.endsWith('/site-content')) {
       return Promise.resolve(json(options.siteContent ?? SITE_CONTENT))
     }
+    /*
+     * ⚠️ 收藏 MUST 在 `/rooms` 之前判斷。
+     *
+     * `POST /favorites/{roomId}` 不會撞到下面那條（它比對的是結尾的 `/rooms`），
+     * 但 `GET /favorites` 若落到最後的 fallthrough 就會回 404 NOT_MOCKED，
+     * 而症狀會出現在一個看起來與收藏無關的房源列表測試裡。
+     */
+    if (/\/favorites(\/|$)/.test(path)) {
+      if (method === 'POST' || method === 'DELETE') {
+        // 後端是冪等的：已收藏時再按一次不是錯誤
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      return Promise.resolve(json(options.favorites ?? []))
+    }
+
     if (path.endsWith('/rooms')) {
       roomQueries.push(query)
       const failure = options.onRooms?.(query)

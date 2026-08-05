@@ -24,20 +24,23 @@
  * 併在房源查詢裡的話，每切一次頁籤就要把整個房源（含照片、房態、品質檢測）
  * 重新拉一遍，而畫面上只有下面那一區要換。
  */
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { api } from '../api/client'
 import { REVIEW_CATEGORIES, type Availability, type PublicReview, type RiskCheck } from '../api/types'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingState } from '../components/LoadingState'
+import { FavoriteButton } from '../components/FavoriteButton'
 import { Rating } from '../components/Rating'
 import * as dates from '../lib/dates'
 import { formatTWD, previewTotal } from '../lib/money'
+import { pendingFavoriteOf } from '../lib/redirect'
 import { panelClass, primaryButtonClass, tagClass } from '../lib/surfaces'
 import { useAsync } from '../lib/useAsync'
 import type { LoginRedirectState } from '../router'
 import { useAuth } from '../state/AuthContext'
+import { useFavorites } from '../state/FavoritesContext'
 
 const AVAILABILITY_LABEL: Record<Availability, string> = {
   available: '可預訂',
@@ -56,7 +59,35 @@ const AVAILABILITY_CLASS: Record<Availability, string> = {
 export function RoomDetail() {
   const { roomId = '' } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const location = useLocation()
+  const { user, status } = useAuth()
+  const { isFavorited, setFavorited } = useFavorites()
+
+  /**
+   * FR-093：未登入時按星號 → 登入 → **回到這裡並把那次收藏補完**。
+   *
+   * ⚠️ 補完之後 MUST 把 location state 清掉。留著的話，使用者按上一頁再回來、
+   * 或重新整理，就會再補一次——而那一次多半是在他剛剛手動取消收藏之後，
+   * 於是星號自己亮回來，看起來像取消失敗。
+   *
+   * `pending` 只在「確實是這一間房」時才動作。使用者登入後可能已經走到別頁
+   * 再回來，那時候的 state 早就不是這一次的了。
+   */
+  const pending = pendingFavoriteOf(location.state)
+  useEffect(() => {
+    if (pending === null || pending !== roomId) return
+    if (status !== 'authenticated') return
+
+    // 先清 state，再送請求。中間任何一步失敗，歷史紀錄裡都已經是乾淨的
+    window.history.replaceState(null, '', `${location.pathname}${location.search}`)
+
+    setFavorited(roomId, true) // 樂觀更新，與 FavoriteButton 同一套做法
+    api.favorites.add(roomId).catch(() => {
+      // 補做失敗就退回。**MUST NOT 留著假的已收藏狀態**——使用者會在收藏清單裡
+      // 找不到他以為收藏過的房間（FR-084 禁止靜默失敗）
+      setFavorited(roomId, false)
+    })
+  }, [pending, roomId, status, setFavorited, location.pathname, location.search])
 
   // 使用者在此頁選的日期。僅用於試算與查詢當日房態，不會送出訂單。
   const [checkIn, setCheckIn] = useState(dates.tomorrow())
@@ -117,7 +148,16 @@ export function RoomDetail() {
                 {data.type} · 最多 {data.maxGuests} 人
               </p>
             </div>
-            <Rating value={data.averageRating} className="text-md" />
+            <div className="flex items-center gap-gap-3">
+              <Rating value={data.averageRating} className="text-md" />
+              <FavoriteButton
+                roomId={roomId}
+                favorited={isFavorited(roomId)}
+                onChange={(favorited) => {
+                  setFavorited(roomId, favorited)
+                }}
+              />
+            </div>
           </header>
 
           {data.description && (

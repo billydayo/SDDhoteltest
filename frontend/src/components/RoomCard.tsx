@@ -43,7 +43,21 @@ export function RoomCard({ room }: { room: Room }) {
     <article className={`group relative flex flex-col overflow-hidden ${archPanelClass} transition-shadow hover:shadow-card`}>
       {/* 圖片的上緣由 <article> 的 overflow-hidden 依拱形裁切，這裡不再重複裁一次 */}
       <div className="relative overflow-hidden bg-surface-alt">
-        <span className="absolute top-gap-2 right-gap-2 z-10">
+        {/*
+          ⚠️ **靠下緣，MUST NOT 改回 `top-*`。**
+
+          卡片的上緣是拱形（`arch-panel`：橫向半徑各 50%、縱向 3rem），而
+          `<article>` 帶 `overflow-hidden`。也就是說在最右側，卡片的實體要到
+          距頂端 3rem 才開始——放在 `top-gap-2 right-gap-2` 的東西幾乎整顆在
+          拱線之外，會被裁掉。這是實際回報的症狀。
+
+          `bottom-*` 另有一個不明顯的好處：本元件失敗時會在按鈕**下方**接一行
+          錯誤訊息（FR-084 禁止靜默失敗）。以下緣定位時，這個絕對定位盒是往上
+          長的，那行字因此仍在圖片範圍內；以 `top-*` 定位則會往下長，一旦超出
+          圖片高度就被同一個 `overflow-hidden` 吃掉——而那正是最需要被看見的
+          時候。
+        */}
+        <span className="absolute right-gap-2 bottom-gap-2 z-10">
           <FavoriteButton
             roomId={room.id}
             favorited={isFavorited(room.id)}

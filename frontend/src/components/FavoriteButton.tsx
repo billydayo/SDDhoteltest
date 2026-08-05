@@ -100,7 +100,17 @@ export function FavoriteButton({
         title={label}
         className={
           variant === 'icon'
-            ? 'rounded-pill border border-line-strong bg-surface/90 px-gap-2 py-gap-1 text-small transition-colors hover:border-brand disabled:opacity-50'
+            ? // ⚠️ **固定 44×44 的正圓，MUST NOT 改回內距撐出來的尺寸。**
+              //
+              // 原本是 `px-gap-2 py-gap-1 text-small`，量出來約 28×22——那是一顆
+              // 疊在照片上、要用拇指按的按鈕，而 44px 是觸控目標公認的下限。
+              // 內距寫法的問題不只是小：它的尺寸取決於字符的行高，換一個
+              // emoji 或改一次字級就會變成另一個大小，而沒有人會注意到。
+              //
+              // `rounded-full` 而不是 `rounded-pill`：正方形配 `rounded-full`
+              // 才保證是正圓。兩個圓角 utility 同時存在時誰贏取決於產生的 CSS
+              // 順序（同 `WithinReachFab` 檔頭記過的那件事）。
+              'grid size-11 place-items-center rounded-full border border-line-strong bg-surface/90 text-md transition-colors hover:border-brand disabled:opacity-50'
             : `rounded-pill border px-gap-4 py-gap-2 text-small transition-colors disabled:opacity-50 ${
                 favorited
                   ? 'border-brand bg-brand-soft text-brand-strong'

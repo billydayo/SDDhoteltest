@@ -75,6 +75,37 @@ describe('⚠️ 房源卡片上必須有收藏入口（FR-091、US10 情境 1�
     expect(wrapper?.textContent).toContain('♡')
   })
 
+  it('⚠️ 按鈕沒有被拱形上緣裁掉', () => {
+    /**
+     * 卡片的上緣是拱形（`arch-panel`：橫向半徑各 50%、縱向 3rem），而
+     * `<article>` 帶 `overflow-hidden`。在最右側，卡片的實體要到距頂端 3rem
+     * 才開始——所以 `top-*` 定位的星號幾乎整顆在拱線外，看起來像被切掉半顆。
+     *
+     * 這是實際被回報的症狀，而且**上一版的測試全綠**：按鈕在 DOM 裡、
+     * 有 z-10、按得到，只是使用者看不到完整的它。
+     *
+     * jsdom 不做繪製，量不到裁切，所以退而求其次驗定位方向——不完美，
+     * 但足以擋住「重構時順手改回 top-2 比較整齊」。
+     */
+    const { container } = renderCard()
+    const wrapper = container.querySelector('.z-10')
+    expect(wrapper?.className).toMatch(/\bbottom-/)
+    expect(wrapper?.className).not.toMatch(/\btop-/)
+  })
+
+  it('⚠️ 星號是可以用拇指按的大小', () => {
+    /**
+     * 原本是內距撐出來的 `px-gap-2 py-gap-1 text-small`，約 28×22——疊在照片上
+     * 的按鈕小到這個程度，在手機上會變成要按兩三次。
+     *
+     * 這裡釘的是 `size-11`（44px，觸控目標的公認下限）而不是「有沒有內距」：
+     * 內距寫法的尺寸取決於字符行高，換一個 emoji 或改一次字級就會悄悄變小。
+     */
+    renderCard()
+    const button = screen.getByRole('button', { name: '收藏此房源' })
+    expect(button.className).toMatch(/\bsize-11\b/)
+  })
+
   it('未登入時按下去被帶往登入頁（FR-093）', async () => {
     renderCard()
     await userEvent.click(await screen.findByRole('button', { name: '收藏此房源' }))

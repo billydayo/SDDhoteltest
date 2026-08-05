@@ -1,5 +1,28 @@
 <!--
 Sync Impact Report
+- Version change: 4.0.0 → 4.0.1
+- Bump rationale: PATCH。更新遷移計畫表中一列已被實作取代的事實陳述，並記錄
+  v4.0.0 遺留的「尚待同步」項目已於本次結清。不新增、移除或重新定義任何原則，
+  故為 PATCH——比照 v3.1.1 修正 `schema.sql` 誤述時的判定。
+- Corrected:
+  - 遷移計畫表「`supabase/seed*.sql` → 合規，MUST 保留（帳號密碼改為雜湊值）」一列。
+    該陳述已被 `backend/src/sunny/seed.py` 取代：後者以 argon2id 於執行時計算雜湊，
+    完整覆蓋原 seed*.sql 的內容，兩份並存即是兩個事實來源。改為 MUST 移除。
+    執行與修憲同日完成：T183 依「已被完整取代」的事實移除該批檔案，本次補上對應
+    的憲章修正。記在這裡而不是留在 tasks.md 的一個註腳裡，是因為遷移計畫表的每一列
+    都會被後續的人當成判準引用，判準改了就該在判準所在的地方看得到。
+  - 同列另註明 `supabase/reset-legacy.sql` MUST 保留，其用途已於 2026-08-04 改為
+    「將 Supabase 專案清空以便 `0001_initial.py` 從零建起」，服務的是現行架構。
+- v4.0.0「尚待同步」清單已結清（2026-08-05）：
+  - `spec.md`：US9 改寫為僅後台；FR-062 收斂至後台；FR-066、FR-086 立墓碑；
+    SC-015、SC-030 立墓碑；新增 FR-129 ~ FR-131（嵌入式第三方元件）。
+  - `tasks.md`：T144、T144a、T146 標記作廢；新增 T184 ~ T189。
+  - 另補上 v3.2.0 的版面寬度規範在規格側的缺口：新增 FR-132 與 T186。
+    該版新增的四條規範性條文自始沒有任何 FR/SC 或任務承載，實作
+    （`frontend/src/lib/surfaces.ts`）卻已存在——規格落後於程式碼。
+- 依據：2026-08-05 `/speckit-analyze` 的一致性分析，六項 CRITICAL 中的 D2 ~ D6。
+
+Sync Impact Report（前一版）
 - Version change: 3.2.0 → 4.0.0
 - Bump rationale: MAJOR。重新定義原則 VI 的一條，且該條原本明文寫著
   「此條不可放寬」。既有的合規實作（自建的前台照片安全檢測）轉為不合規並移除，
@@ -608,7 +631,8 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 | `supabase/schema.sql` → 38 條 RLS 政策 | 授權機制 | **MUST 移除**（見下方修正說明） |
 | `supabase/schema.sql` → 11 個函式 | 業務規則與守門 | 5 個純 PostgreSQL 者 MUST 保留；`is_admin`、`prevent_role_escalation`、`guard_order_transition`、`stamp_review_reply`、`stamp_message_sender` 與掛在 `auth.users` 上的 `handle_new_user` MUST 改寫或移除 |
 | `supabase/migrations.sql`（356 行） | 供舊資料庫補上後續變更 | 其內容已完整包含於 `schema.sql`（見該檔標頭）。初始 revision 建立後即無用途，MUST 移除 |
-| `supabase/seed*.sql` | 種子資料 | 合規，MUST 保留（帳號密碼改為雜湊值） |
+| `supabase/seed*.sql` | 種子資料 | **MUST 移除**（2026-08-05 修正）。已由 `backend/src/sunny/seed.py` 完整取代，後者於執行時以 argon2id 計算雜湊。兩份並存即兩個事實來源 |
+| `supabase/reset-legacy.sql` | 原為舊 schema 過渡 | **MUST 保留**。2026-08-04 起用途已改為「清空 Supabase 專案以便初始 revision 從零建起」，服務的是現行架構，不屬於本表要移除的舊實作 |
 | `tests/`（unit.js、e2e、rest） | 瀏覽器內測試 + puppeteer | 過渡期 MAY 保留供比對；後端測試 MUST 以 pytest 重建 |
 
 過渡期規則：
@@ -635,4 +659,4 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 在修復之前，主要按鈕 MUST NOT 被描述為符合 WCAG AA。
 移植至 Tailwind theme 時 MUST 一併處理此項，MUST NOT 把已知的不合規色值原樣搬過去。
 
-**Version**: 4.0.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-05
+**Version**: 4.0.1 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-05

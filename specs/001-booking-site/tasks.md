@@ -3,7 +3,7 @@
 **Input**: 設計文件來自 `/specs/001-booking-site/`
 
 **Prerequisites**: `plan.md`（必要）、`spec.md`（必要）、`data-model.md`、`quickstart.md`、
-`contracts/README.md`、`research.md`、`.specify/memory/constitution.md`（v3.1.1）
+`contracts/README.md`、`research.md`、`.specify/memory/constitution.md`（**v4.0.1**）
 
 **Organization**: 任務依使用者故事分組，讓每個故事都能獨立執行、測試與交付。
 
@@ -13,9 +13,14 @@
 前一版任務清單（119 項，原生 JS + 瀏覽器直連 Supabase + 雙軌 localStorage adapter）
 **已完全作廢**——那 119 項雖全部標記完成，但它們交付的是一個依新憲章已不合規的實作。
 
-**本次交付的性質**：這不是新功能，是**同一組需求的重新實作**。需求（155 條 FR、
-31 條有效 SC）在前一版堆疊上已完整驗收通過。任務的重心因此不是「要做什麼」，
-而是「哪些保證必須在換堆疊後依然成立」。
+**修訂 2026-08-05**：同步至憲章 **v4.0.1**（此前停在 v3.1.1，落後兩個版本）。
+T144、T144a、T146 作廢（前台自建照片檢測已整條移除）；T173 的稽核路徑更正；
+T066 完成；T183 由 `[X]` 改為 `[~]`；新增 Phase 17 的 T184 ~ T189。
+詳見各任務的行內註記。
+
+**本次交付的性質**：這不是新功能，是**同一組需求的重新實作**。需求（**154 條有效 FR、
+32 條有效 SC**，另有 5 條 FR 與 4 條 SC 為墓碑）在前一版堆疊上已完整驗收通過。
+任務的重心因此不是「要做什麼」，而是「哪些保證必須在換堆疊後依然成立」。
 
 **關於測試**：本清單**包含測試任務，且非選用**。憲章「自動化測試」節明訂三項強制：
 （1）原則 IV 的**每一條**日期與房況規則 MUST 有 pytest 覆蓋；
@@ -24,9 +29,16 @@
 
 ## Summary
 
-- 總任務數：**192**（Setup 10、Foundational 37、使用者故事 126、會員訊息 5、Polish 14）
-- 依故事分佈：US1 16、US2 16、US3 18、US4 12、US5 11、US6 14、US7 6、US8 7、
+- 總任務數：**203**（Setup 10、Foundational 38、使用者故事 130、會員訊息 5、
+  Polish 14、憲章同步 6）
+- 狀態：**193 完成**、4 作廢或條件未滿足（`[~]`）、6 待辦（`[ ]`）
+- 依故事分佈：US1 17、US2 19、US3 18、US4 12、US5 11、US6 14、US7 6、US8 7、
   US9 8、US10 4、US11 6、US12 8
+
+> **2026-08-05 更正**：上列數字原為「總 192、故事 126、US1 16、US2 16」，與實際
+> 逐行點算不符。原因是**字母後綴的補丁任務沒有被計入**（T019a、T021a、T061a、
+> T065a、T071a、T071b、T073a、T093a、T096a、T161a、T165a、T172a）——那些正是
+> 一致性分析與實跑後補上的任務，也就是最不該從統計裡消失的一批。
 
 **修訂 2026-08-04（`/speckit-analyze` 後）**：依一致性分析補上 8 項任務，
 編號採字母後綴（T021a、T065a…）以免重編既有的 183 個 ID 讓引用靜默失準。
@@ -45,7 +57,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 |---|---|---|
 | `EXCLUDE USING gist` 房況約束 | T015、T080 | 超賣不報錯，等到兩位客人同時抵達櫃台才發現 |
 | `admin_logs` 僅可新增 | T019、**T021a**、T160 | 無錯誤訊息，日誌只是變得可以竄改 |
-| 前台照片不離開瀏覽器 | T144、T144a、T146 | 使用者的私人照片被上傳，且沒有任何測試會失敗 |
+| ~~前台照片不離開瀏覽器~~ → **前台不索取照片** | ~~T144、T144a、T146~~ → **T187** | 保證的形式已於憲章 v4.0.0 改變：不再是「守住那條路徑上的每個出口」，而是「那條路徑不存在」。舊的三項任務已作廢 |
+| **嵌入元件不觸及 `localStorage`** | **T185** | 第三方程式讀走同一個 document 裡的 JWT，而人工查核在第三次更新時就會被跳過 |
 | **資料庫只有一個存取者** | **T019a** | RLS 移除後，公開的 anon key 經 PostgREST 讀寫全部資料表 |
 
 **T021a 是第二項保證的前提**：`REVOKE` 只對非擁有者生效。若 FastAPI 以資料表擁有者
@@ -56,7 +69,10 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 `- [ ] [TaskID] [P?] [Story?] 描述與檔案路徑`
 
 - **[P]**：可平行執行（不同檔案、不依賴未完成的任務）
-- **[Story]**：所屬使用者故事；Setup、Foundational、會員訊息與 Polish 階段不帶此標籤
+- **[Story]**：所屬使用者故事；Setup、Foundational、會員訊息、Polish 與憲章同步階段不帶此標籤
+- 狀態記號：`[ ]` 未開始／`[X]` 完成／**`[~]` 已作廢，或動作已執行但前置條件未滿足**
+  （2026-08-05 新增第三種。原本只有兩種，於是 T183「執行了但驗收沒過」只能勾成 `[X]`，
+  而那讓完成度統計看起來比實際樂觀）
 
 ---
 
@@ -97,7 +113,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T012 於 `backend/alembic/versions/0001_initial.py` 最前面寫入 `op.execute("create extension if not exists btree_gist")`；**MUST 為整支 revision 的第一個敘述**，缺了會在建立 gist 約束時失敗（research R2）
 - [X] T013 於 `backend/alembic/versions/0001_initial.py` 建立 12 張表，內容自 `supabase/schema.sql` 折入；**`profiles` MUST 取回身分欄位**：`id` 改為 `default gen_random_uuid()` 的自有主鍵、新增 `email text not null unique`、`password_hash text NULL`、`google_sub text unique`，並移除對 `auth.users` 的外鍵（data-model.md）
 - [X] T014 於 `backend/alembic/versions/0001_initial.py` 原樣折入全部 CHECK 約束與 24 個索引（含 `amenities`／`features` 的 GIN 索引、`site_content_singleton`）
-- [X] T015 於 `backend/alembic/versions/0001_initial.py` 以 `op.execute()` 原生 SQL 建立 `orders_no_overlap` 排除約束：`exclude using gist (room_id with =, daterange(check_in, check_out, '[)') with &&) where (status in ('pending-payment','confirmed','refund-pending'))`；**MUST NOT 依賴 autogenerate**
+- [X] T015 於 `backend/alembic/versions/0001_initial.py` 以 `op.execute()` 原生 SQL 建立 `orders_no_overlap` 排除約束：`exclude using gist (room_id with =, daterange(check_in, check_out, '[)') with &&) where (status in ('pending-payment','confirmed','refund-pending'))`；**MUST NOT 依賴 autogenerate**。這條約束就是 FR-025、FR-026 與 FR-082 的實際承載者——後端的預檢只負責訊息品質，保證在這裡；`where` 子句含 `pending-payment` 即 FR-097
 - [X] T016 於 `backend/alembic/versions/0001_initial.py` 原樣折入 5 個純 PostgreSQL 函式與其觸發器：`pending_payment_minutes()`、`expire_stale_orders()`、`refresh_room_rating()`、`enforce_refund_limit()`、`guard_message_update()`
 - [X] T017 於 `backend/alembic/versions/0001_initial.py` 寫入拆解後的 `guard_order_transition()`：**只保留不需身分的兩項守門**——不得對已逾期訂單付款、不得從任意狀態跳至 `confirmed`；「管理員可自由改狀態」的分支 MUST 移除，改由 FastAPI 判定（research R2）
 - [X] T018 於 `backend/alembic/versions/0001_initial.py` 寫入改寫後的 `stamp_review_reply()` 與 `stamp_message_sender()`：操作者改由後端明確傳入，MUST NOT 引用 `auth.uid()`
@@ -111,7 +127,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 - [X] T021 建立 `backend/src/sunny/config.py`：以 pydantic-settings 讀取全部環境變數；缺少必要變數時 MUST 於啟動時明確失敗，**`JWT_SECRET` MUST NOT 有預設值 fallback**
 - [X] T021a 於 `backend/alembic/versions/0001_initial.py` 建立**非擁有者**的應用連線角色 `sunny_app`，授予 12 張表的 `SELECT, INSERT, UPDATE, DELETE`（`admin_logs` 的 UPDATE／DELETE 隨後由 T019 收回）；於 `backend/.env.example` 與 `backend/src/sunny/config.py` 分離兩組連線字串：`DATABASE_URL`（應用，以 `sunny_app` 連線）與 `MIGRATION_DATABASE_URL`（遷移，以擁有者連線）。**應用 MUST NOT 以資料表擁有者身分連線**——擁有者保有隱含權限，`REVOKE` 對它形同無效，`admin_logs` 的僅可新增保證會安靜失效（research R1 對 RLS 提過同一陷阱，此處同樣適用）
-- [X] T022 建立 `backend/src/sunny/db.py`：async engine 與 session factory（asyncpg），MUST NOT 混用同步 engine
+- [X] T022 建立 `backend/src/sunny/db.py`：async engine 與 session factory（asyncpg），MUST NOT 混用同步 engine。**這是全系統唯一的資料庫存取點**，中央資料庫為六類資料的唯一來源（FR-077、憲章原則 III）
 - [X] T023 [P] 建立 `backend/src/sunny/models/profile.py` 與 `backend/src/sunny/models/room.py`（SQLAlchemy 2.0 `Mapped[...]` 宣告式）
 - [X] T024 [P] 建立 `backend/src/sunny/models/order.py`，於 `__table_args__` 以 `ExcludeConstraint` 宣告 `orders_no_overlap`（運算式以 `text()` 承載，供模型完整性；實際建立仍由 T015 負責）
 - [X] T025 [P] 建立 `backend/src/sunny/models/review.py` 與 `backend/src/sunny/models/refund.py`
@@ -122,7 +138,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T030 建立 `backend/src/sunny/errors.py`：`DomainError`／`InternalError` 型別，以及 `IntegrityError` → **以約束名稱分派**的轉譯層，涵蓋 `orders_no_overlap`(409)、`valid_date_range`(400)、`nights_matches_dates`(500)、`order_no` 唯一(500)、`profiles_email_key`(409)、`reviews_order_id_key`(409)；只看例外型別會把「夜數對不上」回成「已無空房」
   （2026-08-04 修訂：路徑由原訂的 `services/errors.py` 改為 `sunny/errors.py`。`utils/dates.py` 需要引用 `DomainError`，而 utils 匯入 services 是反向的分層）
 - [X] T031 建立 `backend/src/sunny/services/auth.py`：argon2id 雜湊與驗證（argon2-cffi，含 `check_needs_rehash`）、JWT 簽發與解析
-- [X] T032 建立 `backend/src/sunny/deps.py`：`get_current_user` 與 `require_admin`；**預設不是「公開」而是「需登入」**——新增路由時忘記標註 MUST 導致拒絕而非放行
+- [X] T032 建立 `backend/src/sunny/deps.py`：`get_current_user` 與 `require_admin`；訪客／會員／管理員三種角色的判定集中於此（FR-008）；**預設不是「公開」而是「需登入」**——新增路由時忘記標註 MUST 導致拒絕而非放行
 - [X] T033 建立 `backend/src/sunny/repositories/base.py`：session 取得與 `expire_stale_orders()` 的呼叫封裝；**三個呼叫點（查詢房況前、建立訂單前、讀取訂單列表前）MUST 收於 repository 層內部**，MUST NOT 交由各路由自行記得
 - [X] T034 建立 `backend/src/sunny/services/audit.py`：管理員變更寫入 `admin_logs` 的統一入口，**MUST 與變更在同一個交易內**；MUST NOT 記錄密碼、秘鑰或真實個資
 - [X] T035 [P] 建立 `backend/src/sunny/utils/dates.py`：Asia/Taipei 時區於程式內明確指定（MUST NOT 依賴伺服器本機時區）、日曆日以 `datetime.date` 承載、夜數計算、明日下限判定、半開區間重疊判定
@@ -170,7 +186,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 ### Implementation for User Story 1
 
 - [X] T048 [US1] 建立 `backend/src/sunny/repositories/rooms.py`：房源查詢與房態推導；**MUST 於查詢前呼叫 `expire_stale_orders()`**（contracts/README.md）
-- [X] T049 [US1] 建立 `backend/src/sunny/services/search.py`：FR-010 的條件式必填檢查、設施／特色以 jsonb 包含運算子做 AND 篩選、價格與評分排序
+- [X] T049 [US1] 建立 `backend/src/sunny/services/search.py`：FR-010 的條件式必填檢查、設施／特色以 jsonb 包含運算子做 AND 篩選、依每晚價格與平均評分排序且可切換遞增遞減（FR-011）
 - [X] T050 [US1] 於 `backend/src/sunny/repositories/rooms.py` 實作逐日房態推導：「已預訂」由該日期的有效訂單即時推導，**MUST NOT 寫入 `rooms.status` 欄位**；`status = 'maintenance'` 與已預訂等同排除（FR-015、FR-016、FR-051a）
 - [X] T051 [P] [US1] 建立 `backend/src/sunny/schemas/room.py`：`RoomOut` 明列輸出欄位；`average_rating` 為 null 時 MUST 保持 null，**MUST NOT 以 0 表示**（FR-047）
 - [X] T052 [US1] 建立 `backend/src/sunny/routers/rooms.py`：`GET /rooms`、`GET /rooms/{id}`，**MUST 明確標註為公開端點**
@@ -212,11 +228,15 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 
 ### Implementation for User Story 2
 
-- [ ] T066 [US2] 於 Google Cloud Console 建立 OAuth 2.0 client，將 client id／secret／redirect URI 填入 `backend/.env` 並更新 `backend/.env.example`；**client secret MUST 只存在於後端環境變數**
+- [X] T066 [US2] 於 Google Cloud Console 建立 OAuth 2.0 client，將 client id／secret／redirect URI 填入 `backend/.env` 並更新 `backend/.env.example`；**client secret MUST 只存在於後端環境變數**
+  （2026-08-05 完成。開發與正式站**共用同一組 OAuth 用戶端**，Console 的「已授權的重新導向 URI」同時列出 `http://localhost:8000/auth/google/callback` 與 `https://sunny.odootpe.org/api/auth/google/callback`。
+  ⚠️ **正式站那條 MUST 帶 `/api`**：API 在正式環境掛於 Caddy 的 `/api` 前綴之下，填成 `/auth/google/callback` 的話 Google 會把使用者送到一條 SPA 路由、拿到 `index.html`，畫面停在載入中而後端日誌一片空白。
+  ⚠️ **本項需要自有網域**：Google 對 `sslip.io`／`workers.dev` 這類公共後綴網域的授權有額外限制。這是本任務長期未完成的真正原因，不是忘了做。
+  ⚠️ 上線後才發現的相關缺陷：憑證留空時 `_require_google_config()` 會靜默把使用者導回登入頁、不寫任何日誌——已補入 `docs/deploy.md` 的疑難排解）
 - [X] T067 [US2] 建立 `backend/src/sunny/repositories/profiles.py`：以 email 與 `google_sub` 查詢、建立與更新 profile
 - [X] T068 [P] [US2] 建立 `backend/src/sunny/schemas/auth.py` 與 `backend/src/sunny/schemas/profile.py`：`ProfileOut` **MUST 明列輸出欄位**，MUST NOT 用 `from_attributes` 把 ORM 物件全欄位倒出去（data-model.md）
-- [X] T069 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/register`：argon2id 雜湊、6 字元下限、email 重複回 409；回應 MUST NOT 包含 `password_hash`
-- [X] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
+- [X] T069 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/register`：自助註冊需電子郵件、密碼與顯示名稱（FR-001）；argon2id 雜湊、6 字元下限、email 重複回 409（FR-002）；回應 MUST NOT 包含 `password_hash`
+- [X] T070 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `POST /auth/login`（FR-003 的登入端；登出與跨工作階段保留見 T075）：`password_hash is null` MUST 走獨立分支回覆「此帳號請以 Google 登入」，MUST NOT 落入一般的密碼比對失敗分支（data-model.md）
 - [X] T071 [US2] 於 `backend/src/sunny/routers/auth.py` 實作 `GET /auth/google` 與 `GET /auth/google/callback`：Authorization Code Flow，**code 交換由後端執行**；以 email 比對既有 profile 並補上 `google_sub`；使用者取消時導回登入頁且 MUST NOT 建立任何帳號（FR-087、FR-088、FR-090）
 - [X] T072 [US2] 於 `backend/src/sunny/routers/profiles.py` 實作 `GET /me` 與 `PATCH /me`（需登入）
 - [X] T073 [P] [US2] 建立 `frontend/src/pages/Login.tsx`：公開列出測試帳號與「本站為展示用專案，請勿使用你在其他網站的真實密碼」警語（FR-005、FR-006）
@@ -225,7 +245,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
   （按鈕 MUST 用 `window.location.assign` 而非 `navigate`——目的地是 Google 的網域，navigate 只會把它當成本站路徑而顯示「找不到這個頁面」。落點頁讀完片段 MUST 立刻 `history.replaceState` 抹掉：片段不進伺服器日誌，但會留在瀏覽器歷史。**MUST NOT 解 token 的 payload 當身分用**——那份 payload 未經驗證，且使用者可能在簽發後已被降權）
 - [X] T074 [P] [US2] 建立 `frontend/src/pages/Register.tsx`：失敗時 MUST 保留其他已填欄位
   （catch 區塊裡**只有 `setError`**，沒有任何 `setX('')`。email 撞號時他唯一要改的是 email，把顯示名稱與兩次密碼一併清掉會讓他直接放棄。「兩次密碼不一致」由前端擋——後端只收一個 `password`，它根本看不到這個問題；6 字元下限則不在前端重寫第二份規則）
-- [X] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除
+- [X] T075 [US2] 建立 `frontend/src/state/AuthContext.tsx`：token 存於 `localStorage`（憲章原則 III 允許 token、禁止業務資料）、登入狀態於關閉重開瀏覽器後保留、登出清除（FR-003、FR-071）
 - [X] T076 [US2] 建立 `frontend/src/pages/Account.tsx`：維護顯示名稱與聯絡電話，儲存後頁首與訂單資料中的顯示名稱同步更新（FR-007）
   （存檔成功後灌回 `AuthContext` 的是**後端回傳的** profile，不是送出的值——後端可能修剪空白，以送出的值為準會讓畫面顯示一份資料庫裡並不存在的內容。表單以 `key={user.id}` 一次性初始化而非用 effect 同步：那個 effect 會在 context 每次更新時重跑，症狀是使用者打字打到一半字被吃掉）
 - [X] T071a [US2] 修正 `backend/src/sunny/routers/auth.py`：`GET /auth/google` 與 `/auth/google/callback` MUST 回導向，MUST NOT 回 JSON（FR-087、FR-090）
@@ -259,7 +279,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T083 [US3] 建立 `backend/src/sunny/repositories/orders.py`：訂單讀寫；**建立訂單前與讀取訂單列表前 MUST 呼叫 `expire_stale_orders()`**
 - [X] T084 [US3] 建立 `backend/src/sunny/services/booking.py`：日期驗證、夜數計算、**總金額以 `int` 依當下房價計算並凍結於訂單上**（MUST NOT 用 `float`）、人數上限檢查（FR-024、FR-032）
 - [X] T085 [P] [US3] 於 `backend/src/sunny/services/booking.py` 實作 `order_no` 產生器：`SN` + 台北日期 + 序號，對使用者可見且唯一（FR-030）
-- [X] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；回應含 `expires_at` 供前端倒數
+- [X] T086 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders`（需登入）：套用 T030 的約束例外分派；訂單建立後 MUST 進入「待付款」並記錄保留到期時間（FR-096）；回應含 `expires_at` 供前端倒數
 - [X] T087 [US3] 於 `backend/src/sunny/routers/orders.py` 實作 `POST /orders/{id}/pay`：MUST 為訂單擁有者（非本人回 **403 而非 404**）；已逾期回 409 並說明該區間可能已被他人預訂（contracts/README.md）
 - [X] T088 [US3] 建立 `backend/src/sunny/repositories/settings.py`：讀取 `pending_payment_minutes()` 作為 `expires_at` 預設；**變更 MUST NOT 回溯影響既有訂單**（FR-098、FR-101）
 - [X] T089 [US3] 建立 `frontend/src/pages/Booking.tsx`：三步驟流程與步驟間往返，已填內容 MUST 被保留；重整行為 MUST 可預期（回到該步驟保留內容，或明確回到起點並告知），MUST NOT 呈現半殘狀態（FR-020、FR-021）
@@ -350,7 +370,7 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T124 [US6] 建立 `backend/src/sunny/services/room_photos.py` 與 `POST /admin/rooms/{id}/photos`（需管理員）：MUST 檢查檔案大小與 MIME 類型；取消編輯時本次已上傳但未保存的檔案 MUST 被清除，移除既有照片 MUST 於表單送出後才實際刪檔（FR-050e、FR-050f）
 - [X] T125 [US6] 建立 `frontend/src/pages/admin/AdminLayout.tsx`：後台佈局與十二個模組的導覽
 - [X] T126 [P] [US6] 建立 `frontend/src/pages/admin/Dashboard.tsx`
-- [X] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a~FR-050d）
+- [X] T127 [US6] 建立 `frontend/src/pages/admin/Rooms.tsx` 與 `frontend/src/components/ImageManager.tsx`：上限 8 張、第一張為封面、順序調整與逐張移除、本地上傳與圖片網址可混用；**上傳前 MUST 於瀏覽器內以 Canvas 縮圖轉檔，MUST NOT 上傳原始檔**（FR-050a、FR-050b、FR-050c、FR-050d——**逐條列出，MUST NOT 寫成範圍**，理由見 T148）
 - [X] T128 [P] [US6] 建立 `frontend/src/pages/admin/Orders.tsx`：搜尋、篩選與營運指標（訂單總數、已付款數、未付款取消數、成交率、總營業額、平均客單價）（FR-053）
 - [X] T129 [P] [US6] 建立 `frontend/src/pages/admin/Users.tsx`：會員資料維護與權限升降介面（FR-055）
 
@@ -414,15 +434,16 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 ### Tests for User Story 9
 
 - [X] T143 [P] [US9] 單元測試風險公式於 `frontend/src/lib/riskScore.test.ts`：`100 − (0.4×亮度 + 0.35×雜亂度 + 0.25×對比)`；等級切分 0–34 低／35–59 中／60–100 高；過暗、雜亂、正常三類樣本 MUST NOT 全部落在同一等級（FR-068、SC-016）
-- [X] T144 [P] [US9] 相依圖檢查於 `frontend/src/lib/__tests__/riskCheckIsolation.test.ts`：斷言 `frontend/src/pages/RiskCheck.tsx` 的相依圖中**不存在任何上傳模組或圖片端點呼叫**；此測試失敗即代表 SC-030 已失守（research R8、plan.md）
-- [X] T144a [P] [US9] **執行期**網路驗證於 `frontend/src/pages/__tests__/riskCheckNetwork.test.tsx`：以攔截器包住 `fetch` 與 `XMLHttpRequest`，於安全檢測頁完成一次完整分析後斷言**夾帶照片內容的請求數為 0**。與 T144 是不同的驗證面——T144 驗靜態相依（SC-030：不出現在儲存或資料表），本項驗執行期流量（SC-015）
+- [~] ~~T144 [P] [US9] 相依圖檢查於 `frontend/src/lib/__tests__/riskCheckIsolation.test.ts`~~ — **已作廢（2026-08-05，憲章 v4.0.0）**。它守的 `pages/RiskCheck.tsx` 已刪除，測試檔本身也已刪除。取代者為 T187（SC-034）
+- [~] ~~T144a [P] [US9] 執行期網路驗證於 `frontend/src/pages/__tests__/riskCheckNetwork.test.tsx`~~ — **已作廢（2026-08-05，同上）**。SC-015 已立墓碑。取代者為 T187
 
 ### Implementation for User Story 9
 
 - [X] T145 [US9] 建立 `frontend/src/lib/riskScore.ts`：純函式，以 Canvas 計算亮度、雜亂度、對比三項指標；兩條路徑共用「計算」
-- [X] T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`：**只 import `riskScore.ts`**；顯示預覽與亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級（FR-064）、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；照片僅於瀏覽器內處理、MUST NOT 送往任何外部服務或長期儲存（FR-066、FR-086）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；前台與後台皆提供此功能（FR-062）
+- [~] ~~T146 [US9] 建立 `frontend/src/pages/RiskCheck.tsx`~~ — **已作廢並反向執行（2026-08-05，憲章 v4.0.0）**：該頁已刪除。FR-062 收斂至後台、FR-066 立墓碑、FR-086 改寫為「前台 MUST NOT 向使用者索取任何私人照片」。原本掛在此處的 FR-063 ~ FR-065、FR-067 全數改由 T148 的管理端頁面承載
 - [X] T147 [US9] 於 `backend/src/sunny/routers/admin_rooms.py` 實作 `POST /admin/rooms/{id}/risk-checks`（需管理員）：**這是系統中唯一接收檢測圖片的端點**；MUST 檢查檔案大小與 MIME 類型（FR-104、FR-107）
-- [X] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
+- [X] T148 [US9] 建立 `frontend/src/pages/admin/RoomRisk.tsx`：上傳一張照片並顯示亮度／雜亂度／對比三項指標（FR-063）、總風險評分與等級、針對不合格指標的具體改善建議（FR-064）；拒絕非圖片檔與超出大小限制者並顯示明確錯誤（FR-065）；分析期間顯示處理中且畫面不凍結（FR-067）；連續上傳第二張時結果完全取代前一次；儲存前 MUST 明確告知「此圖將公開顯示於房源詳情頁」並需二次確認（FR-105）
+  （2026-08-05：FR-063 ~ FR-065、FR-067 原掛在已作廢的 T146 前台頁上，改由本任務承載。**逐條列出而非寫成 `FR-063 ~ FR-067`**——範圍寫法讓覆蓋率無法機械檢查，本次分析就是因此把 FR-050b／FR-050c 誤報為零覆蓋）
 - [X] T149 [US9] 於 `backend/src/sunny/services/room_photos.py` 實作重新檢測後**舊圖片不再對外可讀取**；房源詳情頁僅顯示最新一筆（FR-106、FR-107）
 
 **Checkpoint**: 差異化功能完成，且前台照片的禁令由結構而非紀律保證
@@ -517,7 +538,8 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T171 [P] 無障礙稽核 `frontend/src/` 全部元件與頁面：語意化標籤（MUST NOT 以 `div` + `onClick` 取代 `button`／`a`）、所有圖片有 `alt`、所有表單控制項有關聯 `<label>`、所有互動元素可鍵盤操作且有可見 focus 樣式（`outline-none` MUST NOT 被全域套用而不提供替代）；訂房流程 MUST 能純以鍵盤完成（憲章原則 V、SC-011）
 - [X] T172 [P] 響應式稽核 `frontend/src/pages/` 全部頁面：320px 至 1920px 之間無橫向捲動且內容不重疊；房源列表於窄螢幕改為直向堆疊（SC-012）
 - [X] T172a [P] 語言與格式稽核 `frontend/src/`：所有介面文字與錯誤訊息 MUST 為繁體中文（台灣用語），日期顯示格式 MUST 全站一致，金額 MUST 為新臺幣元且不出現小數（FR-069、FR-070）
-- [X] T173 [P] 對比度稽核 `frontend/tailwind.config.ts`：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
+- [X] T173 [P] 對比度稽核 `frontend/src/styles/index.css` 的 `@theme` 區塊：確認每個承載文字的顏色皆於註解標註對比度且達 WCAG AA；確認**品牌色為 `#7A6132` 而非 `#96793F`**，淡色文字若投入使用 MUST 改為 `#63706B`（憲章「已知不合規項目」）
+  （2026-08-05 更正路徑：原寫 `frontend/tailwind.config.ts`，**該檔從未存在**——T006 已決定 Tailwind v4 的 token 只留 CSS 這一份。稽核對象不存在卻標記完成，等於這項稽核的結論無從追溯，MUST 依新路徑重跑一次）
 - [X] T174 [P] 驗證前端無元件內直接 `fetch`：搜尋 `frontend/src/` 確認除 `api/client.ts` 外無任何 `fetch(` 呼叫，且 API 端點路徑未散落於各元件（憲章原則 III）
 - [X] T175 [P] 驗證後端無 SQL 或 ORM 查詢散落於路由：搜尋 `backend/src/sunny/routers/` 確認資料存取一律經 `repositories/`（憲章原則 III）
 - [X] T176 [P] 執行 `uv run ruff check .` 與 `uv run ruff format --check .` 至無錯誤；執行 `npm run lint` 與 `tsc --noEmit` 至無錯誤，且所有 `any` 皆有行內註解說明理由；一併確認 `frontend/package.json` 已宣告全部相依（**MUST NOT import 未宣告的間接相依**）、`frontend/src/styles/index.css` 未引入 CJK webfont、版控中無單檔超過 1 MB 的圖片（憲章前後端約束與品質標準）
@@ -527,16 +549,44 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
 - [X] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
 - [X] T182 重寫根目錄 `README.md`：前後端各自的啟動指令與必要環境變數；新進者 MUST 能只依 README 完成本機啟動（憲章「啟動說明」條）
-- [X] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
+- [~] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
 
-> ⚠️ **T183 於 2026-08-05 依指示提前執行**，當時 `browser-acceptance.md` 為 44/47 未驗。
-> 該清單**仍未通過**，勾選 T183 不代表驗收完成。行為比對的來源已改為 git 歷史，
-> 作法見該清單「T183 已於清單通過前執行」一節。
+> ⚠️ **狀態為 `[~]`（已執行，但前置條件未滿足），不是 `[X]`。**（2026-08-05 更正）
+>
+> T183 依指示提前執行，當時 `browser-acceptance.md` 為 44/47 未驗，而本任務在
+> 「Phase Dependencies」中明訂依賴 T179 與 T180 **通過**。原本勾成 `[X]` 讓同一個
+> 記號同時代表「動作做完了」與「條件滿足了」，而後者為假——這種混用會讓日後掃描
+> 完成度的人得到一個過度樂觀的答案。行為比對的來源已改為 git 歷史，作法見該清單
+> 「T183 已於清單通過前執行」一節。**驗收清單通過後才可改為 `[X]`。**
 >
 > `supabase/reset-legacy.sql` **刻意保留**：它已於 2026-08-04 改版，用途從「舊 schema
 > 過渡」變成「把 Supabase 專案清乾淨好讓 `0001_initial.py` 從零建起」——服務的是現行
-> 架構，不屬於本任務要移除的舊實作。憲章遷移計畫表第 494 列「`seed*.sql` MUST 保留」
-> 已被本任務推翻（`seed.py` 覆蓋其全部內容），該列待下次修憲時更正。
+> 架構，不屬於本任務要移除的舊實作。
+>
+> ✅ 憲章遷移計畫表「`seed*.sql` MUST 保留」一列已於同日的 **v4.0.1** 更新為
+> MUST 移除——`seed.py` 已完整取代其內容，兩份並存即兩個事實來源——並補記
+> `reset-legacy.sql` MUST 保留。兩邊現在一致。
+
+---
+
+## Phase 17: 憲章 v3.2.0／v4.0.1 同步（2026-08-05 新增）
+
+**Purpose**: 補上兩次修憲後在任務側留下的缺口。**六項全部是「規格落後於程式碼」**
+——實作都已存在，缺的是需求依據與能重跑的檢查。這個方向本身就是問題：
+沒有檢查的保證，會在下一次重構時無聲消失，而不會有任何測試變紅。
+
+- [ ] T184 [P] 複核嵌入式第三方元件的來源可追溯性與畫面標示（FR-129、FR-131）：於 `frontend/src/components/WithinReachFab.tsx` 檔頭確認已記錄**上游 repo、建置指令與來源 commit**（現為 `CHUN9701/within-reach`、`npm run build:widget`、`46341f1c`）；確認 `frontend/public/wr-widget.js` 已進版控且**未以 `<script src>` 指向外部主機**；確認浮窗內**明確標明該區塊由外部服務提供**
+  （2026-08-05：元件已由 `pages/WithinReach.tsx` 改為掛在 Layout 的浮球 `components/WithinReachFab.tsx`，本任務路徑同步更新。**初查該檔檔頭三項與畫面標示均已具備**，本任務因此是複核而非補建——但仍保留為待辦，因為浮窗的標示比整頁更容易在後續調版面時被當成雜訊移除）
+- [ ] T185 [P] 建立可重跑的相依圖查核於 `frontend/src/lib/__tests__/embeddedWidget.test.ts`（FR-130、SC-035）：掃描 `public/wr-widget.js` 建置產物，斷言 `fetch`／`XMLHttpRequest`／`WebSocket`／`sendBeacon` 與 `localStorage`／`sessionStorage`／`document.cookie` 的出現次數為 **0**
+  **這項的價值在於「更新版本時會自動失敗」**——憲章要求每次更新都重新查核，而人工查核在第三次更新時一定會被跳過。目前的查核結果寫在 `components/WithinReachFab.tsx` 的檔頭註解裡，那份紀錄正確但**是靜態的**：換掉 `wr-widget.js` 之後它不會自己變假。已知例外（指向 `images.unsplash.com` 的示範圖）MUST 以具名白名單放行，MUST NOT 放寬整條規則
+- [ ] T186 [P] 版面寬度稽核 `frontend/src/`（FR-132、SC-036）：確認頁首、主內容區、頁尾與主視覺內層**全部引用 `lib/surfaces.ts` 的同一個 `shellClass`**，全域搜尋確認外殼上無 `max-w-7xl` 之類的固定像素封頂；長文與單欄表單的區塊級 `max-w-*` 為正確用法，MUST NOT 一併移除
+  （憲章 v3.2.0 新增了四條規範性條文，卻沒有任何 FR/SC 或任務承載，實作先於規格存在。本項與 FR-132 是同一次補正）
+- [ ] T187 [P] 前台無照片輸入的自動檢查於 `frontend/src/pages/__tests__/noPublicFileInput.test.tsx`（FR-086、SC-034）：走訪前台全部路由，斷言可接受使用者檔案輸入的元素（`input[type=file]`、拖放接收區、`capture` 屬性）數為 **0**；管理端路由排除
+  **取代已作廢的 T144 與 T144a。** 舊測試要證明「送出去的東西裡沒有照片」，本項只要證明「沒有地方能放照片進來」——後者更難繞過，也不會因為頁面改名就失效
+- [ ] T188 跨裝置與工作階段持久性的驗收綁定（FR-009c、SC-009、SC-021，並一併綁定 SC-001、SC-002）：**SC-001（3 次互動內看到房源詳情）與 SC-002（3 分鐘內完成訂房）同樣沒有任何任務指向**，它們量測的是人的操作而非程式的輸出，因此歸屬手動清單而非自動化測試；SC-013（5 位受測者中至少 4 位獨力完成）為使用性研究，本專案範圍內 MUST 標記為不驗證而非假裝有覆蓋。另於 `checklists/browser-acceptance.md` 補上具名項目——同一帳號於 A、B 兩個瀏覽器登入後個人資料／訂單／評論／退款一致，以及關閉並重開瀏覽器後登入狀態保留
+  **這三條是換堆疊後最該重驗、卻唯一沒有任何任務指向的一組**。它們無法自動化（需要兩個真實瀏覽器工作階段），因此更需要在手動清單上有名字
+- [ ] T189 [P] 負向需求稽核（FR-040、FR-076）：確認退款流程中不存在任何金錢移轉的程式路徑；確認全站無蒐集真實身分證字號、真實金融資訊的欄位或資料表
+  **負向需求最容易在重構中被靜默違反**——沒有人會因為「多做了一件不該做的事」而看到測試失敗
 
 ---
 
@@ -552,6 +602,10 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - **Phase 3–14（US1–US12）**：皆依賴 Phase 2；彼此可平行
 - **Phase 15（會員訊息）**：依賴 Phase 2 與 T034（稽核寫入層）
 - **Phase 16（Polish）**：依賴所有目標故事完成；T183 額外依賴 T179 與 T180 通過
+  （⚠️ T183 已依指示先行執行，而 T179／T180 尚未通過，因此狀態為 `[~]` 而非 `[X]`）
+- **Phase 17（憲章同步）**：不依賴其他階段，可立即開始。T184 ~ T189 彼此獨立、
+  全部可平行。**六項全部是補檢查，不是補功能**——實作已存在，所以做完不會改變
+  站台的行為，只會讓下一次它壞掉的時候有東西變紅
 
 ### User Story Dependencies
 

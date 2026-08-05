@@ -154,6 +154,25 @@
     var(--radius-lg);
 }
 
+/*
+ * 藏起捲軸，但**保留捲動能力**（`components/HomeGallery.tsx` 的相簿軌道）。
+ *
+ * 這三行沒有一行是多餘的：`scrollbar-width` 是標準屬性、`-ms-overflow-style`
+ * 給舊 Edge、`::-webkit-scrollbar` 給 Safari 與 Chromium——三個引擎各認一種，
+ * 少任何一條就會有一個平台露出一條捲軸。Tailwind 沒有對應的 utility。
+ *
+ * ⚠️ 只有在**方向由其他元素表達**時才可以用（相簿下方有箭頭與進度條）。
+ * 單純為了好看藏掉捲軸，等於把「這裡可以捲」這件事藏起來。
+ */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;

@@ -21,7 +21,14 @@ afterEach(() => {
  * `no-unnecessary-condition` 擋下來，也等於為了測試環境去汙染正式碼。
  * 缺的東西補在這裡。
  *
- * 一律覆寫，不做「存在才補」的判斷：那個判斷在型別上永遠不成立。
+ * ⚠️ **`typeof window` 這道判斷不能省。** 這份 setup 對**每一個**測試檔都會跑，
+ * 而其中有四個標了 `@vitest-environment node`（掃原始碼、算對比度，不需要 DOM）。
+ * 在那個環境裡 `window` 根本不存在，少了判斷會是 `ReferenceError`，
+ * 而且那四個檔案會整包失敗在 setup 階段——錯誤訊息指向這裡，看起來卻像是
+ * 那些測試自己壞了。
+ *
+ * 不再多判斷 `window.matchMedia === undefined`：型別上它永遠有值，
+ * 那個比較會被 `no-unnecessary-condition` 擋下來。直接覆寫即可。
  *
  * `matches: false` 表示「不減少動態」，也就是測試看到的是預設行為。真要測
  * reduce-motion 的分支，由該測試自己覆寫這個 stub。
@@ -37,4 +44,6 @@ const matchMediaStub = (query: string) => ({
   dispatchEvent: vi.fn(() => false),
 })
 
-window.matchMedia = matchMediaStub
+if (typeof window !== 'undefined') {
+  window.matchMedia = matchMediaStub
+}

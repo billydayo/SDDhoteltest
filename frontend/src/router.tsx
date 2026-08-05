@@ -28,6 +28,7 @@ import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
+import { WithinReachFab } from './components/WithinReachFab'
 import { shellClass } from './lib/surfaces'
 import { Account } from './pages/Account'
 import { AuthCallback } from './pages/AuthCallback'
@@ -45,7 +46,6 @@ import { Register } from './pages/Register'
 import { ReviewForm } from './pages/ReviewForm'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
-import { WithinReach } from './pages/WithinReach'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { ADMIN_MODULES } from './pages/admin/modules'
 import { useAuth } from './state/AuthContext'
@@ -117,6 +117,9 @@ function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <Footer />
+      {/* 無障礙檢測的浮球。掛在 Layout 而非某一頁——它要在任何頁面都叫得出來，
+          包含正在看房源的時候（憲章 4.0.0：外部嵌入元件）。 */}
+      <WithinReachFab />
     </div>
   )
 }
@@ -155,13 +158,9 @@ export function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* 無障礙檢測。**公開**——這一頁不涉及身分，也不送出任何資料，
-            外部 widget 的資料全部打包在自己的 bundle 裡（見 `WithinReach.tsx`）。
-
-            路徑沿用 `/risk-check`：自建的照片安全檢測退場、改嵌 Within Reach
-            之後功能換了，但對外的網址不必跟著換——已發出去的連結、稽核腳本
-            與驗收清單都指向這裡。 */}
-        <Route path="/risk-check" element={<WithinReach />} />
+        {/* 無障礙檢測沒有自己的路由：它是 `Layout` 裡的浮球與浮窗
+            （`components/WithinReachFab.tsx`），在任何頁面都叫得出來。
+            `/risk-check` 這個舊網址隨自建檢測一併退場，現在會落到 404。 */}
         {/*
           Google 回程的落點。**公開**——抵達這裡的人正是還沒有身分的那個人，
           掛上 RequireAuth 會把他導去登入頁，而他手上的 token 就這樣掉了。

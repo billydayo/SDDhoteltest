@@ -257,10 +257,8 @@ try {
     ['收藏', '/favorites', '收藏'],
     ['客服訊息', '/messages', '客服'],
     ['帳戶設定', '/account', '帳戶'],
-    // 網址仍是 `/risk-check`，但內容已換成外部的 Within Reach widget。
-    // ⚠️ 標記字只比對頁面標題「無障礙檢測」——widget 的文字在 Shadow DOM 裡，
-    // `expectText` 走的 `document.body.textContent` 取不到。
-    ['無障礙檢測', '/risk-check', '無障礙檢測'],
+    // 無障礙檢測不在這裡：它沒有頁面，是每一頁都在的浮球
+    // （`components/WithinReachFab.tsx`）。
     ['服務條款', '/terms', '服務條款'],
   ]) {
     setStep(`F 走訪「${name}」`)

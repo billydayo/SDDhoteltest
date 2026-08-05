@@ -40,10 +40,8 @@ export function Header() {
           <NavLink to="/" className={linkClass} end>
             房源
           </NavLink>
-          {/* 無障礙檢測（Within Reach）。公開——不需要登入，也不送出資料。 */}
-          <NavLink to="/risk-check" className={linkClass}>
-            無障礙檢測
-          </NavLink>
+          {/* 無障礙檢測不在導覽列：它是隨處可叫出的浮球
+              （`components/WithinReachFab.tsx`），沒有對應的頁面。 */}
           {user && (
             <NavLink to="/orders" className={linkClass}>
               我的訂單

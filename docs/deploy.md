@@ -778,6 +778,23 @@ docker compose run --rm api alembic upgrade head
 ⚠️ **`--build` 不能省。** 前端是建置時固定下來的靜態檔，少了它 Caddy 會拿著
 上一次的映像繼續跑：網站正常、內容是舊的、沒有任何錯誤訊息。
 
+⚠️ **`--build` 也還不夠。** `up` 是否重建容器，看的是「服務要用的映像有沒有
+變」，不是「執行中的容器跑的是不是那個映像」。這兩件事會分岔——2026-08-05 在
+正式機上實測，api 容器掛著一個早已不存在的映像 ID，而 `sunny-api:latest` 因為
+建置全部命中快取而沒變，於是 `up -d` 一次又一次回報 `Running` 卻不動它。想確定
+新版真的上線就加 `--force-recreate`：
+
+```bash
+docker compose up -d --build --force-recreate
+```
+
+查現況（容器跑的映像 vs 目前的映像，兩者 MUST 相同）：
+
+```bash
+docker inspect -f '{{.Image}}' sunny-api-1
+docker image inspect -f '{{.Id}}' sunny-api:latest
+```
+
 裝了下一節的自動部署之後，這一段就只剩「想立刻生效、不等那兩分鐘」時才用得到。
 
 ### 自動部署（push 到 GitHub 就會更新網站）
@@ -801,7 +818,7 @@ git pull
 # 依據正是「兩者不一致」——它接手後只會看到沒有差異，於是什麼都不做。若這台
 # 機器目前跑的映像落後於 repo（多半如此，畢竟正是為此才要裝自動部署），
 # 那個落差會就這樣留著，直到下一次有人推 commit 才被順手補上。
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 
 # ⚠️ 用 symlink 而不是 cp。複製過去的話，日後改了 repo 裡的 unit 檔，
 #    systemd 讀的還是當初那份副本——而且沒有任何跡象顯示兩者已經不同。

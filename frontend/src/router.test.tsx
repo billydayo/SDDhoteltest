@@ -12,7 +12,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setToken } from './api/client'
+import { getToken, setToken } from './api/client'
 import { AppRoutes } from './router'
 import { AuthProvider } from './state/AuthContext'
 import { ADMIN, MEMBER, mockApi } from './test/mockApi'
@@ -157,6 +157,75 @@ describe('頁首導覽', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: '後台' })).toBeInTheDocument()
     })
+  })
+})
+
+describe('⚠️ 後端不可用 MUST NOT 被表現為「你沒登入」（FR-084、FR-009d）', () => {
+  /**
+   * 這一組來自一次**正式站的實測**。2026-08-05 部署期間 Caddy 對 `/api/me` 回了
+   * 四個 502，稽核腳本裡的管理員工作階段當場被判定為未登入、丟到登入頁。
+   *
+   * 當時 `AuthContext` 把 `/me` 的所有失敗都收斂成 `anonymous`，註解還寫著
+   * 「後端沒開⋯⋯都當成未登入處理」。那個決定在「整站仍可瀏覽」這件事上是對的，
+   * 在「告訴使用者發生什麼事」這件事上是錯的——而後者才是 FR-084 要的。
+   *
+   * **失敗的樣子**：使用者的 token 完全有效，卻被要求重新登入；他輸入正確的
+   * 密碼，那次登入同樣失敗（後端還是沒回應）。兩次挫折，零個有用的資訊。
+   */
+  const GATEWAY_DOWN = {
+    status: 502,
+    body: { detail: '上游無回應。', code: 'BAD_GATEWAY' },
+  }
+
+  it('502 時顯示可理解的訊息，MUST NOT 導向登入頁', async () => {
+    setToken('fake-token')
+    mockApi({ profile: ADMIN, meError: GATEWAY_DOWN })
+    renderAt('/admin')
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('目前無法確認登入狀態')
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('你並沒有被登出')
+    expect(screen.queryByRole('heading', { level: 1, name: '登入' })).not.toBeInTheDocument()
+  })
+
+  it('⚠️ token MUST NOT 被清掉——它多半還是好的', async () => {
+    setToken('fake-token')
+    mockApi({ profile: MEMBER, meError: GATEWAY_DOWN })
+    renderAt('/orders')
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+    // 清掉它，等於把一次幾秒鐘的伺服器抖動變成一次真正的登出
+    expect(getToken()).toBe('fake-token')
+  })
+
+  it('需登入的一般頁面同樣不被導向登入頁', async () => {
+    setToken('fake-token')
+    mockApi({ profile: MEMBER, meError: GATEWAY_DOWN })
+    renderAt('/favorites')
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('目前無法確認登入狀態')
+    })
+    expect(screen.queryByRole('heading', { level: 1, name: '登入' })).not.toBeInTheDocument()
+  })
+
+  it('⚠️ 401 仍然導向登入頁（迴歸保護）', async () => {
+    /**
+     * 上面三條容易被「修」成「任何錯誤都顯示錯誤畫面」，那會走到另一個極端：
+     * token 真的過期時，使用者看到的是「伺服器沒有回應」，然後永遠等不到
+     * 它回應——因為問題根本不在伺服器。401 是唯一表示「你確實沒登入」的訊號。
+     */
+    setToken('expired-token')
+    mockApi({ profile: null })
+    renderAt('/orders')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: '登入' })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

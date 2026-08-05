@@ -26,14 +26,27 @@ import {
   type ReactNode,
 } from 'react'
 
-import { api, getToken, setToken } from '../api/client'
+import { ApiError, api, getToken, setToken } from '../api/client'
 import type { LoginInput, Profile, RegisterInput } from '../api/types'
 
 interface AuthState {
   /** `null` = 未登入。`status` 為 `loading` 時尚未判定，MUST NOT 據此導向。 */
   user: Profile | null
-  /** `loading` 期間畫面 MUST 顯示載入中，MUST NOT 閃一下登入頁再跳回來。 */
-  status: 'loading' | 'authenticated' | 'anonymous'
+  /**
+   * `loading` 期間畫面 MUST 顯示載入中，MUST NOT 閃一下登入頁再跳回來。
+   *
+   * ⚠️ **`unavailable` 與 `anonymous` MUST 分開**（FR-084、FR-009d）。
+   *
+   * 兩者在畫面上長得很像（都不能進需登入的頁面），但**告訴使用者的事情完全
+   * 相反**：`anonymous` 是「你沒登入」，`unavailable` 是「我們連不到伺服器」。
+   * 混為一談的代價是一個 token 還完全有效的人被丟到登入頁，而他會去嘗試自己
+   * 明明正確的密碼——然後那次登入也會失敗，因為後端根本沒回應。
+   *
+   * 2026-08-05 實測到這個情境：正式站部署期間 Caddy 對 `/api/me` 回了四個 502，
+   * 稽核腳本裡的管理員工作階段當場被判定為未登入。當時的程式碼把 `/me` 的
+   * **所有**失敗都收斂成 `anonymous`，註解還寫著「後端沒開⋯⋯都當成未登入處理」。
+   */
+  status: 'loading' | 'authenticated' | 'anonymous' | 'unavailable'
   login: (input: LoginInput) => Promise<Profile>
   register: (input: RegisterInput) => Promise<Profile>
   /**
@@ -78,10 +91,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        // token 失效（client.ts 已清掉），或後端沒開。兩者都當成未登入處理：
-        // 未登入時整站仍可瀏覽，比卡在載入中好。
         setUser(null)
-        setStatus('anonymous')
+
+        /**
+         * ⚠️ **401 才是「你沒登入」；其餘一律是「我們連不到伺服器」。**
+         *
+         * `client.ts` 當初刻意把 `NetworkError` 與 `ApiError` 分開（見 T038 的
+         * 註記：「否則伺服器沒開時使用者會讀到一句莫名的業務錯誤」），而這裡
+         * 曾經把那個區分整個丟掉——偏偏這是它最要緊的一處。
+         *
+         * 只有 401 表示 token 真的不管用了（`client.ts` 也已在該情形清掉它）。
+         * 502／503 是後端暫時不在（部署、重啟、資料庫斷線），`NetworkError`
+         * 是根本沒連上。這兩種情況下 token **MUST NOT 被清掉**：它多半還是好的，
+         * 清掉等於把一次幾秒鐘的伺服器抖動變成一次真正的登出。
+         */
+        const unauthorized = error instanceof ApiError && error.status === 401
+        setStatus(unauthorized ? 'anonymous' : 'unavailable')
       })
     return () => {
       controller.abort()

@@ -19,9 +19,17 @@ interface ErrorStateProps {
   onRetry?: () => void
   /** 覆寫標題。預設依錯誤種類決定。 */
   title?: string
+  /**
+   * 覆寫說明文字。預設依錯誤種類決定。
+   *
+   * 只在**通用訊息會誤導人**時才用。目前唯一的使用者是登入狀態確認失敗
+   * （`router.tsx` 的 `AuthUnavailable`）：那裡需要說一句 `messageFor` 不可能
+   * 知道的話——「你並沒有被登出」。少了它，使用者會合理地以為自己要重新登入。
+   */
+  detail?: string
 }
 
-export function ErrorState({ error, onRetry, title }: ErrorStateProps) {
+export function ErrorState({ error, onRetry, title, detail }: ErrorStateProps) {
   const message = messageFor(error)
 
   return (
@@ -32,7 +40,7 @@ export function ErrorState({ error, onRetry, title }: ErrorStateProps) {
       className="mx-auto max-w-md rounded-lg border border-danger/20 bg-danger-soft p-gap-5 text-center"
     >
       <h2 className="font-display text-h3 text-danger">{title ?? message.title}</h2>
-      <p className="mt-gap-2 text-body text-ink-muted">{message.detail}</p>
+      <p className="mt-gap-2 text-body text-ink-muted">{detail ?? message.detail}</p>
       {onRetry && (
         <button
           type="button"

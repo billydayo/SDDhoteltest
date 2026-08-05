@@ -226,6 +226,14 @@ function isMockError(result: object): result is MockError {
 
 export interface MockOptions {
   profile?: Profile | null
+  /**
+   * `GET /me` 直接回這個錯誤，**優先於 `profile`**。
+   *
+   * 用來模擬「token 還好好的，但後端暫時不在」——部署、重啟、資料庫斷線。
+   * 這個情境與 401 在畫面上長得很像，但要告訴使用者的話完全相反，
+   * 因此 `AuthContext` 必須分得出來（FR-084、FR-009d）。
+   */
+  meError?: MockError
   rooms?: Room[]
   roomDetail?: RoomDetail
   vocabulary?: Vocabulary
@@ -325,6 +333,11 @@ export function mockApi(options: MockOptions = {}) {
     }
 
     if (path.endsWith('/me')) {
+      // ⚠️ `meError` MUST 先於 `profile` 判斷：要模擬的正是「token 有效、
+      // 但伺服器回不了話」，那個情境下兩者會同時存在
+      if (options.meError) {
+        return Promise.resolve(json(options.meError.body, options.meError.status))
+      }
       return Promise.resolve(
         options.profile
           ? json(options.profile)

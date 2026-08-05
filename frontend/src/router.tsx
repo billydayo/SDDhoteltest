@@ -27,6 +27,7 @@ import {
 import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
+import { ErrorState } from './components/ErrorState'
 import { LoadingState } from './components/LoadingState'
 import { WithinReachFab } from './components/WithinReachFab'
 import { shellClass } from './lib/surfaces'
@@ -64,6 +65,28 @@ export interface LoginRedirectState {
 // ---------------------------------------------------------------------------
 // 守衛
 // ---------------------------------------------------------------------------
+/**
+ * 後端不可用時的畫面（FR-084）。
+ *
+ * ⚠️ **MUST NOT 導向登入頁。** 使用者的 token 多半還是好的，是伺服器暫時不在。
+ * 把他送去登入頁等於告訴他「你沒登入」，於是他會去輸入自己明明正確的密碼
+ * ——而那次登入也會失敗，因為後端根本沒回應。兩次挫折，零個有用的資訊。
+ */
+function AuthUnavailable() {
+  return (
+    <ErrorState
+      error={null}
+      title="目前無法確認登入狀態"
+      detail="伺服器暫時沒有回應，你並沒有被登出。稍候重新載入即可繼續。"
+      onRetry={() => {
+        // 整頁重載會重跑 `AuthProvider` 的開機檢查，比在 context 裡另開一條
+        // 重試路徑簡單得多——而這個畫面本來就只在後端不在時出現
+        window.location.reload()
+      }}
+    />
+  )
+}
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { status } = useAuth()
   const location = useLocation()
@@ -71,6 +94,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   // ⚠️ 判定完成前 MUST NOT 導向。直接把 loading 當成未登入，重新整理任何一個
   // 需登入的頁面都會先閃一下登入頁再跳回來——使用者會以為自己被登出了。
   if (status === 'loading') return <LoadingState label="確認登入狀態…" />
+
+  if (status === 'unavailable') return <AuthUnavailable />
 
   if (status === 'anonymous') {
     return <Navigate to="/login" replace state={{ from: location } satisfies LoginRedirectState} />
@@ -83,6 +108,8 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
   const location = useLocation()
 
   if (status === 'loading') return <LoadingState label="確認登入狀態…" />
+
+  if (status === 'unavailable') return <AuthUnavailable />
 
   if (status === 'anonymous') {
     return <Navigate to="/login" replace state={{ from: location } satisfies LoginRedirectState} />

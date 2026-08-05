@@ -19,7 +19,32 @@ import fs from 'node:fs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const puppeteer = require('C:/Users/user/Desktop/0804/SDDhoteltest/tests/node_modules/puppeteer-core')
+
+/**
+ * puppeteer-core 不是本專案的相依。
+ *
+ * 這支腳本是驗收工具，不是應用程式的一部分——憲章不允許為了驗收在
+ * `frontend/package.json` 塞一個正式程式碼永遠不會 import 的套件。T183 移除的
+ * 舊 `tests/` 目錄曾把它宣告為 devDependency，該目錄刪除後就沒有任何地方宣告它了。
+ *
+ * 所以要跑這支腳本，得自己準備一份，再用 SUNNY_PUPPETEER 指過去：
+ *   npm i -D puppeteer-core           # 裝在任何一個暫存目錄都行
+ *   SUNNY_PUPPETEER=<該目錄>/node_modules/puppeteer-core node t181-walkthrough.mjs
+ *
+ * 先前這裡寫死一條指向另一份 checkout 的絕對路徑，那份 checkout 已不存在——
+ * 亦即腳本在 T183 之前就跑不動了，不是刪除造成的。
+ */
+const puppeteerPath = process.env.SUNNY_PUPPETEER ?? 'puppeteer-core'
+let puppeteer
+try {
+  puppeteer = require(puppeteerPath)
+} catch {
+  console.error(
+    `找不到 puppeteer-core（試的是 ${puppeteerPath}）。\n` +
+      '請先 npm i -D puppeteer-core，再以 SUNNY_PUPPETEER 指向該 node_modules/puppeteer-core。'
+  )
+  process.exit(2)
+}
 
 const BASE = process.env.SUNNY_BASE ?? 'http://localhost:5173'
 

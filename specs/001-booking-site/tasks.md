@@ -527,7 +527,16 @@ SC-026 的稽核完整性測試，以及 `<app_role>` 佔位符的定案（T021a
 - [X] T180 執行 `specs/001-booking-site/quickstart.md` 的 V1–V8 全部驗證情境並記錄結果；全部 MUST 通過才算環境正常
 - [X] T181 走訪 `frontend/src/pages/` 全部頁面的正常操作流程，確認瀏覽器 console 零錯誤零警告，且 `backend/` 執行日誌無未處理的例外堆疊（SC-014、憲章品質標準）
 - [X] T182 重寫根目錄 `README.md`：前後端各自的啟動指令與必要環境變數；新進者 MUST 能只依 README 完成本機啟動（憲章「啟動說明」條）
-- [ ] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
+- [X] T183 **通過全部驗收清單後**移除舊實作：刪除根目錄 `src/`、`styles/`、`index.html`、`assets/`、`tests/`（舊 puppeteer 套件）與 `supabase/migrations.sql`；`supabase/schema.sql` 與 `seed*.sql` 於初始 revision 與 `seed.py` 驗證通過後一併移除。**MUST NOT 以「之後可能用得到」為由留存**（憲章 v3.0.0 遷移計畫）
+
+> ⚠️ **T183 於 2026-08-05 依指示提前執行**，當時 `browser-acceptance.md` 為 44/47 未驗。
+> 該清單**仍未通過**，勾選 T183 不代表驗收完成。行為比對的來源已改為 git 歷史，
+> 作法見該清單「T183 已於清單通過前執行」一節。
+>
+> `supabase/reset-legacy.sql` **刻意保留**：它已於 2026-08-04 改版，用途從「舊 schema
+> 過渡」變成「把 Supabase 專案清乾淨好讓 `0001_initial.py` 從零建起」——服務的是現行
+> 架構，不屬於本任務要移除的舊實作。憲章遷移計畫表第 494 列「`seed*.sql` MUST 保留」
+> 已被本任務推翻（`seed.py` 覆蓋其全部內容），該列待下次修憲時更正。
 
 ---
 

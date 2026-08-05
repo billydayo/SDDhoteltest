@@ -180,9 +180,9 @@ cd backend && uv run pytest                # 2026-08-04：583 passed（約 4 分
 cd frontend && npm run test                # 2026-08-04：504 passed
 ```
 
-⚠️ **根目錄的 `tests/`（puppeteer）驗的是舊版原生 JS 實作，不要拿它驗新版。**
-它打的是 `index.html`，而那份程式碼與 `frontend/` 沒有任何關係。該目錄於 T183
-連同 `src/`、`styles/`、`index.html` 一併移除。
+⚠️ 上面這兩道就是全部的自動化測試。根目錄曾有一個 `tests/`（puppeteer），
+驗的是舊版原生 JS 實作，打的是 `index.html`，與 `frontend/` 沒有任何關係——
+已於 T183 連同 `src/`、`styles/`、`index.html` 一併移除。要查閱請用 git 歷史。
 
 **授權測試的判準**：每個受保護端點 MUST 有三個案例——未認證、以他人身分、
 以正確身分。憲章明訂「僅測試 happy path 的授權測試 MUST NOT 被視為已覆蓋」。

@@ -37,6 +37,4 @@ const matchMediaStub = (query: string) => ({
   dispatchEvent: vi.fn(() => false),
 })
 
-// 這個 cast 省不掉：`MediaQueryList.addEventListener` 是多載簽章，
-// 用 `vi.fn()` 填不出一個結構上相容的型別。
-window.matchMedia = matchMediaStub as unknown as typeof window.matchMedia
+window.matchMedia = matchMediaStub

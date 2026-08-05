@@ -1,0 +1,87 @@
+# 正式環境（DigitalOcean Droplet）。前端不在這裡——它建置成靜態檔後放
+# Cloudflare Pages，見 docs/deploy.md。
+#
+#     docker compose up -d --build
+#
+# 需要兩份設定，兩份都不進版控：
+#
+#   ./.env          — 只放本檔用得到的非機密參數（主機名稱、ACME 信箱）
+#   ./backend/.env  — 所有憑證。憲章後端約束：憑證只存在於這裡（FR-085、SC-022）
+#
+# 兩者刻意分開。compose 的 `${VAR}` 展開發生在**解析 compose 檔的時候**，
+# 若把資料庫密碼放進 ./.env 再用 `environment:` 帶進去，那個值會出現在
+# `docker compose config` 的輸出與 `docker inspect` 裡。用 `env_file` 則是
+# 由 daemon 在啟動容器時直接注入，不經過 compose 檔的文字展開。
+
+name: sunny
+
+services:
+  # ---------------------------------------------------------------------------
+  # FastAPI
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      # ⚠️ 脈絡是專案根目錄，不是 backend/。Dockerfile 內的 COPY 都以此為基準。
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    volumes:
+      # ⚠️ 這一行決定管理員上傳的房源照片會不會活過下一次部署。
+      #
+      # 少了它，容器一重建 /app/uploads 就是空的，而 rooms.images 裡的
+      # `/uploads/<uuid>.jpg` 還在——資料庫說有照片，磁碟上沒有。沒有任何
+      # 錯誤訊息，因為當初每一步都成功了，只有房源頁上一排破圖。
+      - uploads:/app/uploads
+    # 刻意**不** publish 8000。對外只有 Caddy 那兩個 port。
+    #
+    # 這不是潔癖：Dockerfile 的 CMD 帶了 `--forwarded-allow-ips *`，也就是
+    # uvicorn 無條件相信 X-Forwarded-For／X-Forwarded-Proto。那個信任只有在
+    # 「請求必定先經過我們自己的反向代理」時才成立。一旦 8000 直接對公網開放，
+    # 任何人都能自稱來自任何 IP、自稱走的是 HTTPS。
+    expose:
+      - "8000"
+    networks:
+      - edge
+
+  # ---------------------------------------------------------------------------
+  # Caddy：TLS 終結與反向代理
+  # ---------------------------------------------------------------------------
+  # 選 Caddy 而不是 nginx 的唯一理由是憑證：它會自己向 Let's Encrypt 申請與
+  # 續簽，不需要 certbot、不需要 cron、不需要在續簽失敗時才發現有這回事。
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      # HTTP/3。少了 UDP 這條，Caddy 仍會通告 h3 但瀏覽器連不上，
+      # 於是每個連線都先試 h3 失敗再退回 h2——會變慢，但不會壞。
+      - "443:443/udp"
+    environment:
+      # `:?` 讓變數沒設時 compose 直接拒絕啟動，而不是拿空字串去跑。
+      # 主機名稱空掉的話 Caddy 會起一個沒有站台的伺服器：容器狀態是 running，
+      # 但任何請求都得不到回應。
+      API_HOSTNAME: ${API_HOSTNAME:?請在 ./.env 設定 API_HOSTNAME}
+      ACME_EMAIL: ${ACME_EMAIL:?請在 ./.env 設定 ACME_EMAIL}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # ⚠️ caddy_data 存的是已簽發的憑證與 ACME 帳號金鑰。**MUST 持久化。**
+      # 沒有它，每次 `docker compose down` 都會丟掉憑證並重新申請，
+      # 而 Let's Encrypt 對同一組網域有每週簽發上限——踩到之後拿到的是
+      # 「rate limited」，不是「憑證錯誤」，而且要等一週才會自己好。
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - edge
+
+volumes:
+  uploads:
+  caddy_data:
+  caddy_config:
+
+networks:
+  edge:

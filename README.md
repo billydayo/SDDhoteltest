@@ -237,8 +237,19 @@ git show <commit>:src/config.js                 # 只看內容，不落地
 
 ⚠️ 已建好的資料庫**不要**再跑它——那會連現行資料一起清掉。
 
+## 部署
+
+正式環境為 **Cloudflare Pages（前端靜態檔）+ DigitalOcean Droplet（FastAPI）
++ DigitalOcean Managed Postgres**。完整步驟見 [`docs/deploy.md`](docs/deploy.md)。
+
+⚠️ 部署前務必讀該文件的「步驟 0(b) 後台要不要公開」。下方測試帳號一節列出的
+管理員帳密印在登入頁上、也寫在這裡，而本專案**沒有修改密碼的端點**——
+站台一旦公開，那組帳密就是十二個後台模組的公開入口。要關掉它需要同時設定
+後端的 `SEED_ADMIN_PASSWORD` 與前端的 `VITE_HIDE_ADMIN_DEMO`，只設一邊沒有意義。
+
 ## 參考文件
 
+- 部署指南：[`docs/deploy.md`](docs/deploy.md)
 - 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v3.1.1）
 - 規格文件：[`specs/001-booking-site/spec.md`](specs/001-booking-site/spec.md)
 - 實作計畫：[`specs/001-booking-site/plan.md`](specs/001-booking-site/plan.md)

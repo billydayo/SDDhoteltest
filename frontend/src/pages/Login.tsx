@@ -44,6 +44,31 @@ const DEMO_ACCOUNTS = [
 
 type DemoAccount = (typeof DEMO_ACCOUNTS)[number]
 
+/**
+ * 正式部署時是否隱藏管理員那張示範卡片（預設**否**，維持 FR-005 的行為）。
+ *
+ * ## 這個開關存在的理由
+ *
+ * FR-005 要求公開列出兩組帳密，那在本機與內部展示是合理的。但站台一旦放上
+ * 公網，這張卡片等於把十二個後台模組的鑰匙印在首頁上——任何人都能改房價、
+ * 讀客服訊息、看用戶清單。而本專案**沒有修改密碼的端點**，
+ * 所以「先上線再去改密碼」這條路不存在。
+ *
+ * ⚠️ **這個旗標 MUST 與後端的 `SEED_ADMIN_PASSWORD` 一起設定，只設一邊沒有意義：**
+ *
+ * - 只隱藏卡片、不改密碼 → 密碼仍是版控與 README 裡的 `admin123`，
+ *   隱藏的只是提示，不是入口。這是偽裝成安全措施的裝飾。
+ * - 只改密碼、不隱藏卡片 → 卡片上印著一組**已經不能用**的密碼，
+ *   點「使用此帳號」會登入失敗，看起來像網站壞了。
+ *
+ * 見 docs/deploy.md。
+ */
+const HIDE_ADMIN_DEMO = import.meta.env.VITE_HIDE_ADMIN_DEMO === 'true'
+
+const VISIBLE_DEMO_ACCOUNTS: readonly DemoAccount[] = HIDE_ADMIN_DEMO
+  ? DEMO_ACCOUNTS.filter((account) => account.role !== '管理員')
+  : DEMO_ACCOUNTS
+
 export function Login() {
   const { user, status, login } = useAuth()
   const navigate = useNavigate()
@@ -193,7 +218,7 @@ function DemoAccounts({ onUse }: { onUse: (account: DemoAccount) => void }) {
         這是展示用專案，直接使用以下任一組帳號即可，不需要註冊。
       </p>
       <ul className="mt-gap-3 grid gap-gap-3">
-        {DEMO_ACCOUNTS.map((account) => (
+        {VISIBLE_DEMO_ACCOUNTS.map((account) => (
           <li
             key={account.email}
             className="flex flex-wrap items-center justify-between gap-gap-2 rounded-xs bg-surface p-gap-3"

@@ -2,6 +2,18 @@
 #
 # `{$VAR}` 是 Caddy 自己的環境變數展開，不是 compose 的 `${VAR}`——
 # 這份檔案是唯讀掛載進容器的，compose 不會改寫它的內容。
+#
+# ## 一個主機名稱同時服務前端與 API
+#
+# 前端靜態檔（烤在映像裡的 /srv/frontend，見 deploy/Dockerfile）與 FastAPI
+# 共用同一個來源。這不只是少一個網域的問題——**同源讓三件事一起消失**：
+#
+#   1. CORS。沒有跨來源請求，就沒有 preflight、沒有「後端回 200 但瀏覽器
+#      說網路錯誤」那類只在正式環境出現的症狀。
+#   2. `/uploads` 的跨網域轉址。後端寫進 rooms.images 的是同源絕對路徑
+#      `/uploads/<uuid>.jpg`，現在它真的是同源的。
+#   3. `VITE_API_BASE_URL`。不設定時 client.ts 退回 `/api`，與開發環境
+#      （Vite proxy）的行為逐字相同。
 
 {
 	# 憑證到期前的通知信箱。Let's Encrypt 用它寄「你的憑證即將過期」——
@@ -15,7 +27,7 @@
 	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
 
-{$API_HOSTNAME} {
+{$APP_HOSTNAME} {
 	encode zstd gzip
 
 	# ⚠️ 這個上限 MUST 大於後端的 MAX_UPLOAD_BYTES（預設 2 MiB）。
@@ -31,25 +43,100 @@
 	}
 
 	header {
-		# 這個主機只提供 API 與圖片，沒有 HTML 頁面，因此不需要 CSP。
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
 
-	# 房源照片的檔名由伺服器以 uuid4 產生，內容永不改寫——換圖就是換一個新
-	# 檔名（room_photos.py）。因此可以放心地讓瀏覽器與 Cloudflare 長期快取。
-	@uploads path /uploads/*
-	header @uploads Cache-Control "public, max-age=31536000, immutable"
+	# 這個主機開始送 HTML 了，因此需要 CSP。每一條例外都有具體來源；
+	# 不要「為了保險」再放寬，因為放寬之後不會有任何徵兆告訴你它是多餘的。
+	#
+	#   style-src / font-src 的 Google 網域 → index.html 的 Playfair Display
+	#   style-src 'unsafe-inline'           → React 的 style={{...}} 屬性
+	#   img-src blob:                       → 上傳前的本機預覽
+	#                                         （RiskCheck.tsx、admin/RoomRisk.tsx）
+	#   img-src https:                      → 後台可以貼任意外部圖片網址
+	#                                         （ImageManager.tsx、admin/Content.tsx）
+	#
+	# ⚠️ script-src 刻意**沒有** 'unsafe-inline'。若某天畫面整片空白而
+	# Console 出現 CSP 擋下 inline script，那表示建置產物開始內嵌腳本了，
+	# 該處理的是那件事，不是把這裡放寬。
+	#
+	# ⚠️ **/api 與 /uploads 排除在外，這不是偷懶。** FastAPI 產生的 Swagger UI
+	# （/api/docs）從 cdn.jsdelivr.net 載入自己的 JS 與 CSS，套上 `script-src
+	# 'self'` 之後那頁會變成一片空白——而 API 本身完全正常，所以很難聯想到是
+	# 這裡。CSP 是給「會被當成 HTML 頁面執行」的回應用的，API 的 JSON 與
+	# /uploads 的圖片都不是。
+	@html not path /api/* /uploads/*
+	header @html Content-Security-Policy "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+
+	# -------------------------------------------------------------------------
+	# API
+	# -------------------------------------------------------------------------
+	# `handle_path` 會**剝掉** /api 前綴再轉給後端，等同開發時 vite.config.ts
+	# 那條 proxy 的 rewrite。因此後端完全不需要知道自己被掛在前綴底下——
+	# 路由、OpenAPI、契約測試全部維持以 `/` 為根。
+	#
+	# ⚠️ 前綴不能省。後端有 `/rooms`，前端也有 `/rooms` 這條 SPA 路由；
+	# 同源之後，沒有前綴的話兩者會撞在一起。
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	# ⚠️ 這一條看起來多餘，但少了它 `/api/docs` 會壞。
+	#
+	# Swagger UI 那張頁面是後端產生的 HTML，裡面寫死了要去抓 `/openapi.json`
+	# ——一個**根目錄**的絕對路徑，不帶 /api。沒有這條規則的話，那個請求會落到
+	# 下面的 SPA catch-all 拿到一份 index.html，於是 `/api/docs` 開起來是一片
+	# 「Failed to load API definition」。API 本身完全正常，只有文件頁壞掉。
+	handle /openapi.json {
+		reverse_proxy api:8000
+	}
+
+	# -------------------------------------------------------------------------
+	# 已上傳的房源照片
+	# -------------------------------------------------------------------------
+	# 由後端的 StaticFiles 提供（main.py 的 `_mount_uploads`），**不剝前綴**
+	# ——後端就是掛在 /uploads 上的。
+	#
+	# 檔名由伺服器以 uuid4 產生，內容永不改寫——換圖就是換一個新檔名
+	# （room_photos.py）。因此可以放心地讓瀏覽器長期快取。
+	handle /uploads/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy api:8000
+	}
+
+	# -------------------------------------------------------------------------
+	# 前端（catch-all，MUST 放在最後）
+	# -------------------------------------------------------------------------
+	# ⚠️ handle 區塊之間互斥，且**照書寫順序**比對。這個沒有匹配條件的區塊會
+	# 接住所有前面沒接走的路徑，放到上面去就會先吃掉 /api 與 /uploads。
+	handle {
+		root * /srv/frontend
+
+		# Vite 產出的檔名帶內容雜湊，改了內容就是換一個檔名，可以永久快取。
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+
+		# ⚠️ index.html 反過來，MUST NOT 長期快取。它是唯一一份「指向目前這批
+		# assets」的檔案；被快取住的話，使用者會拿著舊的 index.html 去要一批
+		# 已經不存在的 assets，畫面空白而 Console 只有 404——看起來像部署失敗，
+		# 其實是快取。`no-cache` 不是不快取，是每次都先問一下有沒有更新。
+		header /index.html Cache-Control "no-cache"
+
+		# React Router 是前端路由：`/rooms/123` 在磁碟上沒有對應檔案。從首頁點
+		# 過去沒事（沒有發出請求），但重新整理或直接貼網址會落到伺服器上。
+		# 未命中的路徑一律交回 index.html，由前端自己解析。
+		try_files {path} /index.html
+		file_server
+	}
 
 	# ⚠️ CORS 標頭刻意**不**在這裡設定。
 	#
-	# FastAPI 已經掛了 CORSMiddleware，來源清單由 CORS_ORIGINS 明確列出
-	# （憲章後端約束禁止 ["*"] 搭配 allow_credentials）。若 Caddy 也加一份，
-	# 回應裡會出現兩個 Access-Control-Allow-Origin，而瀏覽器對重複的這個標頭
-	# 一律視為不合法並擋下請求——症狀是「後端明明回了 200，前端卻說網路錯誤」。
-	reverse_proxy api:8000
+	# 同源之後前端根本不會發出跨來源請求，這裡加任何 CORS 標頭都只是雜訊；
+	# 而 FastAPI 那邊仍掛著 CORSMiddleware（來源由 CORS_ORIGINS 明確列出）。
+	# 兩邊都設的話，回應裡會出現兩個 Access-Control-Allow-Origin，
+	# 而瀏覽器對重複的這個標頭一律視為不合法並擋下請求。
 
 	log {
 		output stdout

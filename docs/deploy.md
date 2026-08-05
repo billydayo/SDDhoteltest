@@ -1,30 +1,70 @@
-# 部署：Cloudflare Pages + DigitalOcean
+# 部署：DigitalOcean
 
-把 Sunny 訂房平台放上公網的完整步驟。照著做一次大約 60–90 分鐘，
-其中等待 DigitalOcean 建立資料庫叢集約佔 10 分鐘。
+把 Sunny 訂房平台放上公網的完整步驟。照著做一次大約 60–90 分鐘。
+
+資料庫在步驟 1 有兩條路：**1A** DigitalOcean Managed Postgres（每月 15 美元，
+等叢集建立約佔 10 分鐘）或 **1B** Supabase（免費）。**其餘步驟兩條路完全相同**，
+差異只在步驟 1 與步驟 4.3 要填的值。
 
 ## 架構
 
+**前端與 API 在同一台機器、同一個主機名稱上**，路徑分流。
+
 ```
-                       瀏覽器
-                          │
-        ┌─────────────────┴──────────────────┐
-        │ HTTPS                              │ HTTPS
-        ▼                                    ▼
-  Cloudflare Pages                    DigitalOcean Droplet
-  <專案>.pages.dev                     Caddy :443（自動簽憑證）
-  frontend/dist 靜態檔                        │ 反向代理
-  （React SPA）                         uvicorn :8000（FastAPI）
-                                              │ 加密連線（ssl=require）
+                              瀏覽器
+                                 │ HTTPS
+                                 ▼
+                   （選用）Cloudflare Worker：只轉發，不做任何事
+                        sddhotel.<帳號>.workers.dev      ← 步驟 5
+                                 │
+                                 ▼
+                        DigitalOcean Droplet
+                        Caddy :443（自動簽憑證）
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        │ /                      │ /api/*                 │ /uploads/*
+        ▼                        ▼                        ▼
+  /srv/frontend            剝掉 /api 前綴       uvicorn :8000（FastAPI）
+  React SPA 靜態檔                └────────────────────────┘
+  （烤在映像裡）                              │ 加密連線（ssl=require）
                                               ▼
-                                    DigitalOcean Managed Postgres
-                                    <叢集>.b.db.ondigitalocean.com:25060
+                                     託管 PostgreSQL（步驟 1 二選一）
+                                     1A  DO Managed  …ondigitalocean.com:25060
+                                     1B  Supabase    …pooler.supabase.com:5432
 ```
 
-前端是純靜態檔，放 CDN 最省事也最快；後端要跑 Python、要接資料庫、
-還要留住管理員上傳的照片，需要一台真的機器。
+## 為什麼前端不放 CDN
 
-## 為什麼後端用 Droplet 而不是 App Platform
+放 CDN（Cloudflare Pages、Workers、Netlify⋯⋯）確實更快、而且免費，但那表示
+前端與 API 是**兩個來源**，而這個專案有三個具體問題是那個前提造出來的：
+
+1. **房源照片會全部變破圖。** 後端寫進 `rooms.images` 的是 `/uploads/<uuid>.jpg`
+   ——一個**同源的絕對路徑**（`services/room_photos.py` 的 `PUBLIC_PREFIX`）。
+   開發時 Vite 的 proxy 把它轉給 FastAPI 所以看不出問題；放到 CDN 上，那個路徑
+   指向 CDN 而不是後端，於是要另外替 CDN 寫一份跨網域轉址規則。
+2. **重新整理任何非首頁的網址會得到 404。** React Router 是前端路由，
+   `/rooms/123` 在 CDN 上沒有對應檔案，要另外設 SPA fallback，而每一家的設法
+   都不一樣。（2026-08-05 實測：Cloudflare Workers 的 Static Assets **不支援**
+   `_redirects` 裡 `/*  /index.html  200` 這種 200 rewrite，只吃真正的轉址，
+   症狀就是首頁正常但 `/rooms` 回 404。）
+3. **CORS。** 多一份 `CORS_ORIGINS` 要跟前端網址保持同步，而填錯的症狀是
+   「後端日誌顯示 200，瀏覽器卻說網路錯誤」。
+
+三個都有解，但三個都只在正式環境出現、都不會給出指向真正原因的錯誤訊息，
+而且第 1 與第 2 項**首頁看起來完全正常**——要點進內頁或按 F5 才會發現。
+同源讓它們結構上不存在：`/uploads` 真的是同源、SPA fallback 由 Caddy 的
+`try_files` 處理、瀏覽器根本不會發出跨來源請求。
+
+代價是靜態檔由這台 Droplet 出流量，而且更新前端要重新建置映像（多花一兩分鐘）。
+以這個專案的量級都不是問題；日後真的需要 CDN，把網域掛上 Cloudflare 走 proxy
+模式即可，這裡的架構不用動。
+
+> **那步驟 5 的 Worker 算不算「放 CDN」？** 不算，差別是關鍵的。那支 Worker
+> 只是**轉發**，前端檔案仍然只有 Droplet 上那一份，瀏覽器看到的也仍然只有一個
+> 來源。上面三個問題全部來自「前端檔案住在另一個網域、由另一套規則提供」，
+> 而那正是它沒有做的事。
+
+## 為什麼用 Droplet 而不是 App Platform
 
 因為上傳的照片。`main.py` 的 `_mount_uploads` 把 `UPLOAD_DIR` 直接掛成靜態目錄，
 管理員上傳的房源照片與品質檢測圖存在本機磁碟上。
@@ -42,23 +82,29 @@ Droplet 掛一個 Docker volume 就解決了，而且更便宜。
 | 項目 | 規格 | 月費（USD） |
 |---|---|---|
 | Droplet | Basic Regular 1 vCPU / 1 GB / 25 GB | 6 |
-| Managed Postgres | Basic 1 vCPU / 1 GB / 10 GB | 15 |
+| 資料庫 — 1A：DO Managed Postgres | Basic 1 vCPU / 1 GB / 10 GB | 15 |
+| 資料庫 — 1B：Supabase | 免費方案 | 0 |
 | Reserved IP | 綁在執行中的 Droplet 上 | 0 |
-| Cloudflare Pages | 靜態網站，免費方案 | 0 |
 
-若只是短期展示，Managed Postgres 可以改成在同一台 Droplet 上跑 Postgres 容器，
-省下 15 美元；但那樣就沒有自動備份與版本升級，且本文不涵蓋。
+資料庫二選一，見步驟 1。選 1B 的話全套是每月 6 美元，代價是沒有自動備份、
+且免費專案閒置 7 天會被暫停。
+
+第三條路是在同一台 Droplet 上跑 Postgres 容器（同樣省下 15 美元），
+但那樣一樣沒有自動備份與版本升級，而且要跟 uvicorn、Caddy 搶那 1 GB 記憶體，
+本文不涵蓋。
 
 ---
 
 ## 步驟 0：先決定兩件事
 
-### (a) Cloudflare Pages 的專案名稱
+### (a) 站台的主機名稱
 
-它直接決定前端網址：專案叫 `sunny-hotel`，網址就是 `https://sunny-hotel.pages.dev`。
-後端的 `CORS_ORIGINS` 與 `FRONTEND_BASE_URL` 都要填這個值，先決定好可以少繞一圈。
+前後端同源，所以只有**一個**名稱要決定，而它會出現在五個地方：`./.env` 的
+`APP_HOSTNAME`、`backend/.env` 的 `FRONTEND_BASE_URL`、`CORS_ORIGINS`、
+`GOOGLE_REDIRECT_URI`，以及 Let's Encrypt 的憑證。先決定好可以少繞一圈。
 
-以下都以 `sunny-hotel` 為例。
+怎麼取名見步驟 3（還沒有網域就用 sslip.io）。以下都以
+`sunny.203-0-113-5.sslip.io` 為例。
 
 ### (b) 後台要不要公開
 
@@ -117,7 +163,12 @@ demo 管理員的密碼，那個帳號仍然是管理員。** 偶爾看一下 `/
 **(B) 不公開後台。** 兩邊都要設：
 
 - `backend/.env`：`SEED_ADMIN_EMAIL` 與 `SEED_ADMIN_PASSWORD` 填自己的值
-- Cloudflare Pages 環境變數：`VITE_HIDE_ADMIN_DEMO=true`
+- `./.env`：`VITE_HIDE_ADMIN_DEMO=true`
+
+⚠️ 後者是**建置時**才會被讀進去的（compose 把它當 build arg 傳給
+`deploy/Dockerfile`）。改完 MUST `docker compose up -d --build`，
+單純 `up -d` 或 `restart` 都不會讓它生效，而且不會有任何錯誤訊息——
+登入頁上那張卡片只是原封不動地還在。
 
 ⚠️ **只做一邊沒有意義。** 只隱藏卡片不改密碼，藏起來的只是提示、不是入口；
 只改密碼不隱藏卡片，登入頁會印著一組已經失效的密碼，訪客點下去登入失敗，
@@ -140,7 +191,27 @@ orders／rooms 全部八張表，並把 `site_content` 重設為預設值。
 
 ---
 
-## 步驟 1：建立 Managed Postgres
+## 步驟 1：資料庫
+
+這一步有兩條路。**其餘所有步驟兩條路完全相同**，差異只在這裡以及步驟 4.3 要填的值。
+
+| | 1A：DO Managed Postgres | 1B：Supabase |
+|---|---|---|
+| 月費 | 15 USD | 0（免費方案） |
+| 自動備份 | 有，保留 7 天 | 免費方案無 |
+| 閒置處理 | 無 | **7 天無活動會暫停**，要手動恢復 |
+| 與 Droplet 同區域 | 自己選，可以做到 | 專案建好後**不能改區域** |
+| 本文驗證程度 | 完整 | 2026-08-05 實際部署驗證過 |
+
+**沒有既有 Supabase 專案、又不在意每月 15 美元 → 選 1A。** 步驟最少，區域可控。
+
+**專案原本就是 Supabase 起家（本專案的情況）、或不想付費 → 選 1B。**
+`backend/src/sunny/config.py` 把連線資訊拆成元件，兩者都支援；初始 revision 的
+T019a 甚至已經預先處理了 Supabase 的 `anon`／`authenticated` 角色。
+
+---
+
+### 1A：建立 DigitalOcean Managed Postgres
 
 DigitalOcean 控制台 → **Databases** → Create Database Cluster。
 
@@ -171,6 +242,109 @@ DigitalOcean 控制台 → **Databases** → Create Database Cluster。
 
 ---
 
+### 1B：使用 Supabase
+
+Supabase 控制台 → 沿用既有專案，或 Create new project。新建時 **Region 盡量與
+Droplet 同區域**（專案建好後不能改）；不同區域不會壞掉，只是每次查詢多跨一段公網。
+
+#### ⚠️ MUST 用 Session Pooler，這一項沒有替代方案
+
+Dashboard 右上 **Connect** 有三種連線方式，只有一種可用：
+
+| 方式 | 位址 | 可否使用 |
+|---|---|---|
+| Direct connection | `db.<ref>.supabase.co:5432` | ❌ 免費方案**只有 IPv6**。DigitalOcean 的 Droplet 預設沒有 global IPv6（2026-08-05 於 sgp1 實測確認），連不上 |
+| Transaction pooler | `...pooler.supabase.com:6543` | ❌ 不支援 prepared statements，而 asyncpg 依賴它 |
+| **Session pooler** | `...pooler.supabase.com:5432` | ✅ **用這個。** 有 IPv4，行為等同直連 |
+
+兩種錯誤的失敗方式都不會指向真正的原因：
+
+- 直連 → `getaddrinfo failed` 或連線逾時，看起來像網路或防火牆問題
+- Transaction pooler → 零星的 `prepared statement "__asyncpg_x__" does not exist`，
+  看起來像程式碼 bug。**而且不是每次都失敗**，所以很容易被當成偶發問題放過
+
+先驗證這台 Droplet 連得到（不需要密碼）：
+
+```bash
+getent ahostsv4 aws-1-<區域>.pooler.supabase.com    # 要有 IPv4 位址
+```
+
+#### ⚠️ 使用者名稱 MUST 帶專案 ref
+
+走 pooler 時，Supavisor 靠使用者名稱裡的後綴決定路由到哪個租戶。
+**擁有者與應用角色兩個都要帶**：
+
+```
+本機 Postgres    DB_OWNER_USER=postgres          DB_APP_USER=sunny_app
+Supabase pooler  DB_OWNER_USER=postgres.<ref>    DB_APP_USER=sunny_app.<ref>
+```
+
+資料庫裡的角色名仍然是 `sunny_app`——帶 ref 的只是連線時報上的名字。
+少了後綴會回 `tenant/user not found`，那句訊息看起來跟這個設定毫無關係。
+
+#### 步驟 4.3 要填的值
+
+| 欄位 | 1A（DO Managed） | 1B（Supabase Session Pooler） |
+|---|---|---|
+| `DB_HOST` | `<叢集>.b.db.ondigitalocean.com` | `aws-1-<區域>.pooler.supabase.com` |
+| `DB_PORT` | `25060` | **`5432`** |
+| `DB_NAME` | `defaultdb` | **`postgres`** |
+| `DB_OWNER_USER` | `doadmin` | `postgres.<ref>` |
+| `DB_APP_USER` | `sunny_app` | `sunny_app.<ref>` |
+| `DB_SSLMODE` | `require` | `require` |
+
+密碼是專案的 **Database Password**（建立專案時設定的那組）。與 1A 相同，
+**逐欄填、填原樣**，不要整條複製 Connection string、也不要自己做 URL 編碼。
+
+#### ⚠️ 跑完遷移後要關 PostgREST 那扇門
+
+Supabase 對 `public` schema 設了
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+```
+
+因此 Alembic 建立的新表會**自動繼承**這組授權。舊架構靠 RLS 擋住 anon key
+（該 key 設計上可公開，防護來自 RLS 而非保密），而新架構把 RLS 全數移除——
+兩者相加的結果是任何人拿著那把公開的 anon key，就能經由 PostgREST 讀寫全部
+十二張表，包含 `profiles` 與 `admin_logs`。
+
+初始 revision 的 T019a 會 REVOKE 掉 `anon` / `authenticated` 的權限與預設權限，
+這是程式面。設定面還要做一次：**Dashboard → Settings → API，把 `public` 自
+Exposed schemas 移除。** 兩道一起關上。
+
+驗證（應為 0）：
+
+```sql
+select count(*) from information_schema.role_table_grants
+where grantee in ('anon','authenticated') and table_schema = 'public';
+```
+
+#### ⚠️ 既有專案才需要注意的兩件事
+
+**先確認資料庫還在不在舊架構上。** 若 `public.profiles` 已經有 `email` /
+`password_hash` / `google_sub` 欄位，且 `public.alembic_version` 存在，
+表示遷移**早就跑過了**，步驟 4.4 的 `alembic upgrade head` 會是 no-op，
+而 `python -m sunny.seed` 會**刪掉現有的業務資料**（見下）。
+
+```sql
+select column_name from information_schema.columns
+where table_schema='public' and table_name='profiles';
+select version_num from public.alembic_version;   -- 不存在則是舊架構
+```
+
+**`supabase/reset-legacy.sql` 會刪光資料。** 它的用途是把仍在舊架構的專案清成
+乾淨狀態。資料要保留就不能跑它——先自行匯出，或把舊表 `alter table ... set
+schema` 搬到另一個 schema 保存。
+
+#### 免費方案的兩個限制
+
+- **閒置 7 天會暫停專案**，要到 Dashboard 手動恢復。展示期間有人在用不會觸發，
+  但放著一陣子再給人看，會發現整站掛掉而後端日誌只有連線逾時。
+- 沒有自動備份。重要資料自行 `pg_dump`。
+
+---
+
 ## 步驟 2：建立 Droplet
 
 ### 2.1 建立機器
@@ -183,7 +357,10 @@ DigitalOcean 控制台 → **Databases** → Create Database Cluster。
 | Image | Ubuntu 24.04 LTS |
 | Size | Basic / Regular / 1 GB RAM |
 | Authentication | **SSH Key**（不要用密碼） |
-| Hostname | `sunny-api` |
+| Hostname | `sunny` |
+
+1 GB 跑得動這個站台，但**建置前端時不夠用**——那一步要開 swap，見 2.5。
+不想處理 swap 就選 2 GB（每月多 6 美元）。
 
 ### 2.2 配一個 Reserved IP
 
@@ -215,45 +392,82 @@ UDP 443 是 HTTP/3。不開也能用，只是每個連線都會先試 h3 失敗�
 
 ### 2.4 讓資料庫接受這台機器
 
+**選 1A（DO Managed Postgres）才需要這一步。**
+
 回到 **Databases** → 你的叢集 → **Settings** → **Trusted sources** → Edit，
 把剛才那台 Droplet 加進去。
 
 ⚠️ 這一步漏掉，步驟 4 的 `alembic upgrade head` 會在連線階段就卡住，
 錯誤訊息是逾時，看起來像網路不通或密碼錯誤，不會提到 trusted sources。
 
+**選 1B（Supabase）跳過。** Supabase 的 pooler 對外開放，不需要把來源 IP
+加入白名單——換句話說，防護完全來自密碼，因此 `DB_OWNER_PASSWORD` 不要用
+弱密碼，也不要跟其他地方共用。
+
+### 2.5 開一塊 swap
+
+**選 1 GB 的機器就 MUST 做這一步**，否則步驟 4.4 建置前端時會失敗。
+
+前端的建置（`tsc -b && vite build`）尖峰要一點多 GB 的記憶體。1 GB 的 Droplet
+預設**沒有 swap**，於是 Linux 的 OOM killer 會直接砍掉 node，而 docker build
+只會印出一個 `Killed`、退出碼 137——**不會提到記憶體**，看起來像建置指令壞了
+或是 npm 有問題。
+
+```bash
+ssh root@203.0.113.5
+
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab    # 重開機後仍生效
+free -h                                            # Swap 那列應該是 2.0Gi
+```
+
+⚠️ 最後兩件事各有意義：少了 `/etc/fstab` 那行，重開機後 swap 就沒了，
+而你要到下一次建置才會發現；`free -h` 是唯一能當場確認的方式。
+
+swap 比記憶體慢很多，但這裡只在建置那幾分鐘用得到，平時服務跑起來不會碰它。
+
 ---
 
 ## 步驟 3：主機名稱與 HTTPS
 
-後端需要一個公開可解析的主機名稱，Let's Encrypt 才簽得出憑證，
-瀏覽器才不會因為 mixed content 擋掉從 HTTPS 頁面發往 HTTP 的請求。
+站台需要一個公開可解析的主機名稱，Let's Encrypt 才簽得出憑證。**前端與 API
+共用這一個名稱**（步驟 0(a)）。
 
 你還沒有網域，所以用 **sslip.io**：它把 IP 編進主機名稱裡，
 免費、免註冊，而且是真實可解析的公開 DNS。把 IP 的點換成減號，前面接一個名字：
 
 ```
-Reserved IP 203.0.113.5  →  api.203-0-113-5.sslip.io
+Reserved IP 203.0.113.5  →  sunny.203-0-113-5.sslip.io
 ```
 
 驗證一下（在你自己的電腦上）：
 
 ```powershell
-Resolve-DnsName api.203-0-113-5.sslip.io
+Resolve-DnsName sunny.203-0-113-5.sslip.io
 ```
 
 應該回傳 `203.0.113.5`。
 
 > **之後買了網域怎麼辦**
 >
-> 把網域加進 Cloudflare，新增一筆 A 記錄 `api → 203.0.113.5`，
+> 把網域加進 Cloudflare，新增一筆 A 記錄指到 `203.0.113.5`，
 > **並把該筆記錄的 proxy 狀態設為 DNS only（灰雲）**——橘雲會讓 Cloudflare 代收
 > 連線，Let's Encrypt 的 HTTP-01 挑戰就打不到你的 Caddy 了。
-> 然後改 `./.env` 的 `API_HOSTNAME`、`docker compose up -d`，
-> 再更新 Pages 的 `VITE_API_BASE_URL` 與後端的 `CORS_ORIGINS`。其餘不動。
+> 然後改 `./.env` 的 `APP_HOSTNAME`、`backend/.env` 的 `FRONTEND_BASE_URL`、
+> `CORS_ORIGINS`、`GOOGLE_REDIRECT_URI`（有設 Google 登入的話，Google Cloud
+> Console 那邊也要同步改），再 `docker compose up -d`。其餘不動。
+>
+> 同源架構下要改的就是這一份清單——不會有「前端網址改了但後端不知道」的中間狀態。
 
 ---
 
-## 步驟 4：部署後端
+## 步驟 4：部署
+
+前端與後端在這一步一起上線——`docker compose build` 會同時建置兩個映像
+（`deploy/Dockerfile` 用 Node 建置 `frontend/`，再把 `dist/` 複製進 Caddy 映像）。
 
 SSH 進 Droplet：
 
@@ -284,11 +498,12 @@ cp .env.example .env
 nano .env
 ```
 
-填兩個值：
+填兩個值（第三個只有選了步驟 0(B) 才要）：
 
 ```ini
-API_HOSTNAME=api.203-0-113-5.sslip.io
+APP_HOSTNAME=sunny.203-0-113-5.sslip.io
 ACME_EMAIL=你會看的信箱@example.com
+# VITE_HIDE_ADMIN_DEMO=true
 ```
 
 接著是憑證：
@@ -300,13 +515,20 @@ nano backend/.env
 
 範本裡每一欄都有說明，重點只有五個：
 
-- `DB_PORT=25060`、`DB_NAME=defaultdb`（不是 5432 / postgres）
+- **連線那幾欄依你在步驟 1 選的路徑填**，兩者的值不同（host／port／database／
+  使用者名稱），對照表在步驟 1 的「步驟 4.3 要填的值」。1A 是 `25060` /
+  `defaultdb` / `doadmin`；1B 是 `5432` / `postgres` / `postgres.<ref>`，
+  且應用角色也要帶 ref
 - `DB_SSLMODE=require` — ⚠️ 留空的話 asyncpg 會嘗試加密、失敗則**靜默退回明文**，
   沒有任何警告，只是密碼與訂單資料在網路上是明文的
 - `DB_APP_PASSWORD` 自己產一組，**且 MUST 在跑 alembic 之前填好**——
   `sunny_app` 這個角色的密碼是由初始 revision 從這裡讀出來設定的
 - `JWT_SECRET` 至少 32 字元，且不要跟開發環境同一組
-- `CORS_ORIGINS` 與 `FRONTEND_BASE_URL` 填 `https://sunny-hotel.pages.dev`
+- `FRONTEND_BASE_URL` 與 `CORS_ORIGINS` 都填**瀏覽器看得到的那個來源**。
+  沒有做步驟 5 就是 `https://<APP_HOSTNAME>`；做了步驟 5 就是那個
+  workers.dev 網址，**不是** Droplet 的主機名稱。同源所以只有一個值。
+  ⚠️ 有設 Google 登入的話，`GOOGLE_REDIRECT_URI` 是同一個來源**加上 `/api`**
+  （`https://<那個來源>/api/auth/google/callback`），理由見範本裡的說明
 
 產生隨機值：
 
@@ -319,7 +541,8 @@ docker run --rm python:3.12-slim python -c "import secrets; print(secrets.token_
 ```bash
 docker compose build
 
-# 建表、建 gist 排除約束、建 sunny_app 角色。以 doadmin（擁有者）身分連線。
+# 建表、建 gist 排除約束、建 sunny_app 角色。以擁有者身分連線
+# （1A 是 doadmin，1B 是 postgres.<ref>）。
 docker compose run --rm api alembic upgrade head
 
 # 種子資料（可重複執行）
@@ -328,9 +551,18 @@ docker compose run --rm api python -m sunny.seed
 
 ⚠️ 順序不能顛倒：seed 需要表已經存在。
 
+⚠️ **`docker compose build` 第一次要跑好幾分鐘**，其中前端那段（`npm ci` 與
+`vite build`）佔最久。若它以 `Killed` 或 `exit code 137` 結束，那是記憶體不足，
+不是建置設定有問題——回去做步驟 2.5 的 swap。
+
 `alembic upgrade head` 的第一件事是 `create extension if not exists btree_gist`
 ——`orders_no_overlap` 那條「同房同日不得重複成立」的排除約束需要它。
-`btree_gist` 在 DigitalOcean 的支援清單內，以 `doadmin` 身分執行不需要額外授權。
+`btree_gist` 在 DigitalOcean 與 Supabase 的支援清單內都有，以擁有者身分
+（1A 是 `doadmin`、1B 是 `postgres`）執行不需要額外授權。
+
+⚠️ **1B 若沿用既有的 Supabase 專案，先確認遷移是不是早就跑過了。** 已在 head 時
+`alembic upgrade head` 是 no-op（正常結束、不報錯），而下一行的 `sunny.seed`
+會**刪掉現有的業務資料**——見步驟 1B 的「既有專案才需要注意的兩件事」。
 
 ### 4.5 啟動
 
@@ -342,83 +574,98 @@ docker compose logs -f caddy
 第一次啟動時 Caddy 會去申請憑證。看到 `certificate obtained successfully`
 就成功了。`Ctrl-C` 離開日誌（不會停掉容器）。
 
-驗證：
+驗證三條路徑各自落在對的地方：
 
 ```bash
-curl -I https://api.203-0-113-5.sslip.io/openapi.json
+# 前端（靜態檔）
+curl -sI https://sunny.203-0-113-5.sslip.io/ | head -1
+
+# API（Caddy 剝掉 /api 後轉給 FastAPI）
+curl -sI https://sunny.203-0-113-5.sslip.io/api/rooms | head -1
+
+# SPA fallback：這條路徑在磁碟上不存在，但 MUST 回 200 + HTML
+curl -sI https://sunny.203-0-113-5.sslip.io/rooms | head -1
 ```
 
-應該回 `HTTP/2 200`。在瀏覽器打開
-`https://api.203-0-113-5.sslip.io/docs` 也應該看到互動式 API 文件。
+三個都應該是 `HTTP/2 200`。第三個是最容易在正式環境才發現的一項——
+它回 404 就表示 `try_files` 沒生效，症狀是使用者一按 F5 網站就壞掉。
+
+在瀏覽器打開 `https://sunny.203-0-113-5.sslip.io/api/docs` 也應該看到互動式
+API 文件（那頁會去抓根目錄的 `/openapi.json`，Caddyfile 有一條規則專門接它）。
 
 ---
 
-## 步驟 5：部署前端到 Cloudflare Pages
+## 步驟 5：Worker 前門（選用）
 
-Cloudflare 控制台 → **Workers & Pages** → Create → **Pages** → Connect to Git，
-授權 GitHub 並選擇 `DA260526/SDDhoteltest`。
+做完步驟 4，站台已經完整可用了——網址是 `https://<APP_HOSTNAME>`。這一步只解決
+一件事：**想用一個好看的網址，而且還不想買網域。**
 
-設定：
-
-| 欄位 | 值 |
-|---|---|
-| Project name | `sunny-hotel` |
-| Production branch | `python-impl` |
-| Framework preset | None |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory (advanced) | `frontend` |
-
-環境變數（Settings → Environment variables → **Production**）：
-
-| 變數 | 值 |
-|---|---|
-| `VITE_API_BASE_URL` | `https://api.203-0-113-5.sslip.io` |
-| `NODE_VERSION` | `22` |
-| `VITE_HIDE_ADMIN_DEMO` | `true`（只有選了步驟 0(B) 才設） |
-
-⚠️ `NODE_VERSION` 要設。Pages 的預設 Node 版本可能低於 Vite 8 的要求，
-而失敗訊息是一串 esbuild 的語法錯誤，看起來像程式碼壞了。
-
-⚠️ `VITE_API_BASE_URL` MUST 是 `https://`、結尾不加斜線、不帶路徑。
-從 HTTPS 頁面對 `http://` 發請求會被瀏覽器當成 mixed content 直接擋掉，
-而**後端日誌上會一片空白**，因為那些請求根本沒送出去。
-
-按 Save and Deploy。
-
-### 這一步順帶修好的兩個問題
-
-`npm run build` 之後會自動執行 `scripts/build-redirects.mjs`，
-用 `VITE_API_BASE_URL` 產生 `dist/_redirects`：
+`*.workers.dev` 的 DNS 由 Cloudflare 掌控，**沒辦法用 A 記錄指到自己的 Droplet**。
+唯一的辦法是放一支 Worker，把收到的請求原封不動轉給 Droplet 再回傳。
 
 ```
-/uploads/*  https://api.203-0-113-5.sslip.io/uploads/:splat  302
-/*  /index.html  200
+瀏覽器 ──→ sddhotel.<帳號>.workers.dev ──→ api.<ip>.sslip.io
+           （Worker，只轉發）              （Caddy，做所有事）
 ```
 
-第一條解決房源照片。後端存進 `rooms.images` 的是 `/uploads/<uuid>.jpg`，
-一個**同源的絕對路徑**——開發時 Vite proxy 轉給 FastAPI 所以看不出問題，
-但正式環境它會指向 Pages。Pages 上沒有這個檔案，catch-all 會回一份 `index.html`，
-瀏覽器拿到 `text/html` 卻要當圖片畫，結果是破圖。
+### 為什麼這不會把同源架構弄壞
 
-第二條解決重新整理。React Router 是前端路由，`/rooms/123` 在 Pages 上沒有對應檔案；
-從首頁點過去沒事，但重新整理或直接貼網址會落到伺服器上而得到 404。
+因為 Worker **什麼都不做**。它不處理路由、不做 SPA fallback、不剝 `/api` 前綴、
+不加快取標頭——那些全部留在 Caddy。瀏覽器眼中 `/`、`/api/*`、`/uploads/*` 
+統統在 `https://sddhotel.<帳號>.workers.dev` 這一個來源底下，所以同源的三個好處
+原封不動：沒有 CORS、`/uploads/<uuid>.jpg` 真的是同源路徑、前端不需要
+`VITE_API_BASE_URL`。
+
+⚠️ **不要開始在 Worker 裡加邏輯。** 一旦它也處理路由，那份規則就會與
+`deploy/Caddyfile` 各自演化，而分歧的症狀只會在正式環境出現。
+
+### 部署
+
+```bash
+cd deploy/worker
+npx wrangler deploy
+```
+
+⚠️ `wrangler.jsonc` 的 `name` 是 `sddhotel`，與現有那個 Worker 同名——
+部署會**取代**目前跑在該網址上的舊版靜態站。這是預期行為，但它不可復原，
+確認一下那個舊站沒有你還需要的東西。
+
+`ORIGIN` 那個變數填 Droplet 的 `APP_HOSTNAME`，見 `wrangler.jsonc` 的說明。
+
+### 三件要知道的事
+
+⚠️ **`backend/.env` 的網址要填 workers.dev，不是 Droplet 的主機名稱。**
+`FRONTEND_BASE_URL`、`CORS_ORIGINS`、`GOOGLE_REDIRECT_URI` 填的都是**瀏覽器
+看得到的那個來源**。填成 Droplet 的名稱不會有錯誤訊息——直到有人用 Google 登入，
+然後被丟到一個他從沒看過的網域上。
+
+⚠️ **Droplet 仍然直接連得到。** 站台會同時存在於兩個網址。這不會壞掉任何東西
+（同源在各自的網域內都成立），但分享連結時要給 workers.dev 那個，因為
+`FRONTEND_BASE_URL` 指的是它。真的要擋，就把防火牆的 443 限制到 Cloudflare 的
+IP 段——但設錯會把自己鎖在外面，而且 Cloudflare 的 IP 段會變。
+
+⚠️ **每一個請求都算 Worker 的用量**，包含每一張房源照片。免費方案是每天
+十萬次請求，展示用綽綽有餘，但它不是「只有 HTML 走 Worker」——是全部。
 
 ---
 
 ## 步驟 6：回填與收尾
 
-如果步驟 4 填 `CORS_ORIGINS` 時還不確定 Pages 的網址，現在補上：
+主機名稱在步驟 3 就決定了，所以正常情況下沒有東西要回填。若當初 `backend/.env`
+裡的 `FRONTEND_BASE_URL` / `CORS_ORIGINS` / `GOOGLE_REDIRECT_URI` 填錯或還沒填：
 
 ```bash
 cd /opt/sunny
-nano backend/.env      # CORS_ORIGINS 與 FRONTEND_BASE_URL
+nano backend/.env      # 三者都要與 APP_HOSTNAME 一致
 docker compose up -d   # 重新載入環境變數
 ```
 
 ⚠️ `docker compose restart` **不會**重新讀取 `env_file`，要用 `up -d`。
 這個差別很容易踩：restart 之後容器是新的、日誌是新的，但環境變數還是舊的，
-於是 CORS 錯誤一模一樣地繼續出現。
+於是同一個錯誤一模一樣地繼續出現。
+
+⚠️ 反過來，改到**前端**的東西（原始碼、`VITE_HIDE_ADMIN_DEMO`）時 `up -d`
+不夠，要 `up -d --build`——前端是建置時固定下來的靜態檔。
 
 ---
 
@@ -426,24 +673,32 @@ docker compose up -d   # 重新載入環境變數
 
 依序做完，任何一項不過就往下一節找原因。
 
+以下的 `<站台網址>`：沒做步驟 5 就是 `https://<APP_HOSTNAME>`，做了就是 workers.dev
+那個網址。**做了步驟 5 就要用 workers.dev 那個測**，否則你驗的是沒人會用的那條路徑。
+
 | # | 動作 | 預期 |
 |---|---|---|
-| 1 | 開 `https://sunny-hotel.pages.dev` | 首頁載入，房源列表有內容（不是空的） |
-| 2 | 直接貼 `https://sunny-hotel.pages.dev/rooms`，按 F5 | 正常顯示，不是 404 |
+| 1 | 開 `<站台網址>` | 首頁載入，房源列表有內容（不是空的） |
+| 2 | 直接貼 `<站台網址>/rooms`，按 F5 | 正常顯示，不是 404 |
 | 3 | 用 `guest@sunny.com` / `guest123` 登入 | 成功進入 |
 | 4 | 走完一次訂房流程到付款頁 | 成功建立訂單 |
 | 5 | 用管理員登入 → 房源管理 → 上傳一張照片並儲存 | 上傳成功 |
 | 6 | 回前台看該房源詳情頁 | ⚠️ **照片看得到，不是破圖** |
 | 7 | `docker compose restart api` 後重看該頁 | 照片還在（volume 有生效） |
-| 8 | 開發者工具 → Console | 沒有 CORS 或 mixed content 紅字 |
+| 8 | 開發者工具 → Console | 沒有紅字（尤其是 CSP 擋下來的資源） |
 
-第 6 項是最容易漏掉又最容易在正式環境才發現的一項。
+第 2 與第 6 項是最容易漏掉、又最容易只在正式環境出現的兩項——**從首頁點進去
+都是好的**，要按 F5 或真的去看一張上傳的照片才會發現。
+
+第 8 項現在要看的是 CSP 而不是 CORS（同源已經沒有 CORS 了）。Caddyfile 設了
+`Content-Security-Policy`；若哪天畫面缺圖、字型變成系統明體、或整片空白，
+Console 會明白寫出是哪一條指令擋的。
 
 ---
 
 ## 日後更新
 
-### 後端
+### 程式碼（前後端都是同一句）
 
 ```bash
 cd /opt/sunny
@@ -453,14 +708,24 @@ docker compose up -d --build
 docker compose run --rm api alembic upgrade head
 ```
 
-### 前端
+⚠️ **`--build` 不能省。** 前端是建置時固定下來的靜態檔，少了它 Caddy 會拿著
+上一次的映像繼續跑：網站正常、內容是舊的、沒有任何錯誤訊息。
 
-推上 `python-impl` 分支，Cloudflare Pages 會自動建置部署。
+沒有 git push 自動部署——這是同源架構換來的代價之一。要的話可以自己在 Droplet
+上掛一支 webhook 或 cron 跑上面這三行，但那不在本文範圍。
 
 ### 資料庫備份
 
-DO Managed Postgres 預設每日自動備份、保留 7 天，在叢集的 **Backups** 頁。
+**1A：** DO Managed Postgres 預設每日自動備份、保留 7 天，在叢集的 **Backups** 頁。
 不需要額外設定，但值得進去確認它真的開著。
+
+**1B：** Supabase 免費方案**沒有自動備份**，Dashboard 的 Backups 頁在免費方案
+也不提供下載。要備份就自己跑，例如每週一次：
+
+```bash
+pg_dump "postgresql://postgres.<ref>:<密碼>@aws-1-<區域>.pooler.supabase.com:5432/postgres" \
+  --schema=public --no-owner --no-privileges --file=sunny-$(date +%F).sql
+```
 
 ⚠️ **上傳的照片不在備份範圍內。** 它們在 Droplet 的 Docker volume 裡。
 要備份：
@@ -481,29 +746,40 @@ docker run --rm -v sunny_uploads:/data -v $(pwd):/backup alpine \
 `docker compose logs caddy` 反覆出現逾時或 `could not get certificate`。
 
 1. 防火牆的 **80 port** 有沒有開？HTTP-01 挑戰走 80，即使最終服務在 443
-2. `API_HOSTNAME` 解析到的 IP 是不是這台機器？`Resolve-DnsName` 確認
+2. `APP_HOSTNAME` 解析到的 IP 是不是這台機器？`Resolve-DnsName` 確認
 3. 若之後接了自己的網域：Cloudflare 那筆 A 記錄是不是設成了橘雲（Proxied）？
    MUST 改成 **DNS only**，否則挑戰打不到 Caddy
 4. sslip.io 整個網域偶爾會撞到 Let's Encrypt 的週配額。若日誌明確寫 rate limit，
    那不是你的設定問題，等一段時間或改用自己的網域
 
-### 前端一片空白或 API 全部失敗
+### 前端一片空白
 
 打開開發者工具 Console：
 
-- **CORS 紅字** → `CORS_ORIGINS` 填錯。它要填**前端**的網址，不是後端自己的；
-  而且改完要 `docker compose up -d`，不是 `restart`
-- **Mixed content** → `VITE_API_BASE_URL` 是 `http://` 開頭，改成 `https://` 重新部署
-- **404 on /api/...** → `VITE_API_BASE_URL` 結尾多了斜線或帶了路徑
+- **CSP 擋下 script** → 建置產物開始內嵌 `<script>` 了。該處理的是那件事，
+  不是把 `deploy/Caddyfile` 的 `script-src` 放寬
+- **一批 assets 404** → 拿到的是舊的 `index.html`。Caddyfile 對它設了
+  `Cache-Control: no-cache`，所以正常情況不該發生；先強制重新整理
+  （Ctrl-F5）確認是不是快取，再看 `docker compose logs caddy`
+- **什麼都沒有，連 HTML 都不是** → `docker compose exec caddy ls /srv/frontend`
+  有東西嗎？沒有的話是建置階段沒產出 `dist/`（回頭看 `docker compose build` 的輸出）
+
+### API 全部 404 或回傳 HTML
+
+前端呼叫 `/api/...` 卻拿到 `index.html`（Network 分頁看 Content-Type 是
+`text/html`），表示請求落到了 SPA 的 catch-all 而不是後端。
+
+1. `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile`
+2. Caddyfile 裡 `handle_path /api/*` MUST 在最後那個沒有匹配條件的 `handle`
+   **之前**——handle 之間照書寫順序比對，catch-all 放前面會把所有東西都吃掉
+3. `curl -sI https://<你的主機名稱>/api/rooms` 直接確認
 
 ### 房源照片全是破圖
 
-1. `dist/_redirects` 有沒有產生？Pages 的建置日誌裡應該有一行
-   `[build-redirects] 已寫入 dist/_redirects，/uploads → https://...`
-2. 沒有的話，`VITE_API_BASE_URL` 在 Pages 的環境變數裡是不是設在 **Production**
-   而不是只設了 Preview
-3. 直接開 `https://api.<你的主機名稱>/uploads/<檔名>` 看得到嗎？看不到的話問題在後端
-   （volume 沒掛上或檔案真的不存在）
+1. 直接開 `https://<你的主機名稱>/uploads/<檔名>` 看得到嗎？
+2. 看得到 → 問題在前端拿到的路徑，檢查 `rooms.images` 的值
+3. 看不到 → 問題在後端：volume 沒掛上，或檔案真的不存在
+   （`docker compose exec api ls -la /app/uploads`）
 
 ### 照片上傳成功但一重新部署就消失
 
@@ -517,9 +793,14 @@ docker volume ls | grep uploads
 
 ### alembic 連不上資料庫
 
-- 資料庫的 **Trusted sources** 有沒有加這台 Droplet？
-- `DB_PORT` 是 25060 嗎？`DB_NAME` 是 `defaultdb` 嗎？
-- `DB_SSLMODE=require` 有填嗎？DO 只接受加密連線
+- `DB_SSLMODE=require` 有填嗎？兩條路徑都只接受加密連線
+- **1A：** 資料庫的 **Trusted sources** 有沒有加這台 Droplet？
+  `DB_PORT` 是 25060 嗎？`DB_NAME` 是 `defaultdb` 嗎？
+- **1B：** `DB_HOST` 是 `...pooler.supabase.com` 而不是 `db.<ref>.supabase.co` 嗎？
+  後者只有 IPv6，Droplet 連不上，症狀是逾時或 `getaddrinfo failed`。
+  `DB_PORT` 是 **5432**（Session pooler）而不是 6543（Transaction pooler）嗎？
+  `DB_OWNER_USER` / `DB_APP_USER` 兩個都帶了 `.<專案ref>` 嗎？少了會回
+  `tenant/user not found`
 
 ### `password authentication failed for user "sunny_app"`
 
@@ -576,9 +857,10 @@ asyncio.run(main())
 | 檔案 | 用途 |
 |---|---|
 | [`backend/Dockerfile`](../backend/Dockerfile) | 後端映像。建置脈絡是專案根目錄 |
-| [`docker-compose.yml`](../docker-compose.yml) | Caddy + uvicorn + uploads volume |
-| [`deploy/Caddyfile`](../deploy/Caddyfile) | TLS 終結與反向代理 |
+| [`deploy/Dockerfile`](../deploy/Dockerfile) | 前端建置 + Caddy 映像。脈絡同樣是專案根目錄 |
+| [`deploy/Caddyfile`](../deploy/Caddyfile) | TLS 終結、路徑分流、CSP |
+| [`docker-compose.yml`](../docker-compose.yml) | 兩個映像 + uploads volume |
+| [`deploy/worker/worker.js`](../deploy/worker/worker.js) | 步驟 5 的 Worker 前門。只轉發 |
+| [`deploy/worker/wrangler.jsonc`](../deploy/worker/wrangler.jsonc) | Worker 的名稱與 `ORIGIN` |
 | [`.env.example`](../.env.example) | compose 用的非機密參數範本 |
 | [`backend/.env.production.example`](../backend/.env.production.example) | 後端憑證範本 |
-| [`frontend/.env.production.example`](../frontend/.env.production.example) | Pages 環境變數範本 |
-| [`frontend/scripts/build-redirects.mjs`](../frontend/scripts/build-redirects.mjs) | 產生 Pages 的 `_redirects` |

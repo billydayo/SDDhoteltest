@@ -1,0 +1,25 @@
+{
+  // ⚠️ name 決定 workers.dev 的網址，也決定要覆蓋哪一個既有的 Worker。
+  // `sddhotel` 就是目前跑著舊版靜態站的那一個——部署會取代它。
+  "name": "sddhotel",
+  "main": "worker.js",
+  "compatibility_date": "2025-11-01",
+
+  // 這支 Worker 只轉發，不帶靜態資產。**刻意沒有 `assets` 設定**：
+  // 前端的檔案住在 Droplet 的 Caddy 映像裡，由 Caddy 提供。
+  //
+  // 若在這裡也放一份靜態資產，兩份會各自更新、各自過期，而症狀是
+  // 「有些人看到新版有些人看到舊版」——沒有錯誤訊息，也很難重現。
+
+  "vars": {
+    // Droplet 上 Caddy 的站台名稱（./.env 的 APP_HOSTNAME）。
+    //
+    // ⚠️ MUST 是 https:// 且 MUST 有有效憑證。Worker 發出的子請求會驗證憑證，
+    // 失敗時瀏覽器拿到的是一個 5xx，看不出是後端憑證的問題。
+    //
+    // ⚠️ 這個名稱只有 Worker 會用到，使用者永遠看不到它。因此沿用既有的
+    // `api.` 開頭沒有壞處，反而省下重新簽一張憑證（Let's Encrypt 對同一組
+    // 網域有每週上限，撞到要等一週）。名字現在有點名不符實，僅此而已。
+    "ORIGIN": "https://api.167-99-74-99.sslip.io"
+  }
+}

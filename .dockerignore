@@ -1,16 +1,28 @@
-# 建置脈絡是專案根目錄，因此這份清單決定「有哪些東西會被送進 Docker daemon」。
+# 建置脈絡是專案根目錄，兩個 Dockerfile（backend/ 與 deploy/）共用這份清單，
+# 它決定「有哪些東西會被送進 Docker daemon」。
 #
 # ⚠️ 第一條最重要：.env 一旦進了映像，憑證就跟著映像走到每一個 pull 它的地方，
 # 而且 `docker history` 看得到。憲章後端約束：憑證只存在於 backend/.env，
 # 一次都不得離開那裡（FR-085、SC-022）。正式環境的值由 compose 的 env_file
 # 在**執行時**注入，不是烤進映像。
-.env
-.env.*
-!.env.example
-!.env.production.example
+#
+# ⚠️ 用 `**/` 涵蓋所有層級，不只根目錄。除了憑證，這還擋掉一個很難查的問題：
+# deploy/Dockerfile 是 `COPY frontend/ ./`，若開發者本機有一份
+# frontend/.env.production，它會被一起複製進建置階段，而 Vite **會讀它**——
+# 於是正式環境的 VITE_ 變數變成那個人本機的值，建置成功、沒有警告。
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
 
-# 前端。它建置成靜態檔後放 Cloudflare Pages，跟後端映像無關。
-frontend/
+# 前端的衍生物。原始碼本身是 deploy/Dockerfile 需要的，不能整個排除。
+#
+# ⚠️ node_modules MUST 排除。它有數萬個檔案，留著不只讓每次建置都花好幾分鐘
+# 傳輸脈絡，還會在 `COPY frontend/ ./` 時覆蓋掉容器內剛裝好的那一份——
+# 而本機（Windows）與容器（Alpine）的原生模組不相容。
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
 
 # 已上傳的檔案。內容屬於 volume，不屬於映像。
 backend/uploads/

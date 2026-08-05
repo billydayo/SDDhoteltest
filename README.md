@@ -239,13 +239,20 @@ git show <commit>:src/config.js                 # 只看內容，不落地
 
 ## 部署
 
-正式環境為 **Cloudflare Pages（前端靜態檔）+ DigitalOcean Droplet（FastAPI）
-+ DigitalOcean Managed Postgres**。完整步驟見 [`docs/deploy.md`](docs/deploy.md)。
+正式環境是**一台 DigitalOcean Droplet**：Caddy 在前面終結 TLS，`/` 送前端的
+靜態檔、`/api/*` 轉給 FastAPI、`/uploads/*` 是管理員上傳的照片。前後端因此同源
+——沒有 CORS，也不需要替 SPA 路由與圖片路徑另外寫轉址規則。資料庫是託管
+PostgreSQL（DO Managed 或 Supabase 二選一）。完整步驟見
+[`docs/deploy.md`](docs/deploy.md)。
+
+⚠️ 更新時 MUST 帶 `docker compose up -d --build`。前端是**建置時**固定下來的
+靜態檔，少了 `--build` 網站會正常運作但內容是舊的，而且沒有任何錯誤訊息。
 
 ⚠️ 部署前務必讀該文件的「步驟 0(b) 後台要不要公開」。下方測試帳號一節列出的
 管理員帳密印在登入頁上、也寫在這裡，而本專案**沒有修改密碼的端點**——
 站台一旦公開，那組帳密就是十二個後台模組的公開入口。要關掉它需要同時設定
-後端的 `SEED_ADMIN_PASSWORD` 與前端的 `VITE_HIDE_ADMIN_DEMO`，只設一邊沒有意義。
+後端的 `SEED_ADMIN_PASSWORD` 與 `./.env` 的 `VITE_HIDE_ADMIN_DEMO`，
+只設一邊沒有意義。
 
 ## 參考文件
 

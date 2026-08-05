@@ -1,7 +1,11 @@
-# 正式環境（DigitalOcean Droplet）。前端不在這裡——它建置成靜態檔後放
-# Cloudflare Pages，見 docs/deploy.md。
+# 正式環境（DigitalOcean Droplet）。前後端都在這裡，共用同一個主機名稱——
+# 前端建置成靜態檔後烤進 caddy 映像，見 deploy/Dockerfile 與 docs/deploy.md。
 #
 #     docker compose up -d --build
+#
+# ⚠️ 更新前端一定要帶 `--build`。前端是**建置時**就固定下來的靜態檔，
+# 單純 `up -d` 或 `restart` 只會把同一個舊映像再跑一次：網站正常、內容是舊的、
+# 沒有任何錯誤訊息。
 #
 # 需要兩份設定，兩份都不進版控：
 #
@@ -46,12 +50,25 @@ services:
       - edge
 
   # ---------------------------------------------------------------------------
-  # Caddy：TLS 終結與反向代理
+  # Caddy：TLS 終結、前端靜態檔、反向代理
   # ---------------------------------------------------------------------------
   # 選 Caddy 而不是 nginx 的唯一理由是憑證：它會自己向 Let's Encrypt 申請與
   # 續簽，不需要 certbot、不需要 cron、不需要在續簽失敗時才發現有這回事。
+  #
+  # 這個容器同時是前端的來源：deploy/Dockerfile 先用 Node 建置 frontend/，
+  # 再把 dist/ 複製進 caddy 映像。前後端因此同源，CORS 與 /uploads 的跨網域
+  # 轉址都不再需要（理由見 deploy/Caddyfile 開頭）。
   caddy:
-    image: caddy:2.9-alpine
+    build:
+      # ⚠️ 脈絡同樣是專案根目錄，因為 Dockerfile 要 COPY frontend/。
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        # ⚠️ VITE_ 變數在**建置時**被字面替換進產物，所以它是 build arg 而不是
+        # `environment:`。空字串等於不隱藏（維持 FR-005 的預設行為）。
+        # 這個值 MUST 與 backend/.env 的 SEED_ADMIN_PASSWORD 成對決定，
+        # 見 docs/deploy.md 步驟 0(b)。
+        VITE_HIDE_ADMIN_DEMO: ${VITE_HIDE_ADMIN_DEMO:-}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -63,7 +80,7 @@ services:
       # `:?` 讓變數沒設時 compose 直接拒絕啟動，而不是拿空字串去跑。
       # 主機名稱空掉的話 Caddy 會起一個沒有站台的伺服器：容器狀態是 running，
       # 但任何請求都得不到回應。
-      API_HOSTNAME: ${API_HOSTNAME:?請在 ./.env 設定 API_HOSTNAME}
+      APP_HOSTNAME: ${APP_HOSTNAME:?請在 ./.env 設定 APP_HOSTNAME}
       ACME_EMAIL: ${ACME_EMAIL:?請在 ./.env 設定 ACME_EMAIL}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

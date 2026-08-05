@@ -753,15 +753,35 @@ def upgrade() -> None:
     #
     # service_role 不在撤銷之列：那把 key 是秘密且不在前端，撤掉會讓 Supabase
     # 主控台的 Table Editor 無法檢視資料，而那對除錯有實際價值。此為刻意的取捨。
+    #
+    # ⚠️ **這兩個角色只存在於 Supabase。** 自架的 PostgreSQL 上沒有 PostgREST，
+    # 也就沒有這扇門要關；而 `REVOKE ... FROM anon` 對不存在的角色會直接丟
+    # `UndefinedObjectError`，整個遷移中止。2026-08-05 在本機 PostgreSQL 17.6
+    # 上實際撞到：`uv run alembic upgrade head` 停在這裡，一張表都沒建成。
+    #
+    # 因此以 `pg_roles` 判存在與否。**MUST NOT 改成無條件忽略錯誤**——那會讓
+    # Supabase 上真正該生效的撤銷在權限不足時默默跳過，而這一節的全部價值
+    # 就在於它有生效（憲章原則 III）。角色在才做，做了就必須成功。
     for role in ("anon", "authenticated"):
-        op.execute(f"revoke all on all tables in schema public from {role}")
-        op.execute(f"revoke all on all sequences in schema public from {role}")
-        op.execute(f"revoke all on all functions in schema public from {role}")
-        op.execute(f"revoke usage on schema public from {role}")
-        # 日後新建的表不再自動開放。只影響本連線角色（postgres）所建立的物件，
-        # 而遷移正是以該角色執行。
-        op.execute(f"alter default privileges in schema public revoke all on tables from {role}")
-        op.execute(f"alter default privileges in schema public revoke all on sequences from {role}")
+        op.execute(
+            f"""
+            do $$
+            begin
+              if exists (select 1 from pg_roles where rolname = '{role}') then
+                execute 'revoke all on all tables in schema public from {role}';
+                execute 'revoke all on all sequences in schema public from {role}';
+                execute 'revoke all on all functions in schema public from {role}';
+                execute 'revoke usage on schema public from {role}';
+                -- 日後新建的表不再自動開放。只影響本連線角色（postgres）所建立的
+                -- 物件，而遷移正是以該角色執行。
+                execute 'alter default privileges in schema public '
+                        'revoke all on tables from {role}';
+                execute 'alter default privileges in schema public '
+                        'revoke all on sequences from {role}';
+              end if;
+            end $$;
+            """
+        )
 
 
 def downgrade() -> None:

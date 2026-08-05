@@ -40,10 +40,10 @@ export function Header() {
           <NavLink to="/" className={linkClass} end>
             房源
           </NavLink>
-          {/* 前台「安全檢測」已下架：導覽入口與 `/risk-check` 路由一併移除
-              （`router.tsx`）。`pages/RiskCheck.tsx` 與 `lib/riskScore.ts`
-              仍留在原地，因此 T144／T144a 兩支隔離測試照常成立——留著的是
-              程式碼，拿掉的是使用者走得到的路。後台房源品質檢測不受影響。 */}
+          {/* 無障礙檢測（Within Reach）。公開——不需要登入，也不送出資料。 */}
+          <NavLink to="/risk-check" className={linkClass}>
+            無障礙檢測
+          </NavLink>
           {user && (
             <NavLink to="/orders" className={linkClass}>
               我的訂單

@@ -46,7 +46,7 @@ PostgreSQL（託管於 Supabase）
 - 我的訂單與退款申請
 - 評論撰寫（送出後經規則式自動審核 + 管理員複核），並可看到業者的公開回覆
 - 客服訊息：與客服團隊的一對一私訊，訊息送出後不可竄改
-- 前台安全檢測：照片僅於瀏覽器內分析，不會上傳
+- 無障礙檢測：由外部的 Within Reach 元件提供，不索取任何使用者照片
 - 服務條款與隱私聲明
 
 **後台（十二個模組）**
@@ -212,8 +212,8 @@ cd frontend && npm test           # Vitest + Testing Library
 - 不使用 Edge Function、Database Webhook、排程作業或爬蟲
 - 操作日誌僅可新增，任何角色（含管理員）都不得修改或刪除
 - 不串接真實付款、真實金流，也不呼叫任何 OTA 平台或 AI 服務
-- 前台使用者上傳的檢測照片只在瀏覽器內處理，不上傳至任何服務或資料表；
-  僅管理員對自家房源的檢測圖會存入雲端並公開顯示
+- 前台不向使用者索取任何私人照片（憲章 v4.0.0：自建的照片安全檢測已移除，
+  改嵌不接受上傳的外部元件）；僅管理員對自家房源的檢測圖會存入雲端並公開顯示
 
 ## 舊架構已移除
 
@@ -267,9 +267,13 @@ git show <commit>:src/config.js                 # 只看內容，不落地
 1. **瀏覽器沒有通往資料庫的路。** 前端的網路存取全數走
    `frontend/src/api/client.ts` 這個唯一出口，元件內不得自行 `fetch` 拼網址。
    前端不持有任何資料庫憑證——不是「不該用」，是根本沒有。
-2. **前台安全檢測的照片沒有上傳路徑。** `frontend/src/pages/RiskCheck.tsx`
-   只 import `lib/riskScore.ts` 與 React，不引用 API client——那是使用者的私人照片，
-   程式碼裡根本沒有能上傳它的函式。只有管理員的房源檢測會存圖，且該圖明示會公開。
+2. **前台沒有使用者照片這回事。** 原本自建的照片安全檢測靠「相依圖裡沒有出口」
+   來保證私人照片不外流；憲章 v4.0.0 改為嵌入外部的無障礙檢測元件
+   （`frontend/src/pages/WithinReach.tsx`），該元件不接受上傳，於是那條需要被
+   守住的路徑不再存在。只有管理員的房源檢測會存圖，且該圖明示會公開。
+
+   嵌入的 `frontend/public/wr-widget.js` 為自行 host 的建置產物，不指向外部主機。
+   來源與相依圖查核結果記於 `WithinReach.tsx` 的檔頭與憲章 v4.0.0 的 Sync Impact Report。
 3. **操作日誌只能新增。** `backend/src/sunny/repositories/admin_logs.py` 沒有
    update 或 delete 函式，資料庫端也已對應用角色 `REVOKE UPDATE, DELETE`。
    應用連線 MUST 為非擁有者（`sunny_app`）——REVOKE 只對非擁有者生效，

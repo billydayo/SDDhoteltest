@@ -257,8 +257,10 @@ try {
     ['收藏', '/favorites', '收藏'],
     ['客服訊息', '/messages', '客服'],
     ['帳戶設定', '/account', '帳戶'],
-    // 安全檢測已下架：`/risk-check` 路由移除後這一步會落到 404，
-    // `expectText(page, '檢測')` 隨即失敗。
+    // 網址仍是 `/risk-check`，但內容已換成外部的 Within Reach widget。
+    // ⚠️ 標記字只比對頁面標題「無障礙檢測」——widget 的文字在 Shadow DOM 裡，
+    // `expectText` 走的 `document.body.textContent` 取不到。
+    ['無障礙檢測', '/risk-check', '無障礙檢測'],
     ['服務條款', '/terms', '服務條款'],
   ]) {
     setStep(`F 走訪「${name}」`)

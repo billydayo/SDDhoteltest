@@ -45,6 +45,7 @@ import { Register } from './pages/Register'
 import { ReviewForm } from './pages/ReviewForm'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
+import { WithinReach } from './pages/WithinReach'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { ADMIN_MODULES } from './pages/admin/modules'
 import { useAuth } from './state/AuthContext'
@@ -154,14 +155,13 @@ export function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* 前台「安全檢測」（T146）已下架：`/risk-check` 路由與 `Header` 的
-            導覽入口一併移除，因此這個頁面現在沒有任何進入點——直接輸入網址
-            會落到下方的 404。
+        {/* 無障礙檢測。**公開**——這一頁不涉及身分，也不送出任何資料，
+            外部 widget 的資料全部打包在自己的 bundle 裡（見 `WithinReach.tsx`）。
 
-            ⚠️ `pages/RiskCheck.tsx`、`lib/riskScore.ts` 與 T144／T144a 兩支
-            隔離測試**刻意保留**：這次拿掉的是入口，不是實作。要真的刪除，
-            連同 spec 的 US9／FR-062、FR-066、SC-030 與憲章原則 VI 的照片條款
-            一起處理，否則文件會開始描述一個不存在的功能。 */}
+            路徑沿用 `/risk-check`：自建的照片安全檢測退場、改嵌 Within Reach
+            之後功能換了，但對外的網址不必跟著換——已發出去的連結、稽核腳本
+            與驗收清單都指向這裡。 */}
+        <Route path="/risk-check" element={<WithinReach />} />
         {/*
           Google 回程的落點。**公開**——抵達這裡的人正是還沒有身分的那個人，
           掛上 RequireAuth 會把他導去登入頁，而他手上的 token 就這樣掉了。

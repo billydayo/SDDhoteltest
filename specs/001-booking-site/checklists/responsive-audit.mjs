@@ -1,5 +1,5 @@
 /**
- * 響應式稽核：20 頁 × 6 個寬度 = 120 次量測，量兩件事——
+ * 響應式稽核：21 頁 × 6 個寬度 = 126 次量測，量兩件事——
  *   1. 有沒有內容超出視窗**而且拿不回來**（SC-012、T172）
  *   2. 每一次載入的 console 是否零錯誤零警告（SC-014、T181）
  *
@@ -55,10 +55,10 @@ const ADMIN_PW = process.env.SUNNY_ADMIN_PW ?? 'admin123'
 const WIDTHS = [320, 375, 768, 1024, 1440, 1920]
 
 /**
- * 20 頁。
+ * 21 頁。
  *
  * 帶動態 id 的頁面（`/rooms/:id`、`/booking/:id`、`/orders/:id`…）不在這裡：
- * 它們要有資料才進得去，而「有沒有那筆資料」會讓次數浮動、讓 120 這個數字
+ * 它們要有資料才進得去，而「有沒有那筆資料」會讓次數浮動、讓 126 這個數字
  * 不再可重現。那些頁面由 `t181-walkthrough.mjs` 走。
  */
 const PAGES = [
@@ -69,8 +69,9 @@ const PAGES = [
   { path: '/login', title: '登入', anonymous: true },
   { path: '/register', title: '註冊', anonymous: true },
   { path: '/terms', title: '服務條款' },
-  // `/risk-check` 已下架（路由移除，見 `frontend/src/router.tsx`）。
-  // 留著會量到 404 頁，而 404 本來就不在這支的職責裡。
+  // 頁面標題是「無障礙檢測」（自建的照片安全檢測已換成外部 widget），
+  // 網址仍是 `/risk-check`。
+  { path: '/risk-check', title: '無障礙檢測' },
   { path: '/account', title: '帳戶設定' },
   { path: '/favorites', title: '我的收藏' },
   { path: '/messages', title: '客服訊息' },

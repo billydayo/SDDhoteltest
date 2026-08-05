@@ -778,8 +778,65 @@ docker compose run --rm api alembic upgrade head
 ⚠️ **`--build` 不能省。** 前端是建置時固定下來的靜態檔，少了它 Caddy 會拿著
 上一次的映像繼續跑：網站正常、內容是舊的、沒有任何錯誤訊息。
 
-沒有 git push 自動部署——這是同源架構換來的代價之一。要的話可以自己在 Droplet
-上掛一支 webhook 或 cron 跑上面這三行，但那不在本文範圍。
+裝了下一節的自動部署之後，這一段就只剩「想立刻生效、不等那兩分鐘」時才用得到。
+
+### 自動部署（push 到 GitHub 就會更新網站）
+
+Droplet 每兩分鐘問一次 origin 有沒有新 commit，有的話就自己跑一次上面那組指令。
+
+**為什麼是輪詢，而不是 GitHub Actions。** Actions 得把 Droplet 的 SSH 私鑰放進
+GitHub Secrets 並讓 SSH port 對 runner 開放；webhook 得多跑一個常駐服務、多開
+一條對外路徑。輪詢是 Droplet **主動出去拉**：沒有金鑰外流、沒有新的 inbound
+表面，代價只有最多兩分鐘的延遲。
+
+三個檔案都在版控裡，Droplet 上只要把 unit 連過去：
+
+```bash
+cd /opt/sunny
+git pull
+
+# ⚠️ 這一次 MUST 手動建置一輪，往後才不用。
+#
+# 原因是上面那句 `git pull` 已經讓工作區跟 origin 一致了，而自動部署的判斷
+# 依據正是「兩者不一致」——它接手後只會看到沒有差異，於是什麼都不做。若這台
+# 機器目前跑的映像落後於 repo（多半如此，畢竟正是為此才要裝自動部署），
+# 那個落差會就這樣留著，直到下一次有人推 commit 才被順手補上。
+docker compose up -d --build
+
+# ⚠️ 用 symlink 而不是 cp。複製過去的話，日後改了 repo 裡的 unit 檔，
+#    systemd 讀的還是當初那份副本——而且沒有任何跡象顯示兩者已經不同。
+sudo ln -sf /opt/sunny/deploy/sunny-update.service /etc/systemd/system/
+sudo ln -sf /opt/sunny/deploy/sunny-update.timer   /etc/systemd/system/
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now sunny-update.timer
+```
+
+確認它活著：
+
+```bash
+systemctl list-timers sunny-update.timer   # 下次觸發時間
+sudo systemctl start sunny-update.service  # 立刻跑一次，不等排程
+journalctl -u sunny-update.service -n 50   # 它做了什麼
+journalctl -u sunny-update.service -f      # 部署進行中就盯這個
+```
+
+沒有更新時它只做一次 `git fetch` 就結束，所以兩分鐘一次並不昂貴；真的有更新
+時才會建置。**migration 會自動套用**（`alembic upgrade head`，冪等），因為另一
+個選擇更糟：程式碼更新了、schema 沒有，網站會在使用者面前噴 500。不要的話在
+`.service` 裡加 `Environment=SUNNY_AUTO_MIGRATE=0`。
+
+⚠️ **正式機上 MUST NOT 直接改進版控的檔案。** 腳本偵測到工作區有未提交的修改
+時會整輪放棄並在 journal 裡列出是哪些檔案——這是刻意的，自動把它丟掉等於在無人
+看著的時候消滅唯一一份修改。改完記得 commit 或還原，否則自動部署會一直停在
+那裡（`systemctl --failed` 看得到）。
+
+要暫停自動部署（例如正在手動除錯）：
+
+```bash
+sudo systemctl stop sunny-update.timer     # 這次開機期間停用
+sudo systemctl disable sunny-update.timer  # 連開機自啟也取消
+```
 
 ### 資料庫備份
 
@@ -861,6 +918,31 @@ grep -E '^GOOGLE_CLIENT_(ID|SECRET)=' backend/.env | awk -F= '{print $1"= 長度
 | Console 不讓你存這個回呼網址 | 主機名稱是公共後綴網域（`sslip.io`／`workers.dev`／`pages.dev`）。改設定繞不過去，見步驟 0(a) |
 4. sslip.io 整個網域偶爾會撞到 Let's Encrypt 的週配額。若日誌明確寫 rate limit，
    那不是你的設定問題，等一段時間或改用自己的網域
+
+### 網站沒有跟著更新（畫面停在舊版）
+
+症狀是「新功能在本機好好的，線上看不到」，而且**沒有任何錯誤訊息**——舊版本
+本身是正常的網站。先確認線上跑的到底是哪一版，不必開瀏覽器：
+
+```bash
+# index.html 引用的 bundle 檔名帶內容雜湊，改版必換
+curl -s https://<你的主機名稱>/ | grep -o '/assets/index-[^"]*\.js'
+
+# 直接在產物裡找新功能的字串（換成該版新增的文字即可）
+curl -s https://<你的主機名稱>/assets/index-<hash>.js | grep -c '某個新字串'
+```
+
+抓到 0 就是線上跑著舊建置。往下查：
+
+1. commit 推上去了嗎——`git branch -r --contains <sha>`
+2. Droplet 拉到了嗎——`cd /opt/sunny && git log --oneline -1`
+3. 自動部署卡住了嗎——`systemctl --failed`、`journalctl -u sunny-update.service -n 50`。
+   最常見的是正式機上有未提交的本機修改，腳本因此整輪放棄（見「自動部署」）
+4. 手動部署時漏了 `--build`——症狀完全一樣
+
+⚠️ 順帶一提，`public/` 底下的檔案（例如 `wr-widget.js`）沒部署到時**不會回
+404**：Caddyfile 的 SPA catch-all 會把 `index.html` 交出去。看到 `200` 別急著
+放心，要看 `Content-Type` 是不是 `text/html`。
 
 ### 前端一片空白
 
@@ -970,6 +1052,9 @@ asyncio.run(main())
 | [`deploy/Dockerfile`](../deploy/Dockerfile) | 前端建置 + Caddy 映像。脈絡同樣是專案根目錄 |
 | [`deploy/Caddyfile`](../deploy/Caddyfile) | TLS 終結、路徑分流、CSP |
 | [`docker-compose.yml`](../docker-compose.yml) | 兩個映像 + uploads volume |
+| [`deploy/auto-update.sh`](../deploy/auto-update.sh) | 自動部署。比對 origin，有新 commit 才建置 |
+| [`deploy/sunny-update.service`](../deploy/sunny-update.service) | 上面那支腳本的 systemd 執行單元 |
+| [`deploy/sunny-update.timer`](../deploy/sunny-update.timer) | 每兩分鐘觸發一次 |
 | [`deploy/worker/worker.js`](../deploy/worker/worker.js) | 步驟 5 的 Worker 前門。只轉發 |
 | [`deploy/worker/wrangler.jsonc`](../deploy/worker/wrangler.jsonc) | Worker 的名稱與 `ORIGIN` |
 | [`.env.example`](../.env.example) | compose 用的非機密參數範本 |

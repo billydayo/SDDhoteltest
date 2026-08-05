@@ -1,0 +1,32 @@
+# 自動部署的執行單元。由 sunny-update.timer 觸發，本身不含排程。
+#
+# 安裝方式見 docs/deploy.md「日後更新 → 自動部署」。
+
+[Unit]
+Description=Sunny：拉取更新並重新部署
+Documentation=file:///opt/sunny/docs/deploy.md
+
+# ⚠️ `docker.service` 用 Requires 而非 Wants：Docker 沒起來的話這支腳本第一句
+# `docker compose` 就會失敗，讓它在依賴層級就停下來比較誠實。
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sunny
+ExecStart=/opt/sunny/deploy/auto-update.sh
+
+# ⚠️ **這一行不能省。** systemd 對 oneshot 的預設啟動逾時是 90 秒，而 1 GB
+# Droplet 上光是建置前端就遠不止 90 秒（見 deploy/Dockerfile 的 OOM 註記）。
+# 少了它，每一次真的有更新的部署都會在建置到一半時被 SIGTERM 砍掉——留下一個
+# 半新不舊的狀態，而 journal 裡只會寫 timeout，不會說是因為建置太慢。
+TimeoutStartSec=30min
+
+# 建置很吃 CPU。降低優先權讓它不要跟正在服務訪客的 Caddy 與 uvicorn 搶——
+# 部署晚一分鐘完成沒有人會發現，網站卡住則每個人都會。
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+# 刻意不設。這個 unit 只該由 timer 叫起來，不該自己開機啟動。

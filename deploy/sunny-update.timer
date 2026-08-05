@@ -1,0 +1,30 @@
+# 自動部署的排程。每兩分鐘問一次 origin 有沒有新 commit。
+#
+# 沒有更新時 sunny-update.service 只做一次 `git fetch` 就結束（見腳本裡的
+# early return），所以兩分鐘一次並不昂貴。
+
+[Unit]
+Description=Sunny：每兩分鐘檢查一次是否有新版本
+Documentation=file:///opt/sunny/docs/deploy.md
+
+[Timer]
+Unit=sunny-update.service
+
+# 開機後等兩分鐘再開始。Docker 與 Caddy 需要時間就位，一開機就衝進去建置
+# 只會跟它們搶資源。
+OnBootSec=2min
+
+# ⚠️ 用 `OnUnitInactiveSec` 而不是 `OnUnitActiveSec`：前者從**上一輪結束**算起,
+# 後者從上一輪開始算起。一次要跑十分鐘的建置若用後者，計時器在建置期間就會
+# 反覆到期，結束當下立刻再排一輪。
+OnUnitInactiveSec=2min
+
+# 允許 systemd 把觸發時間對齊到附近，好跟其他 timer 併成同一次喚醒。
+# 對「兩分鐘內生效」這個目標，差幾十秒沒有意義。
+AccuracySec=30s
+
+# 刻意不設 Persistent=true。那是給「錯過的排程要補跑」用的，而這裡的工作是
+# 冪等的輪詢——開機後兩分鐘自然就會問一次，不需要補一次關機期間錯過的。
+
+[Install]
+WantedBy=timers.target

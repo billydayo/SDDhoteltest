@@ -1,0 +1,16 @@
+# 這個 repo 在 Windows 上開發、部署到 Linux。Git for Windows 預設
+# `core.autocrlf=true`，也就是 checkout 時把文字檔換成 CRLF。
+#
+# ⚠️ 對 shell 腳本那是致命的：Linux 的 kernel 會把 shebang 讀成
+# `/usr/bin/env bash\r`，找不到那個直譯器，錯誤訊息是
+#
+#     bad interpreter: /usr/bin/env bash^M: No such file or directory
+#
+# ——看起來像 bash 沒裝。systemd 的 unit 檔同理，`\r` 會被算進值裡面。
+#
+# 這幾類檔案只會被 Linux 讀，因此無論在哪台機器上 checkout 都固定 LF。
+*.sh      text eol=lf
+*.service text eol=lf
+*.timer   text eol=lf
+Dockerfile text eol=lf
+Caddyfile  text eol=lf

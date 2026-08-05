@@ -1,5 +1,26 @@
 <!--
 Sync Impact Report
+- Version change: 3.1.1 → 3.2.0
+- Bump rationale: MINOR。原則 V 新增「版面寬度」一組規範性條文。原憲章只規定了
+  下界（320px MUST NOT 產生橫向捲動），未規定上界，於是「內容欄封頂於 1280px」
+  成了一個沒有人決定過、卻散落在四個檔案裡的預設值。本次補上上界，屬新增規範性
+  內容，不使任何既有原則失效，故為 MINOR。
+- Modified principles:
+  - V. 無障礙與響應式基本線 → 新增三條：版面寬度 MUST 隨視窗調整、外殼
+    MUST NOT 以固定像素封頂、行長上限 MUST 施加於區塊而非外殼；並要求外殼的
+    量測線只有一份定義。
+- 本次修訂使既有實作不合規之處已於同次修正，無遺留：
+  - `frontend/src/router.tsx` 的 `<main>`、`components/Header.tsx`、
+    `components/Footer.tsx`、`components/HomeHero.tsx` 內層原各有一份
+    `mx-auto max-w-7xl px-gap-5` → 改為共用 `lib/surfaces.ts` 的 `shellClass`。
+  - 房源格線封頂於 3 欄 → 改為 xl 4 欄、2xl 5 欄（`pages/Home.tsx` 的 `ROOM_GRID`
+    與 `pages/Favorites.tsx`）。
+  - 長文與單欄表單（`Terms`、`Booking`、`Account`、`Login`／`Register` 等）的
+    `max-w-*` 正是新條文明訂的正確做法，**維持不動**。
+- 依據：使用者於 2026-08-05 指示「頁面資料與視窗同寬，隨視窗大小調整」，並於同次
+  確認詳細資料以「最合適閱讀」的寬度為準、卡片格線隨視窗增加欄數。
+
+Sync Impact Report（前一版）
 - Version change: 3.1.0 → 3.1.1
 - Bump rationale: PATCH。修正 v3.0.0／v3.1.0 對既有 schema 的一項事實誤述，
   並據此確定 RLS 的處置。不新增、移除或重新定義任何原則，故為 PATCH。
@@ -239,10 +260,26 @@ React + Tailwind，以免同時承擔建置成本卻不取得其好處。
   MUST NOT 成為對比不足的藉口。
 - 版面 MUST 在 320px 寬度下正常顯示且不產生橫向捲動。房源列表 MUST 在窄螢幕上
   改為可捲動或改為直向堆疊，MUST NOT 造成整頁橫向捲動。
+- **版面寬度 MUST 隨視窗寬度調整。** 頁首、主內容區與頁尾 MUST 撐滿視窗的可用
+  寬度（僅保留左右內距），MUST NOT 以固定像素上限（如 `max-w-7xl`）把整個外殼
+  封頂。列表與格線 MUST 以**增加欄數**回應更寬的視窗，MUST NOT 只把卡片等比
+  放大——放大的是同一張照片與同一段文字，資訊量沒有增加。
+- **行長上限 MUST 施加於區塊，MUST NOT 上移為外殼的寬度上限。** 純文字段落、
+  單欄表單與詳細資料頁 MUST 以可讀行長為上限（約 68ch，見 `--container-measure`），
+  由該區塊自己收窄。上一條與本條不衝突：外殼的寬度是「網站有多寬」，區塊的寬度
+  是「這段內容適合多寬」，兩者 MUST 分開決定。
+- **外殼的量測線 MUST 只有一份定義。** 頁首、主內容區、頁尾與滿版主視覺的內層
+  MUST 引用同一個常數，MUST NOT 各自抄一份內距值——只改到其中三處時，標題會比
+  內容偏移一兩公分，而這種錯位不會有任何測試發現。
 - 介面文字 MUST 使用繁體中文（台灣用語）。日期顯示格式 MUST 全站一致。
 
 **理由**：這些是基本線而非加分項。企劃書已將「行動裝置 RWD 優化」列為待辦，
 本原則將其提前為交付條件而非後補項目。
+
+版面寬度一條補的是**上界**。原憲章只規定了下界（320px 不得橫向捲動），於是
+「內容欄最寬 1280px」從來沒有被決定過，只是四個檔案裡各自寫下的一行 class——
+在 1920px 螢幕上，兩側各留 320px 空白，而使用者要看的房源被擠在中間。
+把上界寫進憲章，是為了讓「要不要封頂」成為一次明確的決定，而不是預設值。
 
 ### VI. 誠實標示模擬範圍（No False Security, No False Payment）
 
@@ -518,4 +555,4 @@ MUST 明確標示，MUST NOT 讓任何使用者或後續開發者誤認。
 在修復之前，主要按鈕 MUST NOT 被描述為符合 WCAG AA。
 移植至 Tailwind theme 時 MUST 一併處理此項，MUST NOT 把已知的不合規色值原樣搬過去。
 
-**Version**: 3.1.1 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-03
+**Version**: 3.2.0 | **Ratified**: 2026-07-30 | **Last Amended**: 2026-08-05

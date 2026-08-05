@@ -7,10 +7,14 @@
  */
 import { Link } from 'react-router-dom'
 
+import { shellClass } from '../lib/surfaces'
+
 export function Footer() {
   return (
     <footer className="mt-gap-8 border-t border-line-soft bg-surface-alt">
-      <div className="mx-auto flex max-w-7xl flex-col gap-gap-3 px-gap-5 py-gap-6 text-small text-ink-muted sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={`flex flex-col gap-gap-3 py-gap-6 text-small text-ink-muted sm:flex-row sm:items-center sm:justify-between ${shellClass}`}
+      >
         <div className="flex items-center gap-gap-3">
           <img src="/logo.png" alt="Sunny 訂房平台" className="h-6 w-auto" />
         </div>

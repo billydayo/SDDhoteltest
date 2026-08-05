@@ -38,6 +38,18 @@ const SORT_OPTIONS: { value: RoomSort | ''; label: string }[] = [
 
 const ALL_TYPES = '__all__'
 
+/**
+ * 房源格線。**欄數隨視窗成長，卡片尺寸不隨視窗成長。**
+ *
+ * 版面改為全寬後，若欄數仍封在 3，1920px 下每張卡會寬到 600px——同一張照片
+ * 被拉大一倍，看起來不是「大器」而是「破圖」。因此寬螢幕改為加欄而非加寬，
+ * 每欄維持在 300–400px 這個卡片原本被設計出來的尺寸帶。
+ *
+ * 骨架（`SkeletonCard`）與這裡用同一個常數：兩邊斷點不同的話，資料抵達的
+ * 瞬間整排卡片會重排一次。
+ */
+const ROOM_GRID = 'grid gap-gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+
 export function Home() {
   /** 使用者正在編輯的表單值。改動它**不會**觸發查詢。 */
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
@@ -242,8 +254,10 @@ function RoomResults({
     return (
       <>
         <LoadingState label="載入房源…" />
-        <div className="grid gap-gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
+        <div className={ROOM_GRID}>
+          {/* 骨架數量取最寬斷點的一整列。少於一列的話，寬螢幕上會看到半排骨架
+              旁邊一片空白，比整排骨架更像壞掉。 */}
+          {[0, 1, 2, 3, 4].map((i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
@@ -277,7 +291,7 @@ function RoomResults({
       <p aria-live="polite" className="text-small text-ink-muted">
         共 {rooms?.length ?? 0} 間房源
       </p>
-      <div className="grid gap-gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={ROOM_GRID}>
         {rooms?.map((room) => <RoomCard key={room.id} room={room} />)}
       </div>
     </>

@@ -11,7 +11,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../state/AuthContext'
-import { primaryButtonClass } from '../lib/surfaces'
+import { primaryButtonClass, shellClass } from '../lib/surfaces'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -30,7 +30,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-line-soft bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-gap-4 px-gap-5 py-gap-3">
+      <div className={`flex flex-wrap items-center gap-gap-4 py-gap-3 ${shellClass}`}>
         <NavLink to="/" className="flex items-center gap-gap-2" aria-label="Sunny 訂房平台首頁">
           <img src="/logo-mark.png" alt="" aria-hidden="true" className="size-8" />
           <span className="font-display text-md text-ink">Sunny</span>
@@ -40,10 +40,10 @@ export function Header() {
           <NavLink to="/" className={linkClass} end>
             房源
           </NavLink>
-          {/* T146：照片安全檢測。公開——照片全程留在瀏覽器內，不需要登入。 */}
-          <NavLink to="/risk-check" className={linkClass}>
-            安全檢測
-          </NavLink>
+          {/* 前台「安全檢測」已下架：導覽入口與 `/risk-check` 路由一併移除
+              （`router.tsx`）。`pages/RiskCheck.tsx` 與 `lib/riskScore.ts`
+              仍留在原地，因此 T144／T144a 兩支隔離測試照常成立——留著的是
+              程式碼，拿掉的是使用者走得到的路。後台房源品質檢測不受影響。 */}
           {user && (
             <NavLink to="/orders" className={linkClass}>
               我的訂單

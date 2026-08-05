@@ -18,9 +18,12 @@
  *
  * ## 標題與頁面其餘內容對齊同一條量測線
  *
- * 底圖破出到視窗邊緣，**文字沒有**：內層再收回 `max-w-7xl px-gap-5`，
- * 與 `router.tsx` 的 `<main>` 完全相同。少了這一步，標題會比下方的內容更靠
- * 左邊一截，而那種一兩公分的錯位看起來就是「沒做完」。
+ * 底圖破出到視窗邊緣（含 `<main>` 的左右內距），**文字沒有**：內層再套一次
+ * `shellClass`，與 `router.tsx` 的 `<main>`、頁首、頁尾用同一個常數。少了這一步，
+ * 標題會比下方的內容更靠左一截，而那種一兩公分的錯位看起來就是「沒做完」。
+ *
+ * 版面改為隨視窗全寬後這一步**沒有變得多餘**：外殼仍有左右內距要對齊，
+ * 而底圖要蓋過那段內距一路貼到視窗邊緣。
  *
  * ## `fullBleed` 為什麼要能關掉
  *
@@ -37,6 +40,7 @@
  * 從一個藏在 class 名稱裡的假設，變成呼叫端要明講的一件事。
  */
 import type { SiteContent } from '../api/types'
+import { shellClass } from '../lib/surfaces'
 
 export function HomeHero({
   content,
@@ -69,7 +73,7 @@ export function HomeHero({
       {/* 圖片上的白字需要一層壓暗才可能達到 4.5:1。沒有圖時底色本身已經夠深。 */}
       {hasImage && <div aria-hidden="true" className="absolute inset-0 bg-forest-strong/55" />}
 
-      <div className="relative mx-auto max-w-7xl px-gap-5 py-[clamp(4rem,14vw,10rem)]">
+      <div className={`relative py-[clamp(4rem,14vw,10rem)] ${shellClass}`}>
         {/* `text-display` 是 `clamp(2.2rem, 5.5vw, 3.4rem)`——**連續**縮放，
             不是幾個斷點之間的跳動（`styles/index.css`）。 */}
         <h1 className="max-w-measure font-display text-display text-ink-invert">

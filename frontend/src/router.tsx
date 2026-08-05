@@ -28,6 +28,7 @@ import { setUnauthorizedHandler } from './api/client'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { LoadingState } from './components/LoadingState'
+import { shellClass } from './lib/surfaces'
 import { Account } from './pages/Account'
 import { AuthCallback } from './pages/AuthCallback'
 import { Booking } from './pages/Booking'
@@ -42,7 +43,6 @@ import { Orders } from './pages/Orders'
 import { RefundForm } from './pages/RefundForm'
 import { Register } from './pages/Register'
 import { ReviewForm } from './pages/ReviewForm'
-import { RiskCheck } from './pages/RiskCheck'
 import { RoomDetail } from './pages/RoomDetail'
 import { Terms } from './pages/Terms'
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -111,7 +111,8 @@ function Layout({ children }: { children: React.ReactNode }) {
         跳至主要內容
       </a>
       <Header />
-      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-gap-5 py-gap-6">
+      {/* 寬度隨視窗，不封頂——量測線集中於 `lib/surfaces.ts` 的 `shellClass` */}
+      <main id="main" className={`flex-1 py-gap-6 ${shellClass}`}>
         {children}
       </main>
       <Footer />
@@ -153,9 +154,14 @@ export function AppRoutes() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* T146：照片安全檢測。**公開**——照片全程留在瀏覽器內，沒有任何
-            資料會被送到後端，因此不需要身分（FR-062、FR-066、SC-030）。 */}
-        <Route path="/risk-check" element={<RiskCheck />} />
+        {/* 前台「安全檢測」（T146）已下架：`/risk-check` 路由與 `Header` 的
+            導覽入口一併移除，因此這個頁面現在沒有任何進入點——直接輸入網址
+            會落到下方的 404。
+
+            ⚠️ `pages/RiskCheck.tsx`、`lib/riskScore.ts` 與 T144／T144a 兩支
+            隔離測試**刻意保留**：這次拿掉的是入口，不是實作。要真的刪除，
+            連同 spec 的 US9／FR-062、FR-066、SC-030 與憲章原則 VI 的照片條款
+            一起處理，否則文件會開始描述一個不存在的功能。 */}
         {/*
           Google 回程的落點。**公開**——抵達這裡的人正是還沒有身分的那個人，
           掛上 RequireAuth 會把他導去登入頁，而他手上的 token 就這樣掉了。

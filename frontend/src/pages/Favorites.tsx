@@ -65,7 +65,8 @@ export function Favorites() {
           }
         />
       ) : (
-        <ul className="mt-gap-5 grid gap-gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // 欄數隨視窗成長，與首頁 `ROOM_GRID` 同一組斷點
+        <ul className="mt-gap-5 grid gap-gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {rooms.map((room) => (
             <li
               key={room.id}

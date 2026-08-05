@@ -795,18 +795,54 @@ docker inspect -f '{{.Image}}' sunny-api-1
 docker image inspect -f '{{.Id}}' sunny-api:latest
 ```
 
-裝了下一節的自動部署之後，這一段就只剩「想立刻生效、不等那兩分鐘」時才用得到。
+裝了下一節的自動部署之後，這一段就只剩「想跳過 GitHub 直接部署」時才用得到。
 
 ### 自動部署（push 到 GitHub 就會更新網站）
 
-Droplet 每兩分鐘問一次 origin 有沒有新 commit，有的話就自己跑一次上面那組指令。
+兩層機制，缺一不可：
 
-**為什麼是輪詢，而不是 GitHub Actions。** Actions 得把 Droplet 的 SSH 私鑰放進
-GitHub Secrets 並讓 SSH port 對 runner 開放；webhook 得多跑一個常駐服務、多開
-一條對外路徑。輪詢是 Droplet **主動出去拉**：沒有金鑰外流、沒有新的 inbound
-表面，代價只有最多兩分鐘的延遲。
+| 層 | 觸發 | 延遲 | 角色 |
+|---|---|---|---|
+| `sunny-webhook.service` | GitHub push webhook | 幾秒 | 平常靠它 |
+| `sunny-update.timer` | 每 15 分鐘輪詢 | ≤15 分鐘 | 漏接時的安全網 |
 
-三個檔案都在版控裡，Droplet 上只要把 unit 連過去：
+兩者最後都叫同一支 `sunny-update.service`（`deploy/auto-update.sh`），由它比對
+HEAD 與 upstream，沒有差異就 195ms 結束。因此重複觸發是安全的。
+
+⚠️ **輪詢那層 MUST 保留。** webhook 會漏——GitHub 那側投遞失敗、接收器剛好在
+重啟、Caddy 正在換憑證。漏掉的那一次不會有任何跡象，網站就這樣停在舊版直到下
+一次有人推東西。輪詢是那時候唯一會發現的東西，而它幾乎不花成本。
+
+⚠️ **「push 後幾秒」指的是部署『開始』，不是網站更新完成。** 前端全量重建在
+1 vCPU 上要好幾分鐘，那段跑不掉。webhook 省下的是排隊等待，不是建置時間。
+
+**為什麼是 webhook 而不是 GitHub Actions。** Actions 得把 Droplet 的 root SSH
+私鑰放進 GitHub Secrets、並讓 SSH port 接受 GitHub runner 那一大片 IP 的連線。
+webhook 反過來：GitHub 只拿到一組**只能用來要求部署**的密鑰，拿不到主機。
+
+**接收器完全沒有監聽任何 TCP port**——它綁的是 `/run/sunny/webhook.sock`，
+而 Caddy 靠 compose 的一條 volume 掛載才看得到它。唯一的入口是
+`https://<你的主機名稱>/_deploy`，且 body 的 HMAC-SHA256 簽章要對得上。
+細節與取捨寫在 [`deploy/webhook-receiver.py`](../deploy/webhook-receiver.py) 開頭。
+
+#### 一、產生密鑰
+
+```bash
+# 產生一組，兩邊要用同一個
+openssl rand -hex 32
+
+# 寫進 Droplet。⚠️ 這個檔案不進版控，權限 MUST 是 600。
+sudo install -m 600 /dev/null /etc/sunny-webhook.env
+sudo tee /etc/sunny-webhook.env >/dev/null <<'EOF'
+GITHUB_WEBHOOK_SECRET=<把上面產生的值貼在這裡>
+EOF
+```
+
+⚠️ 刻意**不放進 `backend/.env`**。那個檔案會被整包注入 api 容器
+（compose 的 `env_file:`），而部署密鑰跟應用程式毫無關係——放進去等於讓網站的
+程式碼也拿得到它。
+
+#### 二、安裝
 
 ```bash
 cd /opt/sunny
@@ -820,37 +856,81 @@ git pull
 # 那個落差會就這樣留著，直到下一次有人推 commit 才被順手補上。
 docker compose up -d --build --force-recreate
 
+# socket 的家。⚠️ 用 tmpfiles 而不是 .service 的 RuntimeDirectory=，
+#    理由寫在 deploy/sunny-webhook.tmpfiles.conf 裡（跟 bind mount 綁 inode 有關）。
+sudo cp /opt/sunny/deploy/sunny-webhook.tmpfiles.conf /etc/tmpfiles.d/sunny.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/sunny.conf
+
 # ⚠️ 用 symlink 而不是 cp。複製過去的話，日後改了 repo 裡的 unit 檔，
 #    systemd 讀的還是當初那份副本——而且沒有任何跡象顯示兩者已經不同。
-sudo ln -sf /opt/sunny/deploy/sunny-update.service /etc/systemd/system/
-sudo ln -sf /opt/sunny/deploy/sunny-update.timer   /etc/systemd/system/
+sudo ln -sf /opt/sunny/deploy/sunny-update.service  /etc/systemd/system/
+sudo ln -sf /opt/sunny/deploy/sunny-update.timer    /etc/systemd/system/
+sudo ln -sf /opt/sunny/deploy/sunny-webhook.service /etc/systemd/system/
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now sunny-update.timer
+sudo systemctl enable --now sunny-webhook.service
+
+# Caddy 要重建才會掛到 /run/sunny 並讀到新的 Caddyfile 路由
+docker compose up -d --force-recreate caddy
 ```
 
-確認它活著：
+#### 三、在 GitHub 上掛 webhook
+
+Repo → **Settings → Webhooks → Add webhook**：
+
+| 欄位 | 值 |
+|---|---|
+| Payload URL | `https://<你的主機名稱>/_deploy` |
+| Content type | `application/json` |
+| Secret | 第一步產生的那組 |
+| Events | Just the push event |
+
+按下 Add 之後 GitHub 會立刻送一個 `ping`，**Recent Deliveries** 裡應該是綠勾
+（接收器對 ping 回 `200 pong`）。紅叉的話那一頁就有請求與回應的完整內容。
+
+#### 四、確認
+
+不必等下一次 push，自己送一個帶正確簽章的請求即可：
 
 ```bash
-systemctl list-timers sunny-update.timer   # 下次觸發時間
-sudo systemctl start sunny-update.service  # 立刻跑一次，不等排程
-journalctl -u sunny-update.service -n 50   # 它做了什麼
-journalctl -u sunny-update.service -f      # 部署進行中就盯這個
+SECRET=$(sudo sed -n 's/^GITHUB_WEBHOOK_SECRET=//p' /etc/sunny-webhook.env)
+BODY='{"ref":"refs/heads/python-impl"}'
+SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -r | cut -d' ' -f1)"
+
+# 應為 202 deploy queued
+curl -s -w '\n%{http_code}\n' -X POST https://<你的主機名稱>/_deploy \
+  -H 'Content-Type: application/json' -H 'X-GitHub-Event: push' \
+  -H "X-Hub-Signature-256: $SIG" -d "$BODY"
+
+# 簽章錯的應為 403 bad signature
+curl -s -w '\n%{http_code}\n' -X POST https://<你的主機名稱>/_deploy \
+  -H 'X-GitHub-Event: push' -H 'X-Hub-Signature-256: sha256=deadbeef' -d "$BODY"
 ```
 
-沒有更新時它只做一次 `git fetch` 就結束，所以兩分鐘一次並不昂貴；真的有更新
-時才會建置。**migration 會自動套用**（`alembic upgrade head`，冪等），因為另一
-個選擇更糟：程式碼更新了、schema 沒有，網站會在使用者面前噴 500。不要的話在
-`.service` 裡加 `Environment=SUNNY_AUTO_MIGRATE=0`。
+平時的觀察指令：
+
+```bash
+systemctl list-timers sunny-update.timer    # 備援輪詢的下次觸發
+systemctl status sunny-webhook.service      # 接收器活著嗎
+journalctl -u sunny-webhook.service -n 30   # 收到什麼、擋掉什麼
+journalctl -u sunny-update.service -f       # 部署進行中就盯這個
+sudo systemctl start sunny-update.service   # 跳過 GitHub，立刻檢查一次
+```
+
+**migration 會自動套用**（`alembic upgrade head`，冪等），因為另一個選擇更糟：
+程式碼更新了、schema 沒有，網站會在使用者面前噴 500。不要的話在
+`sunny-update.service` 裡加 `Environment=SUNNY_AUTO_MIGRATE=0`。
 
 ⚠️ **正式機上 MUST NOT 直接改進版控的檔案。** 腳本偵測到工作區有未提交的修改
 時會整輪放棄並在 journal 裡列出是哪些檔案——這是刻意的，自動把它丟掉等於在無人
 看著的時候消滅唯一一份修改。改完記得 commit 或還原，否則自動部署會一直停在
 那裡（`systemctl --failed` 看得到）。
 
-要暫停自動部署（例如正在手動除錯）：
+要暫停自動部署（例如正在手動除錯）：**兩層都要停**，只停一層另一層還是會動。
 
 ```bash
+sudo systemctl stop sunny-webhook.service  # 先切掉即時觸發
 sudo systemctl stop sunny-update.timer     # 這次開機期間停用
 sudo systemctl disable sunny-update.timer  # 連開機自啟也取消
 ```
@@ -1071,7 +1151,10 @@ asyncio.run(main())
 | [`docker-compose.yml`](../docker-compose.yml) | 兩個映像 + uploads volume |
 | [`deploy/auto-update.sh`](../deploy/auto-update.sh) | 自動部署。比對 origin，有新 commit 才建置 |
 | [`deploy/sunny-update.service`](../deploy/sunny-update.service) | 上面那支腳本的 systemd 執行單元 |
-| [`deploy/sunny-update.timer`](../deploy/sunny-update.timer) | 每兩分鐘觸發一次 |
+| [`deploy/sunny-update.timer`](../deploy/sunny-update.timer) | 備援輪詢，每 15 分鐘一次 |
+| [`deploy/webhook-receiver.py`](../deploy/webhook-receiver.py) | GitHub webhook 接收器。驗 HMAC 後叫上面那個 unit |
+| [`deploy/sunny-webhook.service`](../deploy/sunny-webhook.service) | 接收器的 systemd 單元（含權限收斂） |
+| [`deploy/sunny-webhook.tmpfiles.conf`](../deploy/sunny-webhook.tmpfiles.conf) | 建 `/run/sunny`，socket 的家 |
 | [`deploy/worker/worker.js`](../deploy/worker/worker.js) | 步驟 5 的 Worker 前門。只轉發 |
 | [`deploy/worker/wrangler.jsonc`](../deploy/worker/wrangler.jsonc) | Worker 的名稱與 `ORIGIN` |
 | [`.env.example`](../.env.example) | compose 用的非機密參數範本 |

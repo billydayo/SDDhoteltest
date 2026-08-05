@@ -1,0 +1,49 @@
+# GitHub webhook 接收器。常駐，監聽一個 Unix socket（沒有 TCP port）。
+#
+# 安裝方式見 docs/deploy.md「日後更新 → 自動部署」。
+
+[Unit]
+Description=Sunny：GitHub webhook 接收器
+Documentation=file:///opt/sunny/docs/deploy.md
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/sunny/deploy/webhook-receiver.py
+
+# 密鑰。⚠️ 這個檔案**不在版控裡**，權限 MUST 是 600 root:root。
+# 內容只有一行：GITHUB_WEBHOOK_SECRET=<與 GitHub 上填的同一組>
+#
+# 刻意不放進 backend/.env。那個檔案會被整包注入 api 容器（compose 的
+# `env_file:`），而部署密鑰跟應用程式毫無關係——放進去等於讓網站的程式碼
+# 也拿得到它，白白擴大一個秘密的暴露範圍。
+EnvironmentFile=/etc/sunny-webhook.env
+
+Restart=on-failure
+RestartSec=5s
+
+# --- 收斂權限 -------------------------------------------------------------
+#
+# 以 root 執行，因為它要 `systemctl start`。換來的義務是把其他能力都收掉。
+#
+# ⚠️ `RestrictAddressFamilies=AF_UNIX` 是這裡最有價值的一條：這支程式合法的
+# 需求只有那個 Unix socket，因此即使它被攻破，也開不出任何對外連線。
+RestrictAddressFamilies=AF_UNIX
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+# ProtectSystem=strict 讓整個檔案系統唯讀，這是唯一開放寫入的地方——
+# socket 檔要建在這裡。
+ReadWritePaths=/run/sunny
+
+[Install]
+WantedBy=multi-user.target

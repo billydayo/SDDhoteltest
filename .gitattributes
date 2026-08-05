@@ -14,3 +14,9 @@
 *.timer   text eol=lf
 Dockerfile text eol=lf
 Caddyfile  text eol=lf
+
+# webhook 接收器同樣帶 shebang、同樣只在 Droplet 上執行。
+# 範圍刻意只到 deploy/，不動 backend/ 那一大批 .py——那批目前沒有問題，
+# 而讓一次部署設定的調整順手改寫整個後端的行尾，是兩件事混在一起。
+deploy/*.py        text eol=lf
+*.tmpfiles.conf    text eol=lf

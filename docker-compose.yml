@@ -84,6 +84,17 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?請在 ./.env 設定 ACME_EMAIL}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 自動部署的 webhook socket（deploy/webhook-receiver.py 在宿主機上建立）。
+      #
+      # ⚠️ 掛的是**目錄**而不是 socket 檔本身。掛檔案的話，接收器一重啟就會
+      # unlink 舊檔再建一個新的——新的是另一個 inode，而 bind mount 綁的是
+      # inode：容器裡那個路徑會永遠指著已經被刪掉的舊 socket，/_deploy 從此
+      # 回 502，而宿主機上 `ls` 起來一切正常。掛目錄則每次都是即時查找。
+      #
+      # ⚠️ 不能加 `:ro`。連上一個 Unix socket 需要對它的寫入權限。
+      #
+      # 這條掛載讓接收器完全不必監聽任何 TCP port，見 deploy/webhook-receiver.py。
+      - /run/sunny:/run/sunny
       # ⚠️ caddy_data 存的是已簽發的憑證與 ACME 帳號金鑰。**MUST 持久化。**
       # 沒有它，每次 `docker compose down` 都會丟掉憑證並重新申請，
       # 而 Let's Encrypt 對同一組網域有每週簽發上限——踩到之後拿到的是

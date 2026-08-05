@@ -137,6 +137,23 @@
   border-radius: 50% 50% 0 0 / 22% 22% 0 0;
 }
 
+/*
+ * 拱形**卡片外殼**：拱在卡片的最外緣，底部維持一般圓角。
+ *
+ * ⚠️ **拱 MUST 切在卡片本身，MUST NOT 只切在卡片內的圖片上。**
+ * 只切圖片的話，拱兩側被切掉的區域露出的是卡片自己的白底（`bg-surface`），
+ * 在象牙色頁面上就是拱外緣的兩塊白色三角——看起來像沒去背的圖，而不是拱門。
+ * 把半徑下放到 `<article>`（搭配 `overflow-hidden`），拱外就直接是頁面底色。
+ *
+ * 垂直半徑用**固定長度**而非百分比：百分比會以各自的盒高計算，而卡片遠高於
+ * 圖片，同一組 22% 在兩個盒子上會畫出兩條不同的曲線。3rem 對齊原本 `h-56`
+ * 圖片的 22%（約 49px），外觀不變。
+ */
+@utility arch-panel {
+  border-radius: 50% 50% var(--radius-lg) var(--radius-lg) / 3rem 3rem var(--radius-lg)
+    var(--radius-lg);
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;

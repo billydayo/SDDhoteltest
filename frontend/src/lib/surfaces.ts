@@ -26,6 +26,16 @@
 /** 浮起的白底面板：卡片、篩選列、表格外殼。 */
 export const panelClass = 'rounded-lg border border-line-soft bg-surface shadow-soft'
 
+/**
+ * 拱頂卡片：底色、框線、陰影與 `panelClass` 完全相同，只有頂端是拱形。
+ * 首頁房源卡與其載入骨架用它。
+ *
+ * ⚠️ **MUST NOT 寫成 `` `${panelClass} arch-panel` ``。** 兩者都設 border-radius，
+ * 誰贏取決於 CSS 產生順序而不是 class 字串順序——會變成偶爾是圓角、偶爾是拱。
+ * 因此這裡重列一份不含 `rounded-lg` 的字串；**改動 `panelClass` 時要一併改這裡。**
+ */
+export const archPanelClass = 'arch-panel border border-line-soft bg-surface shadow-soft'
+
 /** 嵌入的砂色區塊：摘要、說明、次要資訊。**刻意沒有陰影。** */
 export const insetClass = 'rounded-lg border border-line-soft bg-surface-alt'
 

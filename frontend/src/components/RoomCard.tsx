@@ -2,8 +2,11 @@
  * T054：房源卡片。直向拱形卡片（FR-013）。
  *
  * ⚠️ **拱形 MUST 以 `border-radius` 雙值語法實作**——水平半徑遠大於垂直半徑，
- * 才會是「拱」而不是單純的圓角。實作在 `styles/index.css` 的 `@utility arch`，
+ * 才會是「拱」而不是單純的圓角。實作在 `styles/index.css` 的 `@utility arch-panel`，
  * 因為 Tailwind 的 `rounded-*` 只吐得出單一半徑。
+ *
+ * ⚠️ **拱切在 `<article>` 上，不切在裡面的圖片上。** 只切圖片的話，拱兩側露出的
+ * 是卡片自己的白底，在象牙色頁面上就是拱外緣的兩塊白色三角。理由詳見該 utility。
  *
  * ## 整張卡片可點，但只有一個連結
  *
@@ -19,14 +22,15 @@ import { Link } from 'react-router-dom'
 import type { Room } from '../api/types'
 import { formatTWD } from '../lib/money'
 import { Rating } from './Rating'
-import { panelClass } from '../lib/surfaces'
+import { archPanelClass } from '../lib/surfaces'
 
 export function RoomCard({ room }: { room: Room }) {
   const cover = room.images[0]
 
   return (
-    <article className={`group relative flex flex-col overflow-hidden ${panelClass} transition-shadow hover:shadow-card`}>
-      <div className="arch overflow-hidden bg-surface-alt">
+    <article className={`group relative flex flex-col overflow-hidden ${archPanelClass} transition-shadow hover:shadow-card`}>
+      {/* 圖片的上緣由 <article> 的 overflow-hidden 依拱形裁切，這裡不再重複裁一次 */}
+      <div className="overflow-hidden bg-surface-alt">
         {cover ? (
           <img
             src={cover}

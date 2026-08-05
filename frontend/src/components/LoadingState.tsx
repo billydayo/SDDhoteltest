@@ -8,6 +8,8 @@
  * 動畫在 `prefers-reduced-motion` 下由 `styles/index.css` 統一壓成幾乎靜止，
  * 因此這裡不必個別處理。
  */
+import { archPanelClass } from '../lib/surfaces'
+
 export function LoadingState({ label = '載入中…' }: { label?: string }) {
   return (
     <div
@@ -29,16 +31,19 @@ export function LoadingState({ label = '載入中…' }: { label?: string }) {
  *
  * `aria-hidden`：這是純視覺的佔位，讀屏使用者該聽到的是上面 `LoadingState`
  * 的那一句話，而不是一排空白方塊。
+ *
+ * ⚠️ 外形 MUST 跟著 `components/RoomCard.tsx` 走——同樣的拱頂外殼、同樣的
+ * `h-56` 圖片區。骨架矮一截或形狀不同，換成真資料時整排卡片會跳一下，
+ * 那正是骨架要避免的事。
  */
 export function SkeletonCard() {
   return (
-    <div
-      aria-hidden="true"
-      className="animate-pulse rounded-lg border border-line-soft bg-surface p-gap-4"
-    >
-      <div className="arch h-48 w-full bg-surface-alt" />
-      <div className="mt-gap-4 h-4 w-2/3 rounded-xs bg-surface-alt" />
-      <div className="mt-gap-2 h-3 w-1/3 rounded-xs bg-surface-alt" />
+    <div aria-hidden="true" className={`animate-pulse overflow-hidden ${archPanelClass}`}>
+      <div className="h-56 w-full bg-surface-alt" />
+      <div className="p-gap-4">
+        <div className="h-4 w-2/3 rounded-xs bg-surface-alt" />
+        <div className="mt-gap-2 h-3 w-1/3 rounded-xs bg-surface-alt" />
+      </div>
     </div>
   )
 }

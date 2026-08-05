@@ -21,6 +21,7 @@ import type { RoomSearchParams, RoomSort, SiteContent } from '../api/types'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { FilterBar } from '../components/FilterBar'
+import { HomeGallery } from '../components/HomeGallery'
 import { HomeHero } from '../components/HomeHero'
 import { LoadingState, SkeletonCard } from '../components/LoadingState'
 import { RoomCard } from '../components/RoomCard'
@@ -194,6 +195,10 @@ export function Home() {
         onClear={handleClear}
         hasConditions={Object.keys(query).length > 0}
       />
+
+      {/* 相簿放在房源之後：它是氛圍，不是使用者來這一頁要找的東西。
+          擺在房源前面會把「有哪些房、多少錢」往下推一整個螢幕高。 */}
+      <HomeGallery />
     </div>
   )
 }

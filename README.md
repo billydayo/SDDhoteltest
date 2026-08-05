@@ -97,10 +97,9 @@ SDDhoteltest/
 │       ├── pages/               # 前台各頁 + admin/ 十二模組
 │       ├── components/ hooks/ state/ lib/
 │       └── router.tsx           # 路由與守衛
-├── supabase/                    # SQL 腳本（舊架構遺留，見「舊架構殘留」）
+├── supabase/reset-legacy.sql    # ⚠️ 會刪資料。把 Supabase 專案清成乾淨狀態
 ├── specs/001-booking-site/      # spec / plan / research / data-model / tasks / contracts
-├── .specify/memory/constitution.md
-└── index.html src/ styles/ assets/ tests/    # 舊架構遺留
+└── .specify/memory/constitution.md
 ```
 
 ## 啟動方式
@@ -216,26 +215,41 @@ cd frontend && npm test           # Vitest + Testing Library
 - 前台使用者上傳的檢測照片只在瀏覽器內處理，不上傳至任何服務或資料表；
   僅管理員對自家房源的檢測圖會存入雲端並公開顯示
 
-## 舊架構殘留
+## 舊架構已移除
 
-根目錄的 `index.html`、`src/`、`styles/`、`assets/`、`tests/` 與 `supabase/`
-屬於**改版前的零建置架構**（瀏覽器以 anon key 直連 Supabase，靠 RLS 防護）。
-該架構已於憲章 v3.0.0 由現行的三層架構取代。
+改版前是**零建置架構**：瀏覽器以 anon key 直連 Supabase，靠 RLS 防護。
+憲章 v3.0.0 換成現行三層架構後，舊實作已於 T183 全數刪除——
+根目錄的 `index.html`、`src/`、`styles/`、`assets/`、`tests/`（puppeteer），
+以及 `supabase/` 下的 `schema.sql`、`migrations.sql` 與三個 `seed*.sql`。
 
-保留它們是為了保有改版前的參考與遷移腳本，但**它們不是現行系統的一部分**：
+若要查閱舊實作，用 git 歷史，不要把檔案復原到工作目錄：
 
-| 目錄／檔案 | 現況 |
+```bash
+git log --oneline -- src/ styles/ index.html   # 找到刪除前的那個 commit
+git show <commit>:src/config.js                 # 只看內容，不落地
+```
+
+`supabase/` 只剩一個檔案，且它服務的是**現行**架構：
+
+| 檔案 | 用途 |
 |---|---|
-| `index.html` `src/` `styles/` `assets/` | 舊前端。`src/config.js` 的 anon key 已無作用——`public` schema 未曝露且權限已 REVOKE |
-| `tests/` | 舊前端的 puppeteer 測試，對應憲章 2.6.0 |
-| `supabase/schema.sql` `seed.sql` `migrations.sql` | 舊架構的建表腳本，含 RLS 政策。現行 schema 由 Alembic 管理 |
-| `supabase/reset-legacy.sql` | ⚠️ 會刪資料。僅用於從舊 schema 遷移到新架構 |
+| `supabase/reset-legacy.sql` | ⚠️ **會刪資料且無法復原。** 把既有 Supabase 專案清成乾淨的 `public` schema，讓 Alembic 的 `0001_initial.py` 能從零建起。只在初始化或重建環境時用 |
 
-⚠️ **不要對現行資料庫執行 `supabase/*.sql`。** 它們會重新 GRANT
-`anon` / `authenticated` 的權限，正好拆掉原則 III 的那道防線。
+⚠️ 已建好的資料庫**不要**再跑它——那會連現行資料一起清掉。
+
+## 部署
+
+正式環境為 **Cloudflare Pages（前端靜態檔）+ DigitalOcean Droplet（FastAPI）
++ DigitalOcean Managed Postgres**。完整步驟見 [`docs/deploy.md`](docs/deploy.md)。
+
+⚠️ 部署前務必讀該文件的「步驟 0(b) 後台要不要公開」。下方測試帳號一節列出的
+管理員帳密印在登入頁上、也寫在這裡，而本專案**沒有修改密碼的端點**——
+站台一旦公開，那組帳密就是十二個後台模組的公開入口。要關掉它需要同時設定
+後端的 `SEED_ADMIN_PASSWORD` 與前端的 `VITE_HIDE_ADMIN_DEMO`，只設一邊沒有意義。
 
 ## 參考文件
 
+- 部署指南：[`docs/deploy.md`](docs/deploy.md)
 - 專案憲章：[`.specify/memory/constitution.md`](.specify/memory/constitution.md)（v3.1.1）
 - 規格文件：[`specs/001-booking-site/spec.md`](specs/001-booking-site/spec.md)
 - 實作計畫：[`specs/001-booking-site/plan.md`](specs/001-booking-site/plan.md)

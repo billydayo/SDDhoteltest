@@ -8,6 +8,10 @@
 .env
 .env.*
 !.env.example
+# 正式環境的範本同樣只有欄位與說明、沒有任何值，MUST 進版控——
+# 上面那條 `.env.*` 會連它一起忽略，因此需要這條例外。
+# 少了它，部署到一半才發現「文件說有這個檔案，但 clone 下來沒有」。
+!.env.production.example
 
 # Python / 後端
 __pycache__/

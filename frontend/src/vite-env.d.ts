@@ -12,6 +12,14 @@
 interface ImportMetaEnv {
   /** API 根路徑。預設 `/api`，由 Vite 開發代理轉給 FastAPI。 */
   readonly VITE_API_BASE_URL?: string
+
+  /**
+   * 設為字串 `'true'` 時，登入頁不顯示管理員的示範帳密卡片（預設顯示）。
+   *
+   * ⚠️ MUST 與後端的 `SEED_ADMIN_PASSWORD` 一起設定——只設一邊，
+   * 得到的不是「比較安全」而是「壞掉」或「假裝安全」。理由見 pages/Login.tsx。
+   */
+  readonly VITE_HIDE_ADMIN_DEMO?: string
 }
 
 interface ImportMeta {

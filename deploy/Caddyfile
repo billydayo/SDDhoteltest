@@ -1,0 +1,58 @@
+# Caddy 設定。變數由 docker-compose.yml 的 environment 帶入。
+#
+# `{$VAR}` 是 Caddy 自己的環境變數展開，不是 compose 的 `${VAR}`——
+# 這份檔案是唯讀掛載進容器的，compose 不會改寫它的內容。
+
+{
+	# 憑證到期前的通知信箱。Let's Encrypt 用它寄「你的憑證即將過期」——
+	# 但那封信只有在自動續簽已經失敗時才有意義，所以填一個你真的會看的信箱。
+	email {$ACME_EMAIL}
+
+	# 正式簽發。若要先演練（例如確認 DNS 與防火牆都通了）而不想消耗
+	# Let's Encrypt 的簽發配額，把下一行的註解拿掉，跑通後再註解回去並執行
+	# `docker compose restart caddy`。⚠️ staging 的憑證瀏覽器不信任，
+	# 會看到紅色警告——那是預期中的，不是設定壞了。
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$API_HOSTNAME} {
+	encode zstd gzip
+
+	# ⚠️ 這個上限 MUST 大於後端的 MAX_UPLOAD_BYTES（預設 2 MiB）。
+	#
+	# 兩邊設成一樣時，超過上限的檔案會被 Caddy 在後端看到之前就切斷，
+	# 使用者拿到的是一個沒有 `code` 欄位的裸 413——前端的錯誤處理靠 `code`
+	# 分辨錯誤種類（見 main.py 的 _HTTP_ERRORS），於是畫面上只會出現一句
+	# 泛用的失敗訊息，而不是「檔案過大」。
+	#
+	# 留一段餘裕，讓「檔案過大」這個判斷由後端做，錯誤格式才會一致。
+	request_body {
+		max_size 4MB
+	}
+
+	header {
+		# 這個主機只提供 API 與圖片，沒有 HTML 頁面，因此不需要 CSP。
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# 房源照片的檔名由伺服器以 uuid4 產生，內容永不改寫——換圖就是換一個新
+	# 檔名（room_photos.py）。因此可以放心地讓瀏覽器與 Cloudflare 長期快取。
+	@uploads path /uploads/*
+	header @uploads Cache-Control "public, max-age=31536000, immutable"
+
+	# ⚠️ CORS 標頭刻意**不**在這裡設定。
+	#
+	# FastAPI 已經掛了 CORSMiddleware，來源清單由 CORS_ORIGINS 明確列出
+	# （憲章後端約束禁止 ["*"] 搭配 allow_credentials）。若 Caddy 也加一份，
+	# 回應裡會出現兩個 Access-Control-Allow-Origin，而瀏覽器對重複的這個標頭
+	# 一律視為不合法並擋下請求——症狀是「後端明明回了 200，前端卻說網路錯誤」。
+	reverse_proxy api:8000
+
+	log {
+		output stdout
+		format console
+	}
+}

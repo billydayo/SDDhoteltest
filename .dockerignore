@@ -1,0 +1,40 @@
+# 建置脈絡是專案根目錄，因此這份清單決定「有哪些東西會被送進 Docker daemon」。
+#
+# ⚠️ 第一條最重要：.env 一旦進了映像，憑證就跟著映像走到每一個 pull 它的地方，
+# 而且 `docker history` 看得到。憲章後端約束：憑證只存在於 backend/.env，
+# 一次都不得離開那裡（FR-085、SC-022）。正式環境的值由 compose 的 env_file
+# 在**執行時**注入，不是烤進映像。
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# 前端。它建置成靜態檔後放 Cloudflare Pages，跟後端映像無關。
+frontend/
+
+# 已上傳的檔案。內容屬於 volume，不屬於映像。
+backend/uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+.pytest_cache/
+.ruff_cache/
+backend/tests/
+
+# 文件與規格
+specs/
+docs/
+.specify/
+.claude/
+*.pptx
+README.md
+
+# 版控與編輯器
+.git/
+.gitignore
+.vscode/
+.idea/
+*.log

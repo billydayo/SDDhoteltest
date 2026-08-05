@@ -242,6 +242,13 @@ export class Page {
    *
    * 以 `loaderId` 配對生命週期事件，而不是「收到第一個 networkIdle 就算數」——
    * 上一頁殘留的事件會讓後者提早放行，量到的是還沒渲染完的畫面。
+   *
+   * ⚠️ 但**不能只認自己那一個 loaderId**。Vite 在相依重新最佳化之後會強制整頁
+   * 重載，那是一次新的導覽、換一個 loaderId；只等自己那個的話，等到的永遠不會
+   * 來，30 秒後以逾時收場。2026-08-05 合併完第一次跑就這樣假性失敗一次，重跑
+   * 又過了——**稽核腳本偶爾假紅比不稽核更糟**，因為沒有人分得出哪次是真的。
+   *
+   * 因此追著 `init` 事件走：每出現一個新的 loaderId 就改等它的 `waitUntil`。
    */
   async goto(url, { waitUntil = 'networkIdle', timeout = 30_000 } = {}) {
     const seen = []
@@ -249,7 +256,13 @@ export class Page {
     let settle = null
     const check = () => {
       if (!loaderId || !settle) return
-      if (seen.some((e) => e.loaderId === loaderId && e.name === waitUntil)) settle()
+      // 從自己那一個開始，順著 init 事件接上後續的導覽，只認最後一棒。
+      const chain = [loaderId]
+      for (const e of seen) {
+        if (e.name === 'init' && !chain.includes(e.loaderId)) chain.push(e.loaderId)
+      }
+      const active = chain[chain.length - 1]
+      if (seen.some((e) => e.loaderId === active && e.name === waitUntil)) settle()
     }
     const off = this.#conn.on(
       'Page.lifecycleEvent',

@@ -12,10 +12,18 @@
  * node specs/001-booking-site/checklists/t181-walkthrough.mjs
  * ```
  *
- * 2026-08-05 改為零相依：原本 `require` 一個寫死的絕對路徑
+ * 2026-08-05 改為零相依。原本 `require` 一個寫死的絕對路徑
  * （`C:/Users/user/Desktop/0804/.../node_modules/puppeteer-core`）取得 puppeteer，
- * 而那個資料夾已經不存在——腳本在任何機器上都跑不起來。現在走 `lib/cdp.mjs`，
- * 只用 Node 內建的 WebSocket，不需要 `npm install`。
+ * 而那個資料夾已經不存在——腳本在任何機器上都跑不起來。
+ *
+ * ⚠️ **不要改回 puppeteer，即使做成可設定的路徑。** puppeteer-core 不是本專案的
+ * 相依：憲章不允許為了驗收在 `frontend/package.json` 塞一個正式程式碼永遠不會
+ * import 的套件，而 T183 刪掉的舊 `tests/` 目錄是唯一宣告過它的地方。留一個
+ * `SUNNY_PUPPETEER` 環境變數要人自備，等於把「先去別處 npm i」變成跑這支腳本的
+ * 前提——而稽核腳本最需要的性質正是「clone 下來就能跑」。
+ *
+ * 現在走 `lib/cdp.mjs`，只用 Node 內建的 WebSocket 驅動 Chrome，不需要
+ * `npm install`，也就沒有任何東西需要宣告。
  *
  * ## 這支腳本刻意做的三件事
  *

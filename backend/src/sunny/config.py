@@ -61,6 +61,17 @@ class Settings(BaseSettings):
     db_app_user: str = "sunny_app"
     db_app_password: str
 
+    #: 連線加密模式，直接轉交給 asyncpg（`disable` / `prefer` / `require` /
+    #: `verify-ca` / `verify-full`）。留空代表不指定，沿用驅動預設。
+    #:
+    #: **DigitalOcean Managed Postgres 只接受加密連線，正式環境 MUST 設為
+    #: `require` 或更嚴格的值。** 留空時 asyncpg 走 `prefer`——它會嘗試加密、
+    #: 失敗則靜默退回明文。那個「靜默退回」正是問題：連線成功、查詢正常、
+    #: 沒有任何錯誤或警告，只是密碼與 JWT 在網路上是明文傳輸的。
+    #:
+    #: 本機開發與 Supabase 可留空（Supabase pooler 本身強制 TLS）。
+    db_sslmode: str = ""
+
     # -- 認證 -----------------------------------------------------------------
     #: **無預設值。** 缺少時應用於啟動時失敗
     jwt_secret: str
@@ -120,11 +131,18 @@ class Settings(BaseSettings):
 
         Supabase 的 Session pooler 使用者名稱形如 `postgres.<專案ref>`，含點號；
         密碼則可能含 `@`、`/`、空白。兩者都必須編碼。
+
+        `db_sslmode` 有值時附加為 `?ssl=`。SQLAlchemy 的 asyncpg 方言認得這個
+        查詢參數並轉交給驅動；**留空時整個參數不出現**，本機與既有環境的行為
+        因此完全不變。
         """
-        return (
+        dsn = (
             f"postgresql+asyncpg://{quote_plus(user)}:{quote_plus(password)}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+        if self.db_sslmode:
+            dsn += f"?ssl={quote_plus(self.db_sslmode)}"
+        return dsn
 
     @property
     def database_url(self) -> str:

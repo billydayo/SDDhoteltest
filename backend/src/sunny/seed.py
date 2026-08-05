@@ -16,6 +16,7 @@ FR-009a 明訂密碼保管無任何例外，含公開列出的測試帳號。硬
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select, text, update
@@ -44,10 +45,24 @@ from sunny.utils import dates
 # ---------------------------------------------------------------------------
 # 這組帳密公開標示於登入畫面（FR-005），且**MUST 為本專案展示專用**，
 # MUST NOT 與任何人的真實密碼相同（憲章原則 VI）。
+#
+# ## 為什麼管理員密碼可以由環境變數覆寫
+#
+# 會員帳號公開是**設計的一部分**：訪客要能進來走一遍訂房流程。
+#
+# 管理員不是。`admin123` 寫在版控裡、也寫在 README 裡，站台一放上公網，
+# 任何讀過 README 的人都能進入十二個後台模組——包含用戶管理與操作日誌。
+# 而本專案**沒有任何修改密碼的端點**，所以「上線後自己去改」這條路不存在。
+#
+# 因此正式部署 MUST 以 `SEED_ADMIN_EMAIL` 與 `SEED_ADMIN_PASSWORD` 覆寫。
+# 預設值保持原樣，本機開發與測試的行為完全不變。
+#
+# ⚠️ 覆寫後 MUST 重跑一次 seed，密碼才會真的換掉——這支種子程式可重複執行，
+# 既有的 profile 會被更新而不是跳過。
 GUEST_EMAIL = "guest@sunny.com"
 GUEST_PASSWORD = "guest123"
-ADMIN_EMAIL = "admin@sunny.com"
-ADMIN_PASSWORD = "admin123"
+ADMIN_EMAIL = os.environ.get("SEED_ADMIN_EMAIL") or "admin@sunny.com"
+ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD") or "admin123"
 
 # ---------------------------------------------------------------------------
 # 房源
